@@ -1,0 +1,13 @@
+args = ["tokenize", "tests/sources/punctuations.lox"]
+status.code = 0
+stdout = """
+DOT . null
+LEFT_PAREN ( null
+LEFT_BRACE { null
+RIGHT_BRACE } null
+RIGHT_PAREN ) null
+COMMA , null
+SEMICOLON ; null
+EOF  null
+"""
+stderr = ""

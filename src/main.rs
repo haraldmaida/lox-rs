@@ -6,10 +6,38 @@ mod dummy_extern_uses {
     #[cfg(test)]
     use proptest as _;
     use thiserror as _;
+    #[cfg(test)]
+    use trycmd as _;
+    use utf8_chars as _;
 }
 
-use lox_rs as _;
+mod cli;
 
-fn main() {
-    todo!()
+use crate::cli::{Cli, Command};
+use clap::Parser;
+use lox_rs::tokenizing::Tokenize;
+use std::fs::File;
+use std::io;
+use std::io::{BufReader, Read};
+use std::path::Path;
+
+fn main() -> anyhow::Result<()> {
+    let cli = Cli::parse();
+
+    match &cli.command {
+        Command::Tokenize { source } => {
+            let mut source_code = open_source_reader(source)?;
+            source_code.tokenize().for_each(|item| match item {
+                Ok(token) => println!("{token:?}"),
+                Err(error) => eprintln!("\n{error}\n"),
+            });
+        },
+    }
+
+    Ok(())
+}
+
+fn open_source_reader(source_file: impl AsRef<Path>) -> Result<BufReader<impl Read>, io::Error> {
+    let file = File::open(source_file)?;
+    Ok(BufReader::new(file))
 }

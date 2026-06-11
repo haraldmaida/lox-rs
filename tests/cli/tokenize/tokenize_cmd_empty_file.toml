@@ -1,0 +1,6 @@
+args = ["tokenize", "tests/sources/empty.lox"]
+status.code = 0
+stdout = """
+EOF  null
+"""
+stderr = ""

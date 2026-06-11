@@ -1,15 +1,20 @@
-use crate::source::Location;
+use crate::source::{Location, SourceCode};
 use std::fmt::{self, Debug, Display};
 use std::io;
-use std::str::Chars;
 
-pub trait Tokenize<'a> {
-    fn tokenize(self) -> Tokens<'a>;
+pub trait Tokenize<'a>
+where
+    Self: SourceCode<'a>,
+{
+    fn tokenize(&'a mut self) -> Tokens<<Self as SourceCode<'a>>::Chars>;
 }
 
-impl<'a> Tokenize<'a> for &'a str {
-    fn tokenize(self) -> Tokens<'a> {
-        Tokens::new(self)
+impl<'a, S> Tokenize<'a> for S
+where
+    S: 'a + SourceCode<'a>,
+{
+    fn tokenize(&'a mut self) -> Tokens<<Self as SourceCode<'a>>::Chars> {
+        Tokens::new(self.chars())
     }
 }
 
@@ -127,23 +132,29 @@ impl FromIterator<Result<Token, TokenizeError>> for TokenizeResult {
     }
 }
 
-pub struct Tokens<'a> {
-    source: Chars<'a>,
+pub struct Tokens<I> {
+    source: I,
     location: Location,
     end_of_file: bool,
 }
 
-impl<'a> Tokens<'a> {
-    pub fn new(source: &'a str) -> Self {
+impl<I> Tokens<I>
+where
+    I: Iterator<Item = Result<char, io::Error>>,
+{
+    pub fn new(source: I) -> Self {
         Self {
-            source: source.chars(),
+            source,
             location: Location::default(),
             end_of_file: false,
         }
     }
 }
 
-impl Iterator for Tokens<'_> {
+impl<I> Iterator for Tokens<I>
+where
+    I: Iterator<Item = Result<char, io::Error>>,
+{
     type Item = Result<Token, TokenizeError>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -156,7 +167,7 @@ impl Iterator for Tokens<'_> {
                     Some(Ok(Token::EndOfFile))
                 }
             },
-            Some(chr) => {
+            Some(Ok(chr)) => {
                 self.location.advance_char();
                 match chr {
                     ',' => Some(Ok(Token::Comma)),
@@ -172,6 +183,10 @@ impl Iterator for Tokens<'_> {
                     })),
                 }
             },
+            Some(Err(error)) => Some(Err(TokenizeError {
+                code: error.into(),
+                location: self.location,
+            })),
         }
     }
 }

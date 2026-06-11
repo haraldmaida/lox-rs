@@ -3,7 +3,7 @@ use asserting::prelude::*;
 
 #[test]
 fn can_tokenize_str() {
-    let source_code = "()";
+    let mut source_code = "()";
 
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
@@ -16,7 +16,7 @@ fn can_tokenize_str() {
 
 #[test]
 fn tokenize_empty_source() {
-    let source_code = "";
+    let mut source_code = "";
 
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
@@ -25,7 +25,7 @@ fn tokenize_empty_source() {
 
 #[test]
 fn tokenize_punctuations() {
-    let source_code = "(){},.;";
+    let mut source_code = "(){},.;";
 
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
@@ -43,7 +43,7 @@ fn tokenize_punctuations() {
 
 #[test]
 fn tokenize_unexpected_character() {
-    let source_code = "(){§},.;";
+    let mut source_code = "(){§},.;";
 
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 

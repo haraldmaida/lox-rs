@@ -1,0 +1,6 @@
+args = ["-V"]
+status.code = 0
+stdout = """
+lox 0.1.0
+"""
+stderr = ""
