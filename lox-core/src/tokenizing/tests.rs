@@ -42,7 +42,41 @@ fn tokenize_punctuations() {
 }
 
 #[test]
-fn tokenize_unexpected_character() {
+fn tokenize_ignores_whitespace() {
+    let mut source_code = " ( \t\n\r\u{000C} ) { \t\n\r\u{000C} } ";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::LeftParen),
+        Ok(Token::RightParen),
+        Ok(Token::LeftBrace),
+        Ok(Token::RightBrace),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_single_character_operators() {
+    let mut source_code = "- + * / ! = < >";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::Minus),
+        Ok(Token::Plus),
+        Ok(Token::Star),
+        Ok(Token::Slash),
+        Ok(Token::Bang),
+        Ok(Token::Equal),
+        Ok(Token::Less),
+        Ok(Token::Greater),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_unexpected_character_at_line_1_char_4() {
     let mut source_code = "(){§},.;";
 
     let tokens = source_code.tokenize().collect::<Vec<_>>();
@@ -59,6 +93,24 @@ fn tokenize_unexpected_character() {
         Ok(Token::Comma),
         Ok(Token::Dot),
         Ok(Token::Semicolon),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_unexpected_character_at_line_3_char_1() {
+    let mut source_code = "{\n;\n§}\n";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::LeftBrace),
+        Ok(Token::Semicolon),
+        Err(TokenizeError {
+            code: TokenizeErrorCode::UnexpectedCharacter('§'),
+            location: Location { line: 3, char: 1 },
+        }),
+        Ok(Token::RightBrace),
         Ok(Token::EndOfFile),
     ]);
 }

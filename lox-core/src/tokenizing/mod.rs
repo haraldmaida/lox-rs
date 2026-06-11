@@ -67,6 +67,14 @@ pub enum Token {
     RightBrace,
     Dot,
     Semicolon,
+    Minus,
+    Plus,
+    Star,
+    Slash,
+    Bang,
+    Equal,
+    Less,
+    Greater,
 }
 
 impl Debug for Token {
@@ -80,6 +88,14 @@ impl Debug for Token {
             Self::RightBrace => write!(f, "RIGHT_BRACE }} null"),
             Self::Dot => write!(f, "DOT . null"),
             Self::Semicolon => write!(f, "SEMICOLON ; null"),
+            Self::Minus => write!(f, "MINUS - null"),
+            Self::Plus => write!(f, "PLUS + null"),
+            Self::Star => write!(f, "STAR * null"),
+            Self::Slash => write!(f, "SLASH / null"),
+            Self::Bang => write!(f, "BANG ! null"),
+            Self::Equal => write!(f, "EQUAL = null"),
+            Self::Less => write!(f, "LESS < null"),
+            Self::Greater => write!(f, "GREATER > null"),
         }
     }
 }
@@ -158,35 +174,54 @@ where
     type Item = Result<Token, TokenizeError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.source.next() {
-            None => {
-                if self.end_of_file {
-                    None
-                } else {
+        loop {
+            match self.source.next() {
+                None => {
+                    if self.end_of_file {
+                        return None;
+                    }
                     self.end_of_file = true;
-                    Some(Ok(Token::EndOfFile))
-                }
-            },
-            Some(Ok(chr)) => {
-                self.location.advance_char();
-                match chr {
-                    ',' => Some(Ok(Token::Comma)),
-                    '(' => Some(Ok(Token::LeftParen)),
-                    ')' => Some(Ok(Token::RightParen)),
-                    '{' => Some(Ok(Token::LeftBrace)),
-                    '}' => Some(Ok(Token::RightBrace)),
-                    '.' => Some(Ok(Token::Dot)),
-                    ';' => Some(Ok(Token::Semicolon)),
-                    _ => Some(Err(TokenizeError {
-                        code: TokenizeErrorCode::UnexpectedCharacter(chr),
+                    return Some(Ok(Token::EndOfFile));
+                },
+                Some(Ok(chr)) => {
+                    self.location.advance_char();
+                    match chr {
+                        ',' => return Some(Ok(Token::Comma)),
+                        '(' => return Some(Ok(Token::LeftParen)),
+                        ')' => return Some(Ok(Token::RightParen)),
+                        '{' => return Some(Ok(Token::LeftBrace)),
+                        '}' => return Some(Ok(Token::RightBrace)),
+                        '.' => return Some(Ok(Token::Dot)),
+                        ';' => return Some(Ok(Token::Semicolon)),
+                        '-' => return Some(Ok(Token::Minus)),
+                        '+' => return Some(Ok(Token::Plus)),
+                        '*' => return Some(Ok(Token::Star)),
+                        '/' => return Some(Ok(Token::Slash)),
+                        '!' => return Some(Ok(Token::Bang)),
+                        '=' => return Some(Ok(Token::Equal)),
+                        '<' => return Some(Ok(Token::Less)),
+                        '>' => return Some(Ok(Token::Greater)),
+                        '\n' => {
+                            self.location.advance_line();
+                        },
+                        c if c.is_whitespace() => {
+                            // ignore whitespace
+                        },
+                        _ => {
+                            return Some(Err(TokenizeError {
+                                code: TokenizeErrorCode::UnexpectedCharacter(chr),
+                                location: self.location,
+                            }));
+                        },
+                    }
+                },
+                Some(Err(error)) => {
+                    return Some(Err(TokenizeError {
+                        code: error.into(),
                         location: self.location,
-                    })),
-                }
-            },
-            Some(Err(error)) => Some(Err(TokenizeError {
-                code: error.into(),
-                location: self.location,
-            })),
+                    }));
+                },
+            }
         }
     }
 }

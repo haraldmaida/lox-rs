@@ -33,4 +33,19 @@ mod location {
             assert_that!(location.line()).is_equal_to(line);
         }
     }
+
+    proptest! {
+        #[test]
+        fn advance_line_adds_one_to_the_line_position_and_resets_the_char_position(
+            line in any::<usize>().prop_filter("line position less than max usize", |n| *n < usize::MAX),
+            char in any::<usize>(),
+        ) {
+            let mut location = Location { line, char };
+
+            location.advance_line();
+
+            assert_that!(location.char()).is_equal_to(0);
+            assert_that!(location.line()).is_equal_to(line + 1);
+        }
+    }
 }

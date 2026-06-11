@@ -31,6 +31,11 @@ impl Location {
     pub const fn advance_char(&mut self) {
         self.char += 1;
     }
+
+    pub const fn advance_line(&mut self) {
+        self.line += 1;
+        self.char = 0;
+    }
 }
 
 pub trait SourceCode<'a> {
