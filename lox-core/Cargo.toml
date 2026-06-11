@@ -1,0 +1,17 @@
+[package]
+name = "lox-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+thiserror = { workspace = true }
+utf8-chars = { workspace = true }
+
+[dev-dependencies]
+asserting = { workspace = true }
+proptest = { workspace = true }
+
+[lints]
+workspace = true

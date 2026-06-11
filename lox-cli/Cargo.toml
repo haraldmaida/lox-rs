@@ -1,0 +1,22 @@
+[package]
+name = "lox-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+lox-core = { workspace = true }
+
+anyhow = { workspace = true }
+clap = { workspace = true }
+
+[dev-dependencies]
+trycmd = "1"
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "lox"
+path = "src/main.rs"
