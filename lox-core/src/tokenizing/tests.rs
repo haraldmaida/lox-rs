@@ -683,3 +683,73 @@ fn tokenize_keyword_print() {
         Ok(Token::EndOfFile),
     ]);
 }
+
+#[test]
+fn tokenize_bang_identifier() {
+    let mut source_code = "!a";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::Bang),
+        Ok(Token::Identifier("a".to_string())),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_equal_string_literal() {
+    let mut source_code = "a=\"Jane\";";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::Identifier("a".to_string())),
+        Ok(Token::Equal),
+        Ok(Token::StringLiteral("Jane".to_string())),
+        Ok(Token::Semicolon),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_greater_number_literal() {
+    let mut source_code = "a>0.5";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::Identifier("a".to_string())),
+        Ok(Token::Greater),
+        Ok(Token::NumberLiteral(0.5)),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_less_number_literal() {
+    let mut source_code = "a<18";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::Identifier("a".to_string())),
+        Ok(Token::Less),
+        Ok(Token::NumberLiteral(18.)),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_slash_number_literal() {
+    let mut source_code = "a/2.5";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::Identifier("a".to_string())),
+        Ok(Token::Slash),
+        Ok(Token::NumberLiteral(2.5)),
+        Ok(Token::EndOfFile),
+    ]);
+}

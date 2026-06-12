@@ -346,21 +346,14 @@ where
                         self.state = LexingState::Initial;
                         return Some(Ok(Token::Bang));
                     },
-                    Some(chr) => match chr {
-                        '=' => {
-                            self.state = LexingState::Initial;
-                            return Some(Ok(Token::BangEqual));
-                        },
-                        _ if chr.is_whitespace() => {
-                            self.state = LexingState::Initial;
-                            return Some(Ok(Token::Bang));
-                        },
-                        _ => {
-                            return Some(Err(LexingError {
-                                code: LexingErrorCode::UnexpectedCharacter(chr),
-                                location: self.location,
-                            }));
-                        },
+                    Some('=') => {
+                        self.state = LexingState::Initial;
+                        return Some(Ok(Token::BangEqual));
+                    },
+                    Some(chr) => {
+                        self.state = LexingState::Initial;
+                        self.open_chars.push_back(chr);
+                        return Some(Ok(Token::Bang));
                     },
                 },
                 LexingState::MaybeEqualEqual => match next_chr {
@@ -368,21 +361,14 @@ where
                         self.state = LexingState::Initial;
                         return Some(Ok(Token::Equal));
                     },
-                    Some(chr) => match chr {
-                        '=' => {
-                            self.state = LexingState::Initial;
-                            return Some(Ok(Token::EqualEqual));
-                        },
-                        _ if chr.is_whitespace() => {
-                            self.state = LexingState::Initial;
-                            return Some(Ok(Token::Equal));
-                        },
-                        _ => {
-                            return Some(Err(LexingError {
-                                code: LexingErrorCode::UnexpectedCharacter(chr),
-                                location: self.location,
-                            }));
-                        },
+                    Some('=') => {
+                        self.state = LexingState::Initial;
+                        return Some(Ok(Token::EqualEqual));
+                    },
+                    Some(chr) => {
+                        self.state = LexingState::Initial;
+                        self.open_chars.push_back(chr);
+                        return Some(Ok(Token::Equal));
                     },
                 },
                 LexingState::MaybeGreaterEqual => match next_chr {
@@ -390,21 +376,14 @@ where
                         self.state = LexingState::Initial;
                         return Some(Ok(Token::Greater));
                     },
-                    Some(chr) => match chr {
-                        '=' => {
-                            self.state = LexingState::Initial;
-                            return Some(Ok(Token::GreaterEqual));
-                        },
-                        _ if chr.is_whitespace() => {
-                            self.state = LexingState::Initial;
-                            return Some(Ok(Token::Greater));
-                        },
-                        _ => {
-                            return Some(Err(LexingError {
-                                code: LexingErrorCode::UnexpectedCharacter(chr),
-                                location: self.location,
-                            }));
-                        },
+                    Some('=') => {
+                        self.state = LexingState::Initial;
+                        return Some(Ok(Token::GreaterEqual));
+                    },
+                    Some(chr) => {
+                        self.state = LexingState::Initial;
+                        self.open_chars.push_back(chr);
+                        return Some(Ok(Token::Greater));
                     },
                 },
                 LexingState::MaybeLessEqual => match next_chr {
@@ -412,21 +391,14 @@ where
                         self.state = LexingState::Initial;
                         return Some(Ok(Token::Less));
                     },
-                    Some(chr) => match chr {
-                        '=' => {
-                            self.state = LexingState::Initial;
-                            return Some(Ok(Token::LessEqual));
-                        },
-                        _ if chr.is_whitespace() => {
-                            self.state = LexingState::Initial;
-                            return Some(Ok(Token::Less));
-                        },
-                        _ => {
-                            return Some(Err(LexingError {
-                                code: LexingErrorCode::UnexpectedCharacter(chr),
-                                location: self.location,
-                            }));
-                        },
+                    Some('=') => {
+                        self.state = LexingState::Initial;
+                        return Some(Ok(Token::LessEqual));
+                    },
+                    Some(chr) => {
+                        self.state = LexingState::Initial;
+                        self.open_chars.push_back(chr);
+                        return Some(Ok(Token::Less));
                     },
                 },
                 LexingState::MaybeLineComment => match next_chr {
@@ -434,20 +406,13 @@ where
                         self.state = LexingState::Initial;
                         return Some(Ok(Token::Slash));
                     },
-                    Some(chr) => match chr {
-                        '/' => {
-                            self.state = LexingState::LineComment;
-                        },
-                        _ if chr.is_whitespace() => {
-                            self.state = LexingState::Initial;
-                            return Some(Ok(Token::Slash));
-                        },
-                        _ => {
-                            return Some(Err(LexingError {
-                                code: LexingErrorCode::UnexpectedCharacter(chr),
-                                location: self.location,
-                            }));
-                        },
+                    Some('/') => {
+                        self.state = LexingState::LineComment;
+                    },
+                    Some(chr) => {
+                        self.state = LexingState::Initial;
+                        self.open_chars.push_back(chr);
+                        return Some(Ok(Token::Slash));
                     },
                 },
                 LexingState::LineComment => match next_chr {
