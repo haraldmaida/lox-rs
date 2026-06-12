@@ -1,9 +1,23 @@
 use super::{Location, *};
 use asserting::prelude::*;
+use std::io::{BufReader, Cursor};
 
 #[test]
 fn can_tokenize_str() {
     let mut source_code = "()";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::LeftParen),
+        Ok(Token::RightParen),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn can_tokenize_from_buf_reader() {
+    let mut source_code = BufReader::new(Cursor::new("()"));
 
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
@@ -143,8 +157,8 @@ fn tokenize_unexpected_character_at_line_1_char_4() {
         Ok(Token::LeftParen),
         Ok(Token::RightParen),
         Ok(Token::LeftBrace),
-        Err(TokenizeError {
-            code: TokenizeErrorCode::UnexpectedCharacter('§'),
+        Err(LexingError {
+            code: LexingErrorCode::UnexpectedCharacter('§'),
             location: Location { line: 1, char: 4 },
         }),
         Ok(Token::RightBrace),
@@ -164,8 +178,8 @@ fn tokenize_unexpected_character_at_line_3_char_1() {
     assert_that!(tokens).contains_exactly([
         Ok(Token::LeftBrace),
         Ok(Token::Semicolon),
-        Err(TokenizeError {
-            code: TokenizeErrorCode::UnexpectedCharacter('§'),
+        Err(LexingError {
+            code: LexingErrorCode::UnexpectedCharacter('§'),
             location: Location { line: 3, char: 1 },
         }),
         Ok(Token::RightBrace),
@@ -173,26 +187,26 @@ fn tokenize_unexpected_character_at_line_3_char_1() {
     ]);
 }
 
-mod tokenize_error_code {
+mod lexing_error_code {
     use super::*;
 
     #[test]
     fn can_be_converted_from_io_error() {
-        let code = TokenizeErrorCode::from(io::Error::from(io::ErrorKind::UnexpectedEof));
+        let code = LexingErrorCode::from(io::Error::from(io::ErrorKind::UnexpectedEof));
 
-        assert_that!(code).is_equal_to(TokenizeErrorCode::IoError(
+        assert_that!(code).is_equal_to(LexingErrorCode::IoError(
             "unexpected end of file".to_string(),
         ));
     }
 }
 
-mod tokenize_error {
+mod lexing_error {
     use super::*;
 
     #[test]
     fn display_format_io_error() {
-        let error = TokenizeError {
-            code: TokenizeErrorCode::IoError("I/O error".to_string()),
+        let error = LexingError {
+            code: LexingErrorCode::IoError("I/O error".to_string()),
             location: Location { line: 1, char: 0 },
         };
 
@@ -201,8 +215,8 @@ mod tokenize_error {
 
     #[test]
     fn display_format_unexpected_character() {
-        let error = TokenizeError {
-            code: TokenizeErrorCode::UnexpectedCharacter('§'),
+        let error = LexingError {
+            code: LexingErrorCode::UnexpectedCharacter('§'),
             location: Location { line: 74, char: 23 },
         };
 

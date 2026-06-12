@@ -20,13 +20,13 @@ where
 
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Debug, Clone, PartialEq)]
-pub enum TokenizeErrorCode {
+pub enum LexingErrorCode {
     IoError(String),
     CharacterAfterEndOfFile(char),
     UnexpectedCharacter(char),
 }
 
-impl Display for TokenizeErrorCode {
+impl Display for LexingErrorCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::IoError(message) => write!(f, "{message}"),
@@ -36,7 +36,7 @@ impl Display for TokenizeErrorCode {
     }
 }
 
-impl From<io::Error> for TokenizeErrorCode {
+impl From<io::Error> for LexingErrorCode {
     fn from(value: io::Error) -> Self {
         Self::IoError(value.to_string())
     }
@@ -44,13 +44,13 @@ impl From<io::Error> for TokenizeErrorCode {
 
 #[derive(thiserror::Error, Debug, Clone, PartialEq)]
 #[error("{code} at {location}")]
-pub struct TokenizeError {
-    code: TokenizeErrorCode,
+pub struct LexingError {
+    code: LexingErrorCode,
     location: Location,
 }
 
-impl TokenizeError {
-    pub const fn code(&self) -> &TokenizeErrorCode {
+impl LexingError {
+    pub const fn code(&self) -> &LexingErrorCode {
         &self.code
     }
 
@@ -110,13 +110,13 @@ impl Debug for Token {
     }
 }
 
-pub struct TokenizeResult {
+pub struct LexingResult {
     tokens: Vec<Token>,
-    errors: Vec<TokenizeError>,
+    errors: Vec<LexingError>,
 }
 
-impl TokenizeResult {
-    pub const fn new(tokens: Vec<Token>, errors: Vec<TokenizeError>) -> Self {
+impl LexingResult {
+    pub const fn new(tokens: Vec<Token>, errors: Vec<LexingError>) -> Self {
         Self { tokens, errors }
     }
 
@@ -124,11 +124,11 @@ impl TokenizeResult {
         &self.tokens
     }
 
-    pub fn errors(&self) -> &[TokenizeError] {
+    pub fn errors(&self) -> &[LexingError] {
         &self.errors
     }
 
-    pub fn into_result(self) -> Result<Vec<Token>, Vec<TokenizeError>> {
+    pub fn into_result(self) -> Result<Vec<Token>, Vec<LexingError>> {
         if self.errors.is_empty() {
             Ok(self.tokens)
         } else {
@@ -137,8 +137,8 @@ impl TokenizeResult {
     }
 }
 
-impl FromIterator<Result<Token, TokenizeError>> for TokenizeResult {
-    fn from_iter<I: IntoIterator<Item = Result<Token, TokenizeError>>>(iter: I) -> Self {
+impl FromIterator<Result<Token, LexingError>> for LexingResult {
+    fn from_iter<I: IntoIterator<Item = Result<Token, LexingError>>>(iter: I) -> Self {
         let iterator = iter.into_iter();
         let (lower_bound, _) = iterator.size_hint();
 
@@ -194,7 +194,7 @@ where
         }
     }
 
-    fn advance_to_next_char(&mut self) -> Option<Result<char, TokenizeError>> {
+    fn advance_to_next_char(&mut self) -> Option<Result<char, LexingError>> {
         let next_chr = self.source.next();
         match next_chr {
             None => None,
@@ -206,7 +206,7 @@ where
                 self.location.advance_char();
                 Some(Ok(chr))
             },
-            Some(Err(error)) => Some(Err(TokenizeError {
+            Some(Err(error)) => Some(Err(LexingError {
                 code: error.into(),
                 location: self.location,
             })),
@@ -218,7 +218,7 @@ impl<I> Iterator for Tokens<I>
 where
     I: Iterator<Item = Result<char, io::Error>>,
 {
-    type Item = Result<Token, TokenizeError>;
+    type Item = Result<Token, LexingError>;
 
     #[allow(clippy::too_many_lines)]
     fn next(&mut self) -> Option<Self::Item> {
@@ -266,8 +266,8 @@ where
                             // ignore whitespace
                         },
                         _ => {
-                            return Some(Err(TokenizeError {
-                                code: TokenizeErrorCode::UnexpectedCharacter(chr),
+                            return Some(Err(LexingError {
+                                code: LexingErrorCode::UnexpectedCharacter(chr),
                                 location: self.location,
                             }));
                         },
@@ -288,8 +288,8 @@ where
                             return Some(Ok(Token::Bang));
                         },
                         _ => {
-                            return Some(Err(TokenizeError {
-                                code: TokenizeErrorCode::UnexpectedCharacter(chr),
+                            return Some(Err(LexingError {
+                                code: LexingErrorCode::UnexpectedCharacter(chr),
                                 location: self.location,
                             }));
                         },
@@ -310,8 +310,8 @@ where
                             return Some(Ok(Token::Equal));
                         },
                         _ => {
-                            return Some(Err(TokenizeError {
-                                code: TokenizeErrorCode::UnexpectedCharacter(chr),
+                            return Some(Err(LexingError {
+                                code: LexingErrorCode::UnexpectedCharacter(chr),
                                 location: self.location,
                             }));
                         },
@@ -332,8 +332,8 @@ where
                             return Some(Ok(Token::Greater));
                         },
                         _ => {
-                            return Some(Err(TokenizeError {
-                                code: TokenizeErrorCode::UnexpectedCharacter(chr),
+                            return Some(Err(LexingError {
+                                code: LexingErrorCode::UnexpectedCharacter(chr),
                                 location: self.location,
                             }));
                         },
@@ -354,8 +354,8 @@ where
                             return Some(Ok(Token::Less));
                         },
                         _ => {
-                            return Some(Err(TokenizeError {
-                                code: TokenizeErrorCode::UnexpectedCharacter(chr),
+                            return Some(Err(LexingError {
+                                code: LexingErrorCode::UnexpectedCharacter(chr),
                                 location: self.location,
                             }));
                         },
@@ -375,8 +375,8 @@ where
                             return Some(Ok(Token::Slash));
                         },
                         _ => {
-                            return Some(Err(TokenizeError {
-                                code: TokenizeErrorCode::UnexpectedCharacter(chr),
+                            return Some(Err(LexingError {
+                                code: LexingErrorCode::UnexpectedCharacter(chr),
                                 location: self.location,
                             }));
                         },
@@ -398,8 +398,8 @@ where
                     None => return None,
                     Some(chr) => {
                         // this should be unreachable, but just in case
-                        return Some(Err(TokenizeError {
-                            code: TokenizeErrorCode::CharacterAfterEndOfFile(chr),
+                        return Some(Err(LexingError {
+                            code: LexingErrorCode::CharacterAfterEndOfFile(chr),
                             location: self.location,
                         }));
                     },
