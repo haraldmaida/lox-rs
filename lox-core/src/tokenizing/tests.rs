@@ -76,6 +76,21 @@ fn tokenize_single_character_operators() {
 }
 
 #[test]
+fn tokenize_two_character_operators() {
+    let mut source_code = "== != <= >=";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::EqualEqual),
+        Ok(Token::BangEqual),
+        Ok(Token::LessEqual),
+        Ok(Token::GreaterEqual),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
 fn tokenize_unexpected_character_at_line_1_char_4() {
     let mut source_code = "(){§},.;";
 

@@ -22,6 +22,7 @@ where
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenizeErrorCode {
     IoError(String),
+    CharacterAfterEndOfFile(char),
     UnexpectedCharacter(char),
 }
 
@@ -29,6 +30,7 @@ impl Display for TokenizeErrorCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::IoError(message) => write!(f, "{message}"),
+            Self::CharacterAfterEndOfFile(chr) => write!(f, "character '{chr}' after end of file"),
             Self::UnexpectedCharacter(chr) => write!(f, "unexpected character '{chr}'"),
         }
     }
@@ -75,6 +77,10 @@ pub enum Token {
     Equal,
     Less,
     Greater,
+    BangEqual,
+    EqualEqual,
+    GreaterEqual,
+    LessEqual,
 }
 
 impl Debug for Token {
@@ -96,6 +102,10 @@ impl Debug for Token {
             Self::Equal => write!(f, "EQUAL = null"),
             Self::Less => write!(f, "LESS < null"),
             Self::Greater => write!(f, "GREATER > null"),
+            Self::BangEqual => write!(f, "BANG_EQUAL != null"),
+            Self::EqualEqual => write!(f, "EQUAL_EQUAL == null"),
+            Self::GreaterEqual => write!(f, "GREATER_EQUAL >= null"),
+            Self::LessEqual => write!(f, "LESS_EQUAL <= null"),
         }
     }
 }
@@ -148,10 +158,27 @@ impl FromIterator<Result<Token, TokenizeError>> for TokenizeResult {
     }
 }
 
+enum LexingState {
+    Normal,
+    MaybeLineComment,
+    MaybeBangEqual,
+    MaybeEqualEqual,
+    MaybeGreaterEqual,
+    MaybeLessEqual,
+    EndOfFile,
+}
+
+#[allow(clippy::derivable_impls)]
+impl Default for LexingState {
+    fn default() -> Self {
+        Self::Normal
+    }
+}
+
 pub struct Tokens<I> {
     source: I,
     location: Location,
-    end_of_file: bool,
+    state: LexingState,
 }
 
 impl<I> Tokens<I>
@@ -162,7 +189,7 @@ where
         Self {
             source,
             location: Location::default(),
-            end_of_file: false,
+            state: LexingState::default(),
         }
     }
 }
@@ -176,12 +203,32 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             match self.source.next() {
-                None => {
-                    if self.end_of_file {
-                        return None;
-                    }
-                    self.end_of_file = true;
-                    return Some(Ok(Token::EndOfFile));
+                None => match self.state {
+                    LexingState::Normal => {
+                        self.state = LexingState::EndOfFile;
+                        return Some(Ok(Token::EndOfFile));
+                    },
+                    LexingState::MaybeLineComment => {
+                        self.state = LexingState::Normal;
+                        return Some(Ok(Token::Slash));
+                    },
+                    LexingState::MaybeBangEqual => {
+                        self.state = LexingState::Normal;
+                        return Some(Ok(Token::Bang));
+                    },
+                    LexingState::MaybeEqualEqual => {
+                        self.state = LexingState::Normal;
+                        return Some(Ok(Token::Equal));
+                    },
+                    LexingState::MaybeGreaterEqual => {
+                        self.state = LexingState::Normal;
+                        return Some(Ok(Token::Greater));
+                    },
+                    LexingState::MaybeLessEqual => {
+                        self.state = LexingState::Normal;
+                        return Some(Ok(Token::Less));
+                    },
+                    LexingState::EndOfFile => return None,
                 },
                 Some(Ok(chr)) => {
                     self.location.advance_char();
@@ -196,16 +243,86 @@ where
                         '-' => return Some(Ok(Token::Minus)),
                         '+' => return Some(Ok(Token::Plus)),
                         '*' => return Some(Ok(Token::Star)),
-                        '/' => return Some(Ok(Token::Slash)),
-                        '!' => return Some(Ok(Token::Bang)),
-                        '=' => return Some(Ok(Token::Equal)),
-                        '<' => return Some(Ok(Token::Less)),
-                        '>' => return Some(Ok(Token::Greater)),
+                        '/' => {
+                            self.state = LexingState::MaybeLineComment;
+                        },
+                        '!' => {
+                            self.state = LexingState::MaybeBangEqual;
+                        },
+                        '=' => match self.state {
+                            LexingState::Normal => {
+                                self.state = LexingState::MaybeEqualEqual;
+                            },
+                            LexingState::MaybeLineComment => {
+                                return Some(Err(TokenizeError {
+                                    code: TokenizeErrorCode::UnexpectedCharacter(chr),
+                                    location: self.location,
+                                }));
+                            },
+                            LexingState::MaybeBangEqual => {
+                                self.state = LexingState::Normal;
+                                return Some(Ok(Token::BangEqual));
+                            },
+                            LexingState::MaybeEqualEqual => {
+                                self.state = LexingState::Normal;
+                                return Some(Ok(Token::EqualEqual));
+                            },
+                            LexingState::MaybeGreaterEqual => {
+                                self.state = LexingState::Normal;
+                                return Some(Ok(Token::GreaterEqual));
+                            },
+                            LexingState::MaybeLessEqual => {
+                                self.state = LexingState::Normal;
+                                return Some(Ok(Token::LessEqual));
+                            },
+                            LexingState::EndOfFile => {
+                                return Some(Err(TokenizeError {
+                                    code: TokenizeErrorCode::CharacterAfterEndOfFile(chr),
+                                    location: self.location,
+                                }));
+                            },
+                        },
+                        '<' => {
+                            self.state = LexingState::MaybeLessEqual;
+                        },
+                        '>' => {
+                            self.state = LexingState::MaybeGreaterEqual;
+                        },
                         '\n' => {
                             self.location.advance_line();
                         },
                         c if c.is_whitespace() => {
-                            // ignore whitespace
+                            match self.state {
+                                LexingState::Normal => {
+                                    // ignore whitespace
+                                },
+                                LexingState::MaybeLineComment => {
+                                    self.state = LexingState::Normal;
+                                    return Some(Ok(Token::Slash));
+                                },
+                                LexingState::MaybeBangEqual => {
+                                    self.state = LexingState::Normal;
+                                    return Some(Ok(Token::Bang));
+                                },
+                                LexingState::MaybeEqualEqual => {
+                                    self.state = LexingState::Normal;
+                                    return Some(Ok(Token::Equal));
+                                },
+                                LexingState::MaybeGreaterEqual => {
+                                    self.state = LexingState::Normal;
+                                    return Some(Ok(Token::Greater));
+                                },
+                                LexingState::MaybeLessEqual => {
+                                    self.state = LexingState::Normal;
+                                    return Some(Ok(Token::Less));
+                                },
+                                LexingState::EndOfFile => {
+                                    return Some(Err(TokenizeError {
+                                        code: TokenizeErrorCode::CharacterAfterEndOfFile(chr),
+                                        location: self.location,
+                                    }));
+                                },
+                            }
                         },
                         _ => {
                             return Some(Err(TokenizeError {
