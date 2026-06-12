@@ -90,6 +90,22 @@ pub enum Token {
     StringLiteral(String),
     NumberLiteral(f64),
     Identifier(String),
+    And,
+    Class,
+    Else,
+    False,
+    Fun,
+    For,
+    If,
+    Nil,
+    Or,
+    Print,
+    Return,
+    Super,
+    This,
+    True,
+    Var,
+    While,
 }
 
 impl Debug for Token {
@@ -118,6 +134,22 @@ impl Debug for Token {
             Self::StringLiteral(value) => write!(f, "STRING_LITERAL \"{value}\" {value:?}"),
             Self::NumberLiteral(value) => write!(f, "NUMBER_LITERAL {value} {value:?}"),
             Self::Identifier(value) => write!(f, "IDENTIFIER {value} {value}"),
+            Self::And => write!(f, "AND and null"),
+            Self::Class => write!(f, "CLASS class null"),
+            Self::Else => write!(f, "ELSE else null"),
+            Self::False => write!(f, "FALSE false null"),
+            Self::Fun => write!(f, "FUN fun null"),
+            Self::For => write!(f, "FOR for null"),
+            Self::If => write!(f, "IF if null"),
+            Self::Nil => write!(f, "NIL nil null"),
+            Self::Or => write!(f, "OR or null"),
+            Self::Print => write!(f, "PRINT print null"),
+            Self::Return => write!(f, "RETURN return null"),
+            Self::Super => write!(f, "SUPER super null"),
+            Self::This => write!(f, "THIS this null"),
+            Self::True => write!(f, "TRUE true null"),
+            Self::Var => write!(f, "VAR var null"),
+            Self::While => write!(f, "WHILE while null"),
         }
     }
 }
@@ -525,8 +557,8 @@ where
                     Some(chr) => {
                         self.state = LexingState::Initial;
                         self.open_chars.push_back(chr);
-                        let identifier = mem::take(&mut self.current_lexeme);
-                        return Some(Ok(Token::Identifier(identifier)));
+                        let lexeme = mem::take(&mut self.current_lexeme);
+                        return Some(Ok(keyword_or_identifier(lexeme)));
                     },
                 },
                 LexingState::EndOfFile => match next_chr {
@@ -541,6 +573,28 @@ where
                 },
             }
         }
+    }
+}
+
+fn keyword_or_identifier(lexeme: String) -> Token {
+    match &lexeme[..] {
+        "and" => Token::And,
+        "class" => Token::Class,
+        "else" => Token::Else,
+        "false" => Token::False,
+        "for" => Token::For,
+        "fun" => Token::Fun,
+        "if" => Token::If,
+        "nil" => Token::Nil,
+        "or" => Token::Or,
+        "print" => Token::Print,
+        "return" => Token::Return,
+        "super" => Token::Super,
+        "this" => Token::This,
+        "true" => Token::True,
+        "var" => Token::Var,
+        "while" => Token::While,
+        _ => Token::Identifier(lexeme),
     }
 }
 

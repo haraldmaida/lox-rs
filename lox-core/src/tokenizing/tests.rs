@@ -463,3 +463,223 @@ fn tokenize_identifier_and_semicolon() {
         Ok(Token::EndOfFile),
     ]);
 }
+
+#[test]
+fn tokenize_boolean_true() {
+    let mut source_code = " true ";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([Ok(Token::True), Ok(Token::EndOfFile)]);
+}
+
+#[test]
+fn tokenize_boolean_false() {
+    let mut source_code = " false; ";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::False),
+        Ok(Token::Semicolon),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_keyword_and() {
+    let mut source_code = " and ";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([Ok(Token::And), Ok(Token::EndOfFile)]);
+}
+
+#[test]
+fn tokenize_keyword_or() {
+    let mut source_code = " or ";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([Ok(Token::Or), Ok(Token::EndOfFile)]);
+}
+
+#[test]
+fn tokenize_keyword_class() {
+    let mut source_code = " class Foo {} ";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::Class),
+        Ok(Token::Identifier("Foo".to_string())),
+        Ok(Token::LeftBrace),
+        Ok(Token::RightBrace),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_keyword_fun() {
+    let mut source_code = " fun foo() {} ";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::Fun),
+        Ok(Token::Identifier("foo".to_string())),
+        Ok(Token::LeftParen),
+        Ok(Token::RightParen),
+        Ok(Token::LeftBrace),
+        Ok(Token::RightBrace),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_keyword_super() {
+    let mut source_code = " super.method(); ";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::Super),
+        Ok(Token::Dot),
+        Ok(Token::Identifier("method".to_string())),
+        Ok(Token::LeftParen),
+        Ok(Token::RightParen),
+        Ok(Token::Semicolon),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_keyword_this() {
+    let mut source_code = " this.name = \"John\"; ";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::This),
+        Ok(Token::Dot),
+        Ok(Token::Identifier("name".to_string())),
+        Ok(Token::Equal),
+        Ok(Token::StringLiteral("John".to_string())),
+        Ok(Token::Semicolon),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_keyword_var() {
+    let mut source_code = " var x = 10; ";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::Var),
+        Ok(Token::Identifier("x".to_string())),
+        Ok(Token::Equal),
+        Ok(Token::NumberLiteral(10.)),
+        Ok(Token::Semicolon),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_keyword_nil() {
+    let mut source_code = " nil ";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([Ok(Token::Nil), Ok(Token::EndOfFile)]);
+}
+
+#[test]
+fn tokenize_keyword_return() {
+    let mut source_code = " return 42; ";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::Return),
+        Ok(Token::NumberLiteral(42.)),
+        Ok(Token::Semicolon),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_keywords_if_else() {
+    let mut source_code = " if (x == 99) { } else { } ";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::If),
+        Ok(Token::LeftParen),
+        Ok(Token::Identifier("x".to_string())),
+        Ok(Token::EqualEqual),
+        Ok(Token::NumberLiteral(99.)),
+        Ok(Token::RightParen),
+        Ok(Token::LeftBrace),
+        Ok(Token::RightBrace),
+        Ok(Token::Else),
+        Ok(Token::LeftBrace),
+        Ok(Token::RightBrace),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_keyword_for() {
+    let mut source_code = " for (;;) { } ";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::For),
+        Ok(Token::LeftParen),
+        Ok(Token::Semicolon),
+        Ok(Token::Semicolon),
+        Ok(Token::RightParen),
+        Ok(Token::LeftBrace),
+        Ok(Token::RightBrace),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_keyword_while() {
+    let mut source_code = " while (x > 0) { } ";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::While),
+        Ok(Token::LeftParen),
+        Ok(Token::Identifier("x".to_string())),
+        Ok(Token::Greater),
+        Ok(Token::NumberLiteral(0.)),
+        Ok(Token::RightParen),
+        Ok(Token::LeftBrace),
+        Ok(Token::RightBrace),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_keyword_print() {
+    let mut source_code = " print(\"Hello, world!\"); ";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::Print),
+        Ok(Token::LeftParen),
+        Ok(Token::StringLiteral("Hello, world!".to_string())),
+        Ok(Token::RightParen),
+        Ok(Token::Semicolon),
+        Ok(Token::EndOfFile),
+    ]);
+}
