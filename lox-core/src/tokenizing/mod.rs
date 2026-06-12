@@ -89,6 +89,7 @@ pub enum Token {
     LessEqual,
     StringLiteral(String),
     NumberLiteral(f64),
+    Identifier(String),
 }
 
 impl Debug for Token {
@@ -116,6 +117,7 @@ impl Debug for Token {
             Self::LessEqual => write!(f, "LESS_EQUAL <= null"),
             Self::StringLiteral(value) => write!(f, "STRING_LITERAL \"{value}\" {value:?}"),
             Self::NumberLiteral(value) => write!(f, "NUMBER_LITERAL {value} {value:?}"),
+            Self::Identifier(value) => write!(f, "IDENTIFIER {value} {value}"),
         }
     }
 }
@@ -179,6 +181,7 @@ enum LexingState {
     StringLiteral,
     NumberLiteral,
     MaybeDecimalPoint,
+    Identifier,
     EndOfFile,
 }
 
@@ -289,6 +292,10 @@ where
                         },
                         _ if chr.is_ascii_digit() => {
                             self.state = LexingState::NumberLiteral;
+                            self.current_lexeme.push(chr);
+                        },
+                        _ if chr.is_ascii_alphabetic() || chr == '_' => {
+                            self.state = LexingState::Identifier;
                             self.current_lexeme.push(chr);
                         },
                         _ if chr.is_whitespace() => {
@@ -504,6 +511,22 @@ where
                             code: LexingErrorCode::InvalidNumberLiteral(lexeme),
                             location: self.location,
                         }));
+                    },
+                },
+                LexingState::Identifier => match next_chr {
+                    None => {
+                        self.state = LexingState::Initial;
+                        let identifier = mem::take(&mut self.current_lexeme);
+                        return Some(Ok(Token::Identifier(identifier)));
+                    },
+                    Some(chr) if chr.is_ascii_alphanumeric() || chr == '_' => {
+                        self.current_lexeme.push(chr);
+                    },
+                    Some(chr) => {
+                        self.state = LexingState::Initial;
+                        self.open_chars.push_back(chr);
+                        let identifier = mem::take(&mut self.current_lexeme);
+                        return Some(Ok(Token::Identifier(identifier)));
                     },
                 },
                 LexingState::EndOfFile => match next_chr {

@@ -414,3 +414,52 @@ fn tokenize_number_literal_with_dot_at_the_end() {
         Ok(Token::EndOfFile),
     ]);
 }
+
+#[test]
+fn tokenize_identifier_letters_only() {
+    let mut source_code = "someIdentifier";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::Identifier("someIdentifier".to_string())),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_identifier_alphanumeric() {
+    let mut source_code = "club42";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::Identifier("club42".to_string())),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_identifier_starting_with_underscore() {
+    let mut source_code = "_identifierWithUnderscore";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::Identifier("_identifierWithUnderscore".to_string())),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_identifier_and_semicolon() {
+    let mut source_code = "number2add;";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::Identifier("number2add".to_string())),
+        Ok(Token::Semicolon),
+        Ok(Token::EndOfFile),
+    ]);
+}
