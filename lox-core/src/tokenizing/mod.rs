@@ -48,7 +48,7 @@ impl From<io::Error> for LexingErrorCode {
     }
 }
 
-#[derive(thiserror::Error, Debug, Clone, PartialEq)]
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 #[error("{code} at {location}")]
 pub struct LexingError {
     code: LexingErrorCode,
@@ -193,7 +193,7 @@ pub struct Tokens<I> {
     source: I,
     location: Location,
     state: LexingState,
-    literal: String,
+    current_lexeme: String,
     open_chars: VecDeque<char>,
 }
 
@@ -206,7 +206,7 @@ where
             source,
             location: Location::default(),
             state: LexingState::default(),
-            literal: String::new(),
+            current_lexeme: String::new(),
             open_chars: VecDeque::with_capacity(2),
         }
     }
@@ -286,12 +286,10 @@ where
                         },
                         '"' => {
                             self.state = LexingState::StringLiteral;
-                            self.literal.clear();
                         },
                         _ if chr.is_ascii_digit() => {
                             self.state = LexingState::NumberLiteral;
-                            self.literal.clear();
-                            self.literal.push(chr);
+                            self.current_lexeme.push(chr);
                         },
                         _ if chr.is_whitespace() => {
                             // ignore whitespace
@@ -428,7 +426,7 @@ where
                 LexingState::StringLiteral => match next_chr {
                     None => {
                         self.state = LexingState::Initial;
-                        let lexeme = mem::take(&mut self.literal);
+                        let lexeme = mem::take(&mut self.current_lexeme);
                         //TODO: should the location in the lexing error point to
                         // the beginning of the lexeme or the end?
                         return Some(Err(LexingError {
@@ -438,22 +436,22 @@ where
                     },
                     Some('"') => {
                         self.state = LexingState::Initial;
-                        let value = mem::take(&mut self.literal);
+                        let value = mem::take(&mut self.current_lexeme);
                         return Some(Ok(Token::StringLiteral(value)));
                     },
-                    Some(chr) => self.literal.push(chr),
+                    Some(chr) => self.current_lexeme.push(chr),
                 },
                 LexingState::NumberLiteral => match next_chr {
                     None => {
                         self.state = LexingState::Initial;
-                        let str_value = mem::take(&mut self.literal);
-                        match str_value.parse::<f64>() {
+                        let lexeme = mem::take(&mut self.current_lexeme);
+                        match lexeme.parse::<f64>() {
                             Ok(value) => {
                                 return Some(Ok(Token::NumberLiteral(value)));
                             },
                             Err(_) => {
                                 return Some(Err(LexingError {
-                                    code: LexingErrorCode::InvalidNumberLiteral(str_value),
+                                    code: LexingErrorCode::InvalidNumberLiteral(lexeme),
                                     location: self.location,
                                 }));
                             },
@@ -462,18 +460,18 @@ where
                     Some('.') => {
                         self.state = LexingState::MaybeDecimalPoint;
                     },
-                    Some(chr) if chr.is_ascii_digit() => self.literal.push(chr),
+                    Some(chr) if chr.is_ascii_digit() => self.current_lexeme.push(chr),
                     Some(chr) => {
                         self.state = LexingState::Initial;
                         self.open_chars.push_back(chr);
-                        let str_value = mem::take(&mut self.literal);
-                        match str_value.parse::<f64>() {
+                        let lexeme = mem::take(&mut self.current_lexeme);
+                        match lexeme.parse::<f64>() {
                             Ok(value) => {
                                 return Some(Ok(Token::NumberLiteral(value)));
                             },
                             Err(_) => {
                                 return Some(Err(LexingError {
-                                    code: LexingErrorCode::InvalidNumberLiteral(str_value),
+                                    code: LexingErrorCode::InvalidNumberLiteral(lexeme),
                                     location: self.location,
                                 }));
                             },
@@ -483,8 +481,8 @@ where
                 LexingState::MaybeDecimalPoint => match next_chr {
                     None => {
                         self.state = LexingState::Initial;
-                        self.literal.push('.');
-                        let lexeme = mem::take(&mut self.literal);
+                        self.current_lexeme.push('.');
+                        let lexeme = mem::take(&mut self.current_lexeme);
                         return Some(Err(LexingError {
                             code: LexingErrorCode::InvalidNumberLiteral(lexeme),
                             location: self.location,
@@ -492,16 +490,16 @@ where
                     },
                     Some(chr) if chr.is_ascii_digit() => {
                         self.state = LexingState::NumberLiteral;
-                        self.literal.push('.');
-                        self.literal.push(chr);
+                        self.current_lexeme.push('.');
+                        self.current_lexeme.push(chr);
                     },
                     Some(chr) => {
                         self.state = LexingState::Initial;
-                        self.literal.push('.');
+                        self.current_lexeme.push('.');
                         self.open_chars.push_back(chr);
                         //TODO: scan for function calls on number literal
                         // - returning lexing error for now
-                        let lexeme = mem::take(&mut self.literal);
+                        let lexeme = mem::take(&mut self.current_lexeme);
                         return Some(Err(LexingError {
                             code: LexingErrorCode::InvalidNumberLiteral(lexeme),
                             location: self.location,
