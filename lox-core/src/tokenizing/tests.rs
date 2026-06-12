@@ -397,7 +397,7 @@ fn tokenize_list_of_number_literal_float_1_98() {
 }
 
 #[test]
-fn tokenize_number_literal_with_dot_at_the_end() {
+fn tokenize_number_literal_with_trailing_dot() {
     let mut source_code = "400,\n4.,\n655";
 
     let tokens = source_code.tokenize().collect::<Vec<_>>();
@@ -405,14 +405,20 @@ fn tokenize_number_literal_with_dot_at_the_end() {
     assert_that!(tokens).contains_exactly([
         Ok(Token::NumberLiteral(400.)),
         Ok(Token::Comma),
-        Err(LexingError {
-            code: LexingErrorCode::InvalidNumberLiteral("4.".to_string()),
-            location: Location { line: 2, char: 3 },
-        }),
+        Ok(Token::NumberLiteral(4.)),
         Ok(Token::Comma),
         Ok(Token::NumberLiteral(655.)),
         Ok(Token::EndOfFile),
     ]);
+}
+
+#[test]
+fn tokenize_number_literal_with_trailing_dot_at_end_of_file() {
+    let mut source_code = " 777.";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([Ok(Token::NumberLiteral(777.)), Ok(Token::EndOfFile)]);
 }
 
 #[test]
@@ -750,6 +756,22 @@ fn tokenize_slash_number_literal() {
         Ok(Token::Identifier("a".to_string())),
         Ok(Token::Slash),
         Ok(Token::NumberLiteral(2.5)),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_dot_after_integer_literal() {
+    let mut source_code = "1.neg()";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::NumberLiteral(1.)),
+        Ok(Token::Dot),
+        Ok(Token::Identifier("neg".to_string())),
+        Ok(Token::LeftParen),
+        Ok(Token::RightParen),
         Ok(Token::EndOfFile),
     ]);
 }
