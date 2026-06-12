@@ -160,11 +160,12 @@ impl FromIterator<Result<Token, TokenizeError>> for TokenizeResult {
 
 enum LexingState {
     Initial,
-    MaybeLineComment,
     MaybeBangEqual,
     MaybeEqualEqual,
     MaybeGreaterEqual,
     MaybeLessEqual,
+    MaybeLineComment,
+    LineComment,
     EndOfFile,
 }
 
@@ -272,24 +273,6 @@ where
                         },
                     },
                 },
-                LexingState::MaybeLineComment => match next_chr {
-                    None => {
-                        self.state = LexingState::Initial;
-                        return Some(Ok(Token::Slash));
-                    },
-                    Some(chr) => match chr {
-                        _ if chr.is_whitespace() => {
-                            self.state = LexingState::Initial;
-                            return Some(Ok(Token::Slash));
-                        },
-                        _ => {
-                            return Some(Err(TokenizeError {
-                                code: TokenizeErrorCode::UnexpectedCharacter(chr),
-                                location: self.location,
-                            }));
-                        },
-                    },
-                },
                 LexingState::MaybeBangEqual => match next_chr {
                     None => {
                         self.state = LexingState::Initial;
@@ -376,6 +359,39 @@ where
                                 location: self.location,
                             }));
                         },
+                    },
+                },
+                LexingState::MaybeLineComment => match next_chr {
+                    None => {
+                        self.state = LexingState::Initial;
+                        return Some(Ok(Token::Slash));
+                    },
+                    Some(chr) => match chr {
+                        '/' => {
+                            self.state = LexingState::LineComment;
+                        },
+                        _ if chr.is_whitespace() => {
+                            self.state = LexingState::Initial;
+                            return Some(Ok(Token::Slash));
+                        },
+                        _ => {
+                            return Some(Err(TokenizeError {
+                                code: TokenizeErrorCode::UnexpectedCharacter(chr),
+                                location: self.location,
+                            }));
+                        },
+                    },
+                },
+                LexingState::LineComment => match next_chr {
+                    None => {
+                        self.state = LexingState::EndOfFile;
+                        return Some(Ok(Token::EndOfFile));
+                    },
+                    Some('\n') => {
+                        self.state = LexingState::Initial;
+                    },
+                    Some(_) => {
+                        // ignore characters in line comment
                     },
                 },
                 LexingState::EndOfFile => match next_chr {

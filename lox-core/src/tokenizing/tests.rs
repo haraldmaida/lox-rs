@@ -91,6 +91,49 @@ fn tokenize_two_character_operators() {
 }
 
 #[test]
+fn tokenize_line_comment_not_on_last_line() {
+    let mut source_code = "() // (some comment).\n{}";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::LeftParen),
+        Ok(Token::RightParen),
+        Ok(Token::LeftBrace),
+        Ok(Token::RightBrace),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_line_comment_at_end_of_file() {
+    let mut source_code = "() // (some comment).";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::LeftParen),
+        Ok(Token::RightParen),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_line_comments_on_two_subsequent_lines() {
+    let mut source_code = "() \n// (first line of comment).\n// (second line of comment).\n{}";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::LeftParen),
+        Ok(Token::RightParen),
+        Ok(Token::LeftBrace),
+        Ok(Token::RightBrace),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
 fn tokenize_unexpected_character_at_line_1_char_4() {
     let mut source_code = "(){§},.;";
 
