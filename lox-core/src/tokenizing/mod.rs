@@ -159,7 +159,7 @@ impl FromIterator<Result<Token, TokenizeError>> for TokenizeResult {
 }
 
 enum LexingState {
-    Normal,
+    Initial,
     MaybeLineComment,
     MaybeBangEqual,
     MaybeEqualEqual,
@@ -171,7 +171,7 @@ enum LexingState {
 #[allow(clippy::derivable_impls)]
 impl Default for LexingState {
     fn default() -> Self {
-        Self::Normal
+        Self::Initial
     }
 }
 
@@ -192,6 +192,25 @@ where
             state: LexingState::default(),
         }
     }
+
+    fn advance_to_next_char(&mut self) -> Option<Result<char, TokenizeError>> {
+        let next_chr = self.source.next();
+        match next_chr {
+            None => None,
+            Some(Ok('\n')) => {
+                self.location.advance_line();
+                Some(Ok('\n'))
+            },
+            Some(Ok(chr)) => {
+                self.location.advance_char();
+                Some(Ok(chr))
+            },
+            Some(Err(error)) => Some(Err(TokenizeError {
+                code: error.into(),
+                location: self.location,
+            })),
+        }
+    }
 }
 
 impl<I> Iterator for Tokens<I>
@@ -200,39 +219,23 @@ where
 {
     type Item = Result<Token, TokenizeError>;
 
+    #[allow(clippy::too_many_lines)]
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            match self.source.next() {
-                None => match self.state {
-                    LexingState::Normal => {
+            let next_chr = match self.advance_to_next_char() {
+                None => None,
+                Some(Ok(chr)) => Some(chr),
+                Some(Err(error)) => {
+                    return Some(Err(error));
+                },
+            };
+            match self.state {
+                LexingState::Initial => match next_chr {
+                    None => {
                         self.state = LexingState::EndOfFile;
                         return Some(Ok(Token::EndOfFile));
                     },
-                    LexingState::MaybeLineComment => {
-                        self.state = LexingState::Normal;
-                        return Some(Ok(Token::Slash));
-                    },
-                    LexingState::MaybeBangEqual => {
-                        self.state = LexingState::Normal;
-                        return Some(Ok(Token::Bang));
-                    },
-                    LexingState::MaybeEqualEqual => {
-                        self.state = LexingState::Normal;
-                        return Some(Ok(Token::Equal));
-                    },
-                    LexingState::MaybeGreaterEqual => {
-                        self.state = LexingState::Normal;
-                        return Some(Ok(Token::Greater));
-                    },
-                    LexingState::MaybeLessEqual => {
-                        self.state = LexingState::Normal;
-                        return Some(Ok(Token::Less));
-                    },
-                    LexingState::EndOfFile => return None,
-                },
-                Some(Ok(chr)) => {
-                    self.location.advance_char();
-                    match chr {
+                    Some(chr) => match chr {
                         ',' => return Some(Ok(Token::Comma)),
                         '(' => return Some(Ok(Token::LeftParen)),
                         ')' => return Some(Ok(Token::RightParen)),
@@ -249,38 +252,8 @@ where
                         '!' => {
                             self.state = LexingState::MaybeBangEqual;
                         },
-                        '=' => match self.state {
-                            LexingState::Normal => {
-                                self.state = LexingState::MaybeEqualEqual;
-                            },
-                            LexingState::MaybeLineComment => {
-                                return Some(Err(TokenizeError {
-                                    code: TokenizeErrorCode::UnexpectedCharacter(chr),
-                                    location: self.location,
-                                }));
-                            },
-                            LexingState::MaybeBangEqual => {
-                                self.state = LexingState::Normal;
-                                return Some(Ok(Token::BangEqual));
-                            },
-                            LexingState::MaybeEqualEqual => {
-                                self.state = LexingState::Normal;
-                                return Some(Ok(Token::EqualEqual));
-                            },
-                            LexingState::MaybeGreaterEqual => {
-                                self.state = LexingState::Normal;
-                                return Some(Ok(Token::GreaterEqual));
-                            },
-                            LexingState::MaybeLessEqual => {
-                                self.state = LexingState::Normal;
-                                return Some(Ok(Token::LessEqual));
-                            },
-                            LexingState::EndOfFile => {
-                                return Some(Err(TokenizeError {
-                                    code: TokenizeErrorCode::CharacterAfterEndOfFile(chr),
-                                    location: self.location,
-                                }));
-                            },
+                        '=' => {
+                            self.state = LexingState::MaybeEqualEqual;
                         },
                         '<' => {
                             self.state = LexingState::MaybeLessEqual;
@@ -288,41 +261,8 @@ where
                         '>' => {
                             self.state = LexingState::MaybeGreaterEqual;
                         },
-                        '\n' => {
-                            self.location.advance_line();
-                        },
-                        c if c.is_whitespace() => {
-                            match self.state {
-                                LexingState::Normal => {
-                                    // ignore whitespace
-                                },
-                                LexingState::MaybeLineComment => {
-                                    self.state = LexingState::Normal;
-                                    return Some(Ok(Token::Slash));
-                                },
-                                LexingState::MaybeBangEqual => {
-                                    self.state = LexingState::Normal;
-                                    return Some(Ok(Token::Bang));
-                                },
-                                LexingState::MaybeEqualEqual => {
-                                    self.state = LexingState::Normal;
-                                    return Some(Ok(Token::Equal));
-                                },
-                                LexingState::MaybeGreaterEqual => {
-                                    self.state = LexingState::Normal;
-                                    return Some(Ok(Token::Greater));
-                                },
-                                LexingState::MaybeLessEqual => {
-                                    self.state = LexingState::Normal;
-                                    return Some(Ok(Token::Less));
-                                },
-                                LexingState::EndOfFile => {
-                                    return Some(Err(TokenizeError {
-                                        code: TokenizeErrorCode::CharacterAfterEndOfFile(chr),
-                                        location: self.location,
-                                    }));
-                                },
-                            }
+                        _ if chr.is_whitespace() => {
+                            // ignore whitespace
                         },
                         _ => {
                             return Some(Err(TokenizeError {
@@ -330,13 +270,123 @@ where
                                 location: self.location,
                             }));
                         },
-                    }
+                    },
                 },
-                Some(Err(error)) => {
-                    return Some(Err(TokenizeError {
-                        code: error.into(),
-                        location: self.location,
-                    }));
+                LexingState::MaybeLineComment => match next_chr {
+                    None => {
+                        self.state = LexingState::Initial;
+                        return Some(Ok(Token::Slash));
+                    },
+                    Some(chr) => match chr {
+                        _ if chr.is_whitespace() => {
+                            self.state = LexingState::Initial;
+                            return Some(Ok(Token::Slash));
+                        },
+                        _ => {
+                            return Some(Err(TokenizeError {
+                                code: TokenizeErrorCode::UnexpectedCharacter(chr),
+                                location: self.location,
+                            }));
+                        },
+                    },
+                },
+                LexingState::MaybeBangEqual => match next_chr {
+                    None => {
+                        self.state = LexingState::Initial;
+                        return Some(Ok(Token::Bang));
+                    },
+                    Some(chr) => match chr {
+                        '=' => {
+                            self.state = LexingState::Initial;
+                            return Some(Ok(Token::BangEqual));
+                        },
+                        _ if chr.is_whitespace() => {
+                            self.state = LexingState::Initial;
+                            return Some(Ok(Token::Bang));
+                        },
+                        _ => {
+                            return Some(Err(TokenizeError {
+                                code: TokenizeErrorCode::UnexpectedCharacter(chr),
+                                location: self.location,
+                            }));
+                        },
+                    },
+                },
+                LexingState::MaybeEqualEqual => match next_chr {
+                    None => {
+                        self.state = LexingState::Initial;
+                        return Some(Ok(Token::Equal));
+                    },
+                    Some(chr) => match chr {
+                        '=' => {
+                            self.state = LexingState::Initial;
+                            return Some(Ok(Token::EqualEqual));
+                        },
+                        _ if chr.is_whitespace() => {
+                            self.state = LexingState::Initial;
+                            return Some(Ok(Token::Equal));
+                        },
+                        _ => {
+                            return Some(Err(TokenizeError {
+                                code: TokenizeErrorCode::UnexpectedCharacter(chr),
+                                location: self.location,
+                            }));
+                        },
+                    },
+                },
+                LexingState::MaybeGreaterEqual => match next_chr {
+                    None => {
+                        self.state = LexingState::Initial;
+                        return Some(Ok(Token::Greater));
+                    },
+                    Some(chr) => match chr {
+                        '=' => {
+                            self.state = LexingState::Initial;
+                            return Some(Ok(Token::GreaterEqual));
+                        },
+                        _ if chr.is_whitespace() => {
+                            self.state = LexingState::Initial;
+                            return Some(Ok(Token::Greater));
+                        },
+                        _ => {
+                            return Some(Err(TokenizeError {
+                                code: TokenizeErrorCode::UnexpectedCharacter(chr),
+                                location: self.location,
+                            }));
+                        },
+                    },
+                },
+                LexingState::MaybeLessEqual => match next_chr {
+                    None => {
+                        self.state = LexingState::Initial;
+                        return Some(Ok(Token::Less));
+                    },
+                    Some(chr) => match chr {
+                        '=' => {
+                            self.state = LexingState::Initial;
+                            return Some(Ok(Token::LessEqual));
+                        },
+                        _ if chr.is_whitespace() => {
+                            self.state = LexingState::Initial;
+                            return Some(Ok(Token::Less));
+                        },
+                        _ => {
+                            return Some(Err(TokenizeError {
+                                code: TokenizeErrorCode::UnexpectedCharacter(chr),
+                                location: self.location,
+                            }));
+                        },
+                    },
+                },
+                LexingState::EndOfFile => match next_chr {
+                    None => return None,
+                    Some(chr) => {
+                        // this should be unreachable, but just in case
+                        return Some(Err(TokenizeError {
+                            code: TokenizeErrorCode::CharacterAfterEndOfFile(chr),
+                            location: self.location,
+                        }));
+                    },
                 },
             }
         }
