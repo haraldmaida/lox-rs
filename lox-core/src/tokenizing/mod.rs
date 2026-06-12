@@ -1,4 +1,5 @@
 use crate::source::{Location, SourceCode};
+use std::collections::VecDeque;
 use std::fmt::{self, Debug, Display};
 use std::{io, mem};
 
@@ -18,11 +19,11 @@ where
     }
 }
 
-#[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LexingErrorCode {
     IoError(String),
     CharacterAfterEndOfFile(char),
+    InvalidNumberLiteral(String),
     UnexpectedCharacter(char),
     UnterminatedStringLiteral(String),
 }
@@ -32,6 +33,7 @@ impl Display for LexingErrorCode {
         match self {
             Self::IoError(message) => write!(f, "{message}"),
             Self::CharacterAfterEndOfFile(chr) => write!(f, "character '{chr}' after end of file"),
+            Self::InvalidNumberLiteral(value) => write!(f, "invalid number literal {value}"),
             Self::UnexpectedCharacter(chr) => write!(f, "unexpected character '{chr}'"),
             Self::UnterminatedStringLiteral(value) => {
                 write!(f, "unterminated string literal \"{value}")
@@ -63,7 +65,7 @@ impl LexingError {
     }
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq)]
 pub enum Token {
     EndOfFile,
     Comma,
@@ -86,6 +88,7 @@ pub enum Token {
     GreaterEqual,
     LessEqual,
     StringLiteral(String),
+    NumberLiteral(f64),
 }
 
 impl Debug for Token {
@@ -112,6 +115,7 @@ impl Debug for Token {
             Self::GreaterEqual => write!(f, "GREATER_EQUAL >= null"),
             Self::LessEqual => write!(f, "LESS_EQUAL <= null"),
             Self::StringLiteral(value) => write!(f, "STRING_LITERAL \"{value}\" {value:?}"),
+            Self::NumberLiteral(value) => write!(f, "NUMBER_LITERAL {value} {value:?}"),
         }
     }
 }
@@ -173,6 +177,8 @@ enum LexingState {
     MaybeLineComment,
     LineComment,
     StringLiteral,
+    NumberLiteral,
+    MaybeDecimalPoint,
     EndOfFile,
 }
 
@@ -188,6 +194,7 @@ pub struct Tokens<I> {
     location: Location,
     state: LexingState,
     literal: String,
+    open_chars: VecDeque<char>,
 }
 
 impl<I> Tokens<I>
@@ -200,11 +207,17 @@ where
             location: Location::default(),
             state: LexingState::default(),
             literal: String::new(),
+            open_chars: VecDeque::with_capacity(2),
         }
     }
 
     fn advance_to_next_char(&mut self) -> Option<Result<char, LexingError>> {
-        let next_chr = self.source.next();
+        let next_chr = self
+            .open_chars
+            .pop_front()
+            .map(Ok)
+            .or_else(|| self.source.next());
+
         match next_chr {
             None => None,
             Some(Ok('\n')) => {
@@ -274,6 +287,11 @@ where
                         '"' => {
                             self.state = LexingState::StringLiteral;
                             self.literal.clear();
+                        },
+                        _ if chr.is_ascii_digit() => {
+                            self.state = LexingState::NumberLiteral;
+                            self.literal.clear();
+                            self.literal.push(chr);
                         },
                         _ if chr.is_whitespace() => {
                             // ignore whitespace
@@ -423,8 +441,71 @@ where
                         let value = mem::take(&mut self.literal);
                         return Some(Ok(Token::StringLiteral(value)));
                     },
+                    Some(chr) => self.literal.push(chr),
+                },
+                LexingState::NumberLiteral => match next_chr {
+                    None => {
+                        self.state = LexingState::Initial;
+                        let str_value = mem::take(&mut self.literal);
+                        match str_value.parse::<f64>() {
+                            Ok(value) => {
+                                return Some(Ok(Token::NumberLiteral(value)));
+                            },
+                            Err(_) => {
+                                return Some(Err(LexingError {
+                                    code: LexingErrorCode::InvalidNumberLiteral(str_value),
+                                    location: self.location,
+                                }));
+                            },
+                        }
+                    },
+                    Some('.') => {
+                        self.state = LexingState::MaybeDecimalPoint;
+                    },
+                    Some(chr) if chr.is_ascii_digit() => self.literal.push(chr),
                     Some(chr) => {
+                        self.state = LexingState::Initial;
+                        self.open_chars.push_back(chr);
+                        let str_value = mem::take(&mut self.literal);
+                        match str_value.parse::<f64>() {
+                            Ok(value) => {
+                                return Some(Ok(Token::NumberLiteral(value)));
+                            },
+                            Err(_) => {
+                                return Some(Err(LexingError {
+                                    code: LexingErrorCode::InvalidNumberLiteral(str_value),
+                                    location: self.location,
+                                }));
+                            },
+                        }
+                    },
+                },
+                LexingState::MaybeDecimalPoint => match next_chr {
+                    None => {
+                        self.state = LexingState::Initial;
+                        self.literal.push('.');
+                        let lexeme = mem::take(&mut self.literal);
+                        return Some(Err(LexingError {
+                            code: LexingErrorCode::InvalidNumberLiteral(lexeme),
+                            location: self.location,
+                        }));
+                    },
+                    Some(chr) if chr.is_ascii_digit() => {
+                        self.state = LexingState::NumberLiteral;
+                        self.literal.push('.');
                         self.literal.push(chr);
+                    },
+                    Some(chr) => {
+                        self.state = LexingState::Initial;
+                        self.literal.push('.');
+                        self.open_chars.push_back(chr);
+                        //TODO: scan for function calls on number literal
+                        // - returning lexing error for now
+                        let lexeme = mem::take(&mut self.literal);
+                        return Some(Err(LexingError {
+                            code: LexingErrorCode::InvalidNumberLiteral(lexeme),
+                            location: self.location,
+                        }));
                     },
                 },
                 LexingState::EndOfFile => match next_chr {

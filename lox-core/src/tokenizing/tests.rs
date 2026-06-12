@@ -352,3 +352,65 @@ fn tokenize_string_literal_which_is_unterminated() {
         Ok(Token::EndOfFile),
     ]);
 }
+
+#[test]
+fn tokenize_number_literal_integer_0() {
+    let mut source_code = "0";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([Ok(Token::NumberLiteral(0.)), Ok(Token::EndOfFile)]);
+}
+
+#[test]
+fn tokenize_number_literal_integer_256() {
+    let mut source_code = "256";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([Ok(Token::NumberLiteral(256.)), Ok(Token::EndOfFile)]);
+}
+
+#[test]
+fn tokenize_number_literal_float_1_98() {
+    let mut source_code = "1.98";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([Ok(Token::NumberLiteral(1.98)), Ok(Token::EndOfFile)]);
+}
+
+#[test]
+fn tokenize_list_of_number_literal_float_1_98() {
+    let mut source_code = "811.2344, 5.0, 0.67";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::NumberLiteral(811.2344)),
+        Ok(Token::Comma),
+        Ok(Token::NumberLiteral(5.0)),
+        Ok(Token::Comma),
+        Ok(Token::NumberLiteral(0.67)),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_number_literal_with_dot_at_the_end() {
+    let mut source_code = "400,\n4.,\n655";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::NumberLiteral(400.)),
+        Ok(Token::Comma),
+        Err(LexingError {
+            code: LexingErrorCode::InvalidNumberLiteral("4.".to_string()),
+            location: Location { line: 2, char: 3 },
+        }),
+        Ok(Token::Comma),
+        Ok(Token::NumberLiteral(655.)),
+        Ok(Token::EndOfFile),
+    ]);
+}
