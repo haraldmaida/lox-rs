@@ -187,6 +187,59 @@ fn tokenize_unexpected_character_at_line_3_char_1() {
     ]);
 }
 
+#[test]
+fn tokenize_string_literal_empty_string() {
+    let mut source_code = r#""""#;
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::StringLiteral(String::new())),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_string_literal_with_some_characters() {
+    let mut source_code = r#""some text""#;
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::StringLiteral("some text".to_string())),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_string_literal_with_line_breaks() {
+    let mut source_code = "\"first line\nsecond line\r\nthird line\"";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::StringLiteral(
+            "first line\nsecond line\r\nthird line".to_string(),
+        )),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
+#[test]
+fn tokenize_string_literal_which_is_unterminated() {
+    let mut source_code = r#""some text"#;
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Err(LexingError {
+            code: LexingErrorCode::UnterminatedStringLiteral("some text".to_string()),
+            location: Location { line: 1, char: 10 },
+        }),
+        Ok(Token::EndOfFile),
+    ]);
+}
+
 mod lexing_error_code {
     use super::*;
 

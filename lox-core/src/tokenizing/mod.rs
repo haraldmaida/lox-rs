@@ -1,6 +1,6 @@
 use crate::source::{Location, SourceCode};
 use std::fmt::{self, Debug, Display};
-use std::io;
+use std::{io, mem};
 
 pub trait Tokenize<'a>
 where
@@ -24,6 +24,7 @@ pub enum LexingErrorCode {
     IoError(String),
     CharacterAfterEndOfFile(char),
     UnexpectedCharacter(char),
+    UnterminatedStringLiteral(String),
 }
 
 impl Display for LexingErrorCode {
@@ -32,6 +33,9 @@ impl Display for LexingErrorCode {
             Self::IoError(message) => write!(f, "{message}"),
             Self::CharacterAfterEndOfFile(chr) => write!(f, "character '{chr}' after end of file"),
             Self::UnexpectedCharacter(chr) => write!(f, "unexpected character '{chr}'"),
+            Self::UnterminatedStringLiteral(value) => {
+                write!(f, "unterminated string literal \"{value}")
+            },
         }
     }
 }
@@ -81,6 +85,7 @@ pub enum Token {
     EqualEqual,
     GreaterEqual,
     LessEqual,
+    StringLiteral(String),
 }
 
 impl Debug for Token {
@@ -106,6 +111,7 @@ impl Debug for Token {
             Self::EqualEqual => write!(f, "EQUAL_EQUAL == null"),
             Self::GreaterEqual => write!(f, "GREATER_EQUAL >= null"),
             Self::LessEqual => write!(f, "LESS_EQUAL <= null"),
+            Self::StringLiteral(value) => write!(f, "STRING_LITERAL \"{value}\" {value:?}"),
         }
     }
 }
@@ -166,6 +172,7 @@ enum LexingState {
     MaybeLessEqual,
     MaybeLineComment,
     LineComment,
+    StringLiteral,
     EndOfFile,
 }
 
@@ -180,6 +187,7 @@ pub struct Tokens<I> {
     source: I,
     location: Location,
     state: LexingState,
+    literal: String,
 }
 
 impl<I> Tokens<I>
@@ -191,6 +199,7 @@ where
             source,
             location: Location::default(),
             state: LexingState::default(),
+            literal: String::new(),
         }
     }
 
@@ -261,6 +270,10 @@ where
                         },
                         '>' => {
                             self.state = LexingState::MaybeGreaterEqual;
+                        },
+                        '"' => {
+                            self.state = LexingState::StringLiteral;
+                            self.literal.clear();
                         },
                         _ if chr.is_whitespace() => {
                             // ignore whitespace
@@ -392,6 +405,26 @@ where
                     },
                     Some(_) => {
                         // ignore characters in line comment
+                    },
+                },
+                LexingState::StringLiteral => match next_chr {
+                    None => {
+                        self.state = LexingState::Initial;
+                        let lexeme = mem::take(&mut self.literal);
+                        //TODO: should the location in the lexing error point to
+                        // the beginning of the lexeme or the end?
+                        return Some(Err(LexingError {
+                            code: LexingErrorCode::UnterminatedStringLiteral(lexeme),
+                            location: self.location,
+                        }));
+                    },
+                    Some('"') => {
+                        self.state = LexingState::Initial;
+                        let value = mem::take(&mut self.literal);
+                        return Some(Ok(Token::StringLiteral(value)));
+                    },
+                    Some(chr) => {
+                        self.literal.push(chr);
                     },
                 },
                 LexingState::EndOfFile => match next_chr {
