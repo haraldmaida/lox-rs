@@ -48,6 +48,7 @@ dead_code = "warn"
 pedantic = { level = "warn", priority = -1 }
 nursery = { level = "warn", priority = -1 }
 must_use_candidate = "allow"
+option_if_let_else = "allow"
 print_stderr = "warn"
 print_stdout = "warn"
 unwrap_used = "deny"

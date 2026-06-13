@@ -361,17 +361,7 @@ where
                     None => {
                         self.state = LexingState::Initial;
                         let lexeme = mem::take(&mut self.current_lexeme);
-                        match lexeme.parse::<f64>() {
-                            Ok(value) => {
-                                return Some(Ok(Token::NumberLiteral(value)));
-                            },
-                            Err(_) => {
-                                return Some(Err(LexingError {
-                                    code: LexingErrorCode::InvalidNumberLiteral(lexeme),
-                                    location: self.location,
-                                }));
-                            },
-                        }
+                        return Some(parse_number_token(lexeme, self.location));
                     },
                     Some('.') => {
                         self.state = LexingState::MaybeDecimalPoint;
@@ -381,34 +371,14 @@ where
                         self.state = LexingState::Initial;
                         self.open_chars.push_back(chr);
                         let lexeme = mem::take(&mut self.current_lexeme);
-                        match lexeme.parse::<f64>() {
-                            Ok(value) => {
-                                return Some(Ok(Token::NumberLiteral(value)));
-                            },
-                            Err(_) => {
-                                return Some(Err(LexingError {
-                                    code: LexingErrorCode::InvalidNumberLiteral(lexeme),
-                                    location: self.location,
-                                }));
-                            },
-                        }
+                        return Some(parse_number_token(lexeme, self.location));
                     },
                 },
                 LexingState::MaybeDecimalPoint => match next_chr {
                     None => {
                         self.state = LexingState::Initial;
                         let lexeme = mem::take(&mut self.current_lexeme);
-                        match lexeme.parse::<f64>() {
-                            Ok(value) => {
-                                return Some(Ok(Token::NumberLiteral(value)));
-                            },
-                            Err(_) => {
-                                return Some(Err(LexingError {
-                                    code: LexingErrorCode::InvalidNumberLiteral(lexeme),
-                                    location: self.location,
-                                }));
-                            },
-                        }
+                        return Some(parse_number_token(lexeme, self.location));
                     },
                     Some(chr) if chr.is_ascii_digit() => {
                         self.state = LexingState::NumberLiteral;
@@ -422,17 +392,7 @@ where
                         }
                         self.open_chars.push_back(chr);
                         let lexeme = mem::take(&mut self.current_lexeme);
-                        match lexeme.parse::<f64>() {
-                            Ok(value) => {
-                                return Some(Ok(Token::NumberLiteral(value)));
-                            },
-                            Err(_) => {
-                                return Some(Err(LexingError {
-                                    code: LexingErrorCode::InvalidNumberLiteral(lexeme),
-                                    location: self.location,
-                                }));
-                            },
-                        }
+                        return Some(parse_number_token(lexeme, self.location));
                     },
                 },
                 LexingState::Identifier => match next_chr {
@@ -463,6 +423,16 @@ where
                 },
             }
         }
+    }
+}
+
+fn parse_number_token(lexeme: String, location: Location) -> Result<Token, LexingError> {
+    match lexeme.parse::<f64>() {
+        Ok(value) => Ok(Token::NumberLiteral(value)),
+        Err(_) => Err(LexingError {
+            code: LexingErrorCode::InvalidNumberLiteral(lexeme),
+            location,
+        }),
     }
 }
 
