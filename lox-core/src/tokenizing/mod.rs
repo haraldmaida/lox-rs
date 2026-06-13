@@ -1,5 +1,5 @@
 use crate::source::{Location, SourceCode};
-use crate::token::Token;
+use crate::token::{Literal, Token, TokenKind};
 use std::collections::VecDeque;
 use std::fmt::{self, Debug, Display};
 use std::{io, mem};
@@ -138,9 +138,10 @@ impl Default for LexingState {
 
 pub struct Tokens<I> {
     source: I,
-    location: Location,
     state: LexingState,
+    start_location: Location,
     current_lexeme: String,
+    current_location: Location,
     open_chars: VecDeque<char>,
 }
 
@@ -151,9 +152,10 @@ where
     pub fn new(source: I) -> Self {
         Self {
             source,
-            location: Location::default(),
             state: LexingState::default(),
+            start_location: Location::default(),
             current_lexeme: String::new(),
+            current_location: Location::default(),
             open_chars: VecDeque::with_capacity(2),
         }
     }
@@ -168,18 +170,23 @@ where
         match next_chr {
             None => None,
             Some(Ok('\n')) => {
-                self.location.advance_line();
+                self.current_location.advance_line();
                 Some(Ok('\n'))
             },
             Some(Ok(chr)) => {
-                self.location.advance_char();
+                self.current_location.advance_char();
                 Some(Ok(chr))
             },
             Some(Err(error)) => Some(Err(LexingError {
                 code: error.into(),
-                location: self.location,
+                location: self.current_location,
             })),
         }
+    }
+
+    fn revert_char(&mut self, chr: char) {
+        self.open_chars.push_back(chr);
+        self.current_location.revert(1);
     }
 }
 
@@ -203,136 +210,293 @@ where
                 LexingState::Initial => match next_chr {
                     None => {
                         self.state = LexingState::EndOfFile;
-                        return Some(Ok(Token::EndOfFile));
+                        let lexeme = mem::take(&mut self.current_lexeme);
+                        return Some(Ok(nonliteral_token(
+                            TokenKind::EndOfFile,
+                            lexeme,
+                            self.current_location,
+                        )));
                     },
-                    Some(chr) => match chr {
-                        ',' => return Some(Ok(Token::Comma)),
-                        '(' => return Some(Ok(Token::LeftParen)),
-                        ')' => return Some(Ok(Token::RightParen)),
-                        '{' => return Some(Ok(Token::LeftBrace)),
-                        '}' => return Some(Ok(Token::RightBrace)),
-                        '.' => return Some(Ok(Token::Dot)),
-                        ';' => return Some(Ok(Token::Semicolon)),
-                        '-' => return Some(Ok(Token::Minus)),
-                        '+' => return Some(Ok(Token::Plus)),
-                        '*' => return Some(Ok(Token::Star)),
-                        '/' => {
-                            self.state = LexingState::MaybeLineComment;
-                        },
-                        '!' => {
-                            self.state = LexingState::MaybeBangEqual;
-                        },
-                        '=' => {
-                            self.state = LexingState::MaybeEqualEqual;
-                        },
-                        '<' => {
-                            self.state = LexingState::MaybeLessEqual;
-                        },
-                        '>' => {
-                            self.state = LexingState::MaybeGreaterEqual;
-                        },
-                        '"' => {
-                            self.state = LexingState::StringLiteral;
-                        },
-                        _ if chr.is_ascii_digit() => {
-                            self.state = LexingState::NumberLiteral;
-                            self.current_lexeme.push(chr);
-                        },
-                        _ if chr.is_ascii_alphabetic() || chr == '_' => {
-                            self.state = LexingState::Identifier;
-                            self.current_lexeme.push(chr);
-                        },
-                        _ if chr.is_whitespace() => {
-                            // ignore whitespace
-                        },
-                        _ => {
-                            return Some(Err(LexingError {
-                                code: LexingErrorCode::UnexpectedCharacter(chr),
-                                location: self.location,
-                            }));
-                        },
+                    Some(chr) => {
+                        self.current_lexeme.push(chr);
+                        match chr {
+                            ',' => {
+                                let lexeme = mem::take(&mut self.current_lexeme);
+                                return Some(Ok(nonliteral_token(
+                                    TokenKind::Comma,
+                                    lexeme,
+                                    self.current_location,
+                                )));
+                            },
+                            '(' => {
+                                let lexeme = mem::take(&mut self.current_lexeme);
+                                return Some(Ok(nonliteral_token(
+                                    TokenKind::LeftParen,
+                                    lexeme,
+                                    self.current_location,
+                                )));
+                            },
+                            ')' => {
+                                let lexeme = mem::take(&mut self.current_lexeme);
+                                return Some(Ok(nonliteral_token(
+                                    TokenKind::RightParen,
+                                    lexeme,
+                                    self.current_location,
+                                )));
+                            },
+                            '{' => {
+                                let lexeme = mem::take(&mut self.current_lexeme);
+                                return Some(Ok(nonliteral_token(
+                                    TokenKind::LeftBrace,
+                                    lexeme,
+                                    self.current_location,
+                                )));
+                            },
+                            '}' => {
+                                let lexeme = mem::take(&mut self.current_lexeme);
+                                return Some(Ok(nonliteral_token(
+                                    TokenKind::RightBrace,
+                                    lexeme,
+                                    self.current_location,
+                                )));
+                            },
+                            '.' => {
+                                let lexeme = mem::take(&mut self.current_lexeme);
+                                return Some(Ok(nonliteral_token(
+                                    TokenKind::Dot,
+                                    lexeme,
+                                    self.current_location,
+                                )));
+                            },
+                            ';' => {
+                                let lexeme = mem::take(&mut self.current_lexeme);
+                                return Some(Ok(nonliteral_token(
+                                    TokenKind::Semicolon,
+                                    lexeme,
+                                    self.current_location,
+                                )));
+                            },
+                            '-' => {
+                                let lexeme = mem::take(&mut self.current_lexeme);
+                                return Some(Ok(nonliteral_token(
+                                    TokenKind::Minus,
+                                    lexeme,
+                                    self.current_location,
+                                )));
+                            },
+                            '+' => {
+                                let lexeme = mem::take(&mut self.current_lexeme);
+                                return Some(Ok(nonliteral_token(
+                                    TokenKind::Plus,
+                                    lexeme,
+                                    self.current_location,
+                                )));
+                            },
+                            '*' => {
+                                let lexeme = mem::take(&mut self.current_lexeme);
+                                return Some(Ok(nonliteral_token(
+                                    TokenKind::Star,
+                                    lexeme,
+                                    self.current_location,
+                                )));
+                            },
+                            '/' => {
+                                self.state = LexingState::MaybeLineComment;
+                                self.start_location = self.current_location;
+                            },
+                            '!' => {
+                                self.state = LexingState::MaybeBangEqual;
+                                self.start_location = self.current_location;
+                            },
+                            '=' => {
+                                self.state = LexingState::MaybeEqualEqual;
+                                self.start_location = self.current_location;
+                            },
+                            '<' => {
+                                self.state = LexingState::MaybeLessEqual;
+                                self.start_location = self.current_location;
+                            },
+                            '>' => {
+                                self.state = LexingState::MaybeGreaterEqual;
+                                self.start_location = self.current_location;
+                            },
+                            '"' => {
+                                self.state = LexingState::StringLiteral;
+                                self.start_location = self.current_location;
+                            },
+                            _ if chr.is_ascii_digit() => {
+                                self.state = LexingState::NumberLiteral;
+                                self.start_location = self.current_location;
+                            },
+                            _ if chr.is_ascii_alphabetic() || chr == '_' => {
+                                self.state = LexingState::Identifier;
+                                self.start_location = self.current_location;
+                            },
+                            _ if chr.is_whitespace() => {
+                                // ignore whitespace
+                                self.current_lexeme.pop();
+                            },
+                            _ => {
+                                self.current_lexeme.clear();
+                                return Some(Err(LexingError {
+                                    code: LexingErrorCode::UnexpectedCharacter(chr),
+                                    location: self.current_location,
+                                }));
+                            },
+                        }
                     },
                 },
                 LexingState::MaybeBangEqual => match next_chr {
                     None => {
                         self.state = LexingState::Initial;
-                        return Some(Ok(Token::Bang));
+                        let lexeme = mem::take(&mut self.current_lexeme);
+                        return Some(Ok(nonliteral_token(
+                            TokenKind::Bang,
+                            lexeme,
+                            self.start_location,
+                        )));
                     },
                     Some('=') => {
                         self.state = LexingState::Initial;
-                        return Some(Ok(Token::BangEqual));
+                        self.current_lexeme.push('=');
+                        let lexeme = mem::take(&mut self.current_lexeme);
+                        return Some(Ok(nonliteral_token(
+                            TokenKind::BangEqual,
+                            lexeme,
+                            self.start_location,
+                        )));
                     },
                     Some(chr) => {
                         self.state = LexingState::Initial;
-                        self.open_chars.push_back(chr);
-                        return Some(Ok(Token::Bang));
+                        self.revert_char(chr);
+                        let lexeme = mem::take(&mut self.current_lexeme);
+                        return Some(Ok(nonliteral_token(
+                            TokenKind::Bang,
+                            lexeme,
+                            self.start_location,
+                        )));
                     },
                 },
                 LexingState::MaybeEqualEqual => match next_chr {
                     None => {
                         self.state = LexingState::Initial;
-                        return Some(Ok(Token::Equal));
+                        let lexeme = mem::take(&mut self.current_lexeme);
+                        return Some(Ok(nonliteral_token(
+                            TokenKind::Equal,
+                            lexeme,
+                            self.start_location,
+                        )));
                     },
                     Some('=') => {
                         self.state = LexingState::Initial;
-                        return Some(Ok(Token::EqualEqual));
+                        self.current_lexeme.push('=');
+                        let lexeme = mem::take(&mut self.current_lexeme);
+                        return Some(Ok(nonliteral_token(
+                            TokenKind::EqualEqual,
+                            lexeme,
+                            self.start_location,
+                        )));
                     },
                     Some(chr) => {
                         self.state = LexingState::Initial;
-                        self.open_chars.push_back(chr);
-                        return Some(Ok(Token::Equal));
+                        self.revert_char(chr);
+                        let lexeme = mem::take(&mut self.current_lexeme);
+                        return Some(Ok(nonliteral_token(
+                            TokenKind::Equal,
+                            lexeme,
+                            self.start_location,
+                        )));
                     },
                 },
                 LexingState::MaybeGreaterEqual => match next_chr {
                     None => {
                         self.state = LexingState::Initial;
-                        return Some(Ok(Token::Greater));
+                        let lexeme = mem::take(&mut self.current_lexeme);
+                        return Some(Ok(nonliteral_token(
+                            TokenKind::Greater,
+                            lexeme,
+                            self.start_location,
+                        )));
                     },
                     Some('=') => {
                         self.state = LexingState::Initial;
-                        return Some(Ok(Token::GreaterEqual));
+                        self.current_lexeme.push('=');
+                        let lexeme = mem::take(&mut self.current_lexeme);
+                        return Some(Ok(nonliteral_token(
+                            TokenKind::GreaterEqual,
+                            lexeme,
+                            self.start_location,
+                        )));
                     },
                     Some(chr) => {
                         self.state = LexingState::Initial;
-                        self.open_chars.push_back(chr);
-                        return Some(Ok(Token::Greater));
+                        self.revert_char(chr);
+                        let lexeme = mem::take(&mut self.current_lexeme);
+                        return Some(Ok(nonliteral_token(
+                            TokenKind::Greater,
+                            lexeme,
+                            self.start_location,
+                        )));
                     },
                 },
                 LexingState::MaybeLessEqual => match next_chr {
                     None => {
                         self.state = LexingState::Initial;
-                        return Some(Ok(Token::Less));
+                        let lexeme = mem::take(&mut self.current_lexeme);
+                        return Some(Ok(nonliteral_token(
+                            TokenKind::Less,
+                            lexeme,
+                            self.start_location,
+                        )));
                     },
                     Some('=') => {
                         self.state = LexingState::Initial;
-                        return Some(Ok(Token::LessEqual));
+                        self.current_lexeme.push('=');
+                        let lexeme = mem::take(&mut self.current_lexeme);
+                        return Some(Ok(nonliteral_token(
+                            TokenKind::LessEqual,
+                            lexeme,
+                            self.start_location,
+                        )));
                     },
                     Some(chr) => {
                         self.state = LexingState::Initial;
-                        self.open_chars.push_back(chr);
-                        return Some(Ok(Token::Less));
+                        self.revert_char(chr);
+                        let lexeme = mem::take(&mut self.current_lexeme);
+                        return Some(Ok(nonliteral_token(
+                            TokenKind::Less,
+                            lexeme,
+                            self.start_location,
+                        )));
                     },
                 },
                 LexingState::MaybeLineComment => match next_chr {
                     None => {
                         self.state = LexingState::Initial;
-                        return Some(Ok(Token::Slash));
+                        let lexeme = mem::take(&mut self.current_lexeme);
+                        return Some(Ok(nonliteral_token(
+                            TokenKind::Slash,
+                            lexeme,
+                            self.start_location,
+                        )));
                     },
                     Some('/') => {
                         self.state = LexingState::LineComment;
+                        self.current_lexeme.clear();
                     },
                     Some(chr) => {
                         self.state = LexingState::Initial;
-                        self.open_chars.push_back(chr);
-                        return Some(Ok(Token::Slash));
+                        self.revert_char(chr);
+                        let lexeme = mem::take(&mut self.current_lexeme);
+                        return Some(Ok(nonliteral_token(
+                            TokenKind::Slash,
+                            lexeme,
+                            self.start_location,
+                        )));
                     },
                 },
                 LexingState::LineComment => match next_chr {
-                    None => {
-                        self.state = LexingState::EndOfFile;
-                        return Some(Ok(Token::EndOfFile));
-                    },
-                    Some('\n') => {
+                    None | Some('\n') => {
                         self.state = LexingState::Initial;
                     },
                     Some(_) => {
@@ -343,17 +507,17 @@ where
                     None => {
                         self.state = LexingState::Initial;
                         let lexeme = mem::take(&mut self.current_lexeme);
-                        //TODO: should the location in the lexing error point to
-                        // the beginning of the lexeme or the end?
                         return Some(Err(LexingError {
                             code: LexingErrorCode::UnterminatedStringLiteral(lexeme),
-                            location: self.location,
+                            location: self.start_location,
                         }));
                     },
                     Some('"') => {
                         self.state = LexingState::Initial;
-                        let value = mem::take(&mut self.current_lexeme);
-                        return Some(Ok(Token::StringLiteral(value)));
+                        self.current_lexeme.push('"');
+                        let lexeme = mem::take(&mut self.current_lexeme);
+                        let value = lexeme.trim_matches('"').to_string();
+                        return Some(Ok(string_literal(lexeme, value, self.start_location)));
                     },
                     Some(chr) => self.current_lexeme.push(chr),
                 },
@@ -361,7 +525,7 @@ where
                     None => {
                         self.state = LexingState::Initial;
                         let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(parse_number_token(lexeme, self.location));
+                        return Some(parse_number_token(lexeme, self.start_location));
                     },
                     Some('.') => {
                         self.state = LexingState::MaybeDecimalPoint;
@@ -369,16 +533,17 @@ where
                     Some(chr) if chr.is_ascii_digit() => self.current_lexeme.push(chr),
                     Some(chr) => {
                         self.state = LexingState::Initial;
-                        self.open_chars.push_back(chr);
+                        self.revert_char(chr);
                         let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(parse_number_token(lexeme, self.location));
+                        return Some(parse_number_token(lexeme, self.start_location));
                     },
                 },
                 LexingState::MaybeDecimalPoint => match next_chr {
                     None => {
                         self.state = LexingState::Initial;
+                        self.current_lexeme.push('.');
                         let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(parse_number_token(lexeme, self.location));
+                        return Some(parse_number_token(lexeme, self.start_location));
                     },
                     Some(chr) if chr.is_ascii_digit() => {
                         self.state = LexingState::NumberLiteral;
@@ -388,27 +553,29 @@ where
                     Some(chr) => {
                         self.state = LexingState::Initial;
                         if chr.is_ascii_alphabetic() || chr == '_' {
-                            self.open_chars.push_back('.');
+                            self.revert_char('.');
+                        } else {
+                            self.current_lexeme.push('.');
                         }
-                        self.open_chars.push_back(chr);
+                        self.revert_char(chr);
                         let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(parse_number_token(lexeme, self.location));
+                        return Some(parse_number_token(lexeme, self.start_location));
                     },
                 },
                 LexingState::Identifier => match next_chr {
                     None => {
                         self.state = LexingState::Initial;
-                        let identifier = mem::take(&mut self.current_lexeme);
-                        return Some(Ok(Token::Identifier(identifier)));
+                        let lexeme = mem::take(&mut self.current_lexeme);
+                        return Some(Ok(keyword_or_identifier(lexeme, self.start_location)));
                     },
                     Some(chr) if chr.is_ascii_alphanumeric() || chr == '_' => {
                         self.current_lexeme.push(chr);
                     },
                     Some(chr) => {
                         self.state = LexingState::Initial;
-                        self.open_chars.push_back(chr);
+                        self.revert_char(chr);
                         let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(Ok(keyword_or_identifier(lexeme)));
+                        return Some(Ok(keyword_or_identifier(lexeme, self.start_location)));
                     },
                 },
                 LexingState::EndOfFile => match next_chr {
@@ -417,7 +584,7 @@ where
                         // this should be unreachable, but just in case
                         return Some(Err(LexingError {
                             code: LexingErrorCode::CharacterAfterEndOfFile(chr),
-                            location: self.location,
+                            location: self.current_location,
                         }));
                     },
                 },
@@ -428,7 +595,7 @@ where
 
 fn parse_number_token(lexeme: String, location: Location) -> Result<Token, LexingError> {
     match lexeme.parse::<f64>() {
-        Ok(value) => Ok(Token::NumberLiteral(value)),
+        Ok(value) => Ok(number_literal(lexeme, value, location)),
         Err(_) => Err(LexingError {
             code: LexingErrorCode::InvalidNumberLiteral(lexeme),
             location,
@@ -436,26 +603,49 @@ fn parse_number_token(lexeme: String, location: Location) -> Result<Token, Lexin
     }
 }
 
-fn keyword_or_identifier(lexeme: String) -> Token {
-    match &lexeme[..] {
-        "and" => Token::And,
-        "class" => Token::Class,
-        "else" => Token::Else,
-        "false" => Token::False,
-        "for" => Token::For,
-        "fun" => Token::Fun,
-        "if" => Token::If,
-        "nil" => Token::Nil,
-        "or" => Token::Or,
-        "print" => Token::Print,
-        "return" => Token::Return,
-        "super" => Token::Super,
-        "this" => Token::This,
-        "true" => Token::True,
-        "var" => Token::Var,
-        "while" => Token::While,
-        _ => Token::Identifier(lexeme),
-    }
+const fn nonliteral_token(kind: TokenKind, lexeme: String, location: Location) -> Token {
+    Token::new(kind, None, lexeme, location)
+}
+
+const fn number_literal(lexeme: String, value: f64, location: Location) -> Token {
+    Token::new(
+        TokenKind::NumberLiteral,
+        Some(Literal::Number(value)),
+        lexeme,
+        location,
+    )
+}
+
+const fn string_literal(lexeme: String, value: String, location: Location) -> Token {
+    Token::new(
+        TokenKind::StringLiteral,
+        Some(Literal::String(value)),
+        lexeme,
+        location,
+    )
+}
+
+fn keyword_or_identifier(lexeme: String, location: Location) -> Token {
+    let token_kind = match &lexeme[..] {
+        "and" => TokenKind::And,
+        "class" => TokenKind::Class,
+        "else" => TokenKind::Else,
+        "false" => TokenKind::False,
+        "for" => TokenKind::For,
+        "fun" => TokenKind::Fun,
+        "if" => TokenKind::If,
+        "nil" => TokenKind::Nil,
+        "or" => TokenKind::Or,
+        "print" => TokenKind::Print,
+        "return" => TokenKind::Return,
+        "super" => TokenKind::Super,
+        "this" => TokenKind::This,
+        "true" => TokenKind::True,
+        "var" => TokenKind::Var,
+        "while" => TokenKind::While,
+        _ => TokenKind::Identifier,
+    };
+    Token::new(token_kind, None, lexeme, location)
 }
 
 #[cfg(test)]

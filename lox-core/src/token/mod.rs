@@ -1,8 +1,9 @@
+use crate::source::Location;
 use std::fmt;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
-#[derive(Clone, PartialEq)]
-pub enum Token {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TokenKind {
     EndOfFile,
     LeftParen,
     RightParen,
@@ -23,9 +24,9 @@ pub enum Token {
     EqualEqual,
     GreaterEqual,
     LessEqual,
-    StringLiteral(String),
-    NumberLiteral(f64),
-    Identifier(String),
+    StringLiteral,
+    NumberLiteral,
+    Identifier,
     And,
     Class,
     Else,
@@ -44,49 +45,179 @@ pub enum Token {
     While,
 }
 
-impl Debug for Token {
+impl Display for TokenKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let formatted = match self {
+            Self::EndOfFile => "EOF",
+            Self::LeftParen => "LEFT_PAREN",
+            Self::RightParen => "RIGHT_PAREN",
+            Self::LeftBrace => "LEFT_BRACE",
+            Self::RightBrace => "RIGHT_BRACE",
+            Self::Comma => "COMMA",
+            Self::Dot => "DOT",
+            Self::Semicolon => "SEMICOLON",
+            Self::Minus => "MINUS",
+            Self::Plus => "PLUS",
+            Self::Star => "STAR",
+            Self::Slash => "SLASH",
+            Self::Bang => "BANG",
+            Self::Equal => "EQUAL",
+            Self::Greater => "GREATER",
+            Self::Less => "LESS",
+            Self::BangEqual => "BANG_EQUAL",
+            Self::EqualEqual => "EQUAL_EQUAL",
+            Self::GreaterEqual => "GREATER_EQUAL",
+            Self::LessEqual => "LESS_EQUAL",
+            Self::StringLiteral => "STRING_LITERAL",
+            Self::NumberLiteral => "NUMBER_LITERAL",
+            Self::Identifier => "IDENTIFIER",
+            Self::And => "AND",
+            Self::Class => "CLASS",
+            Self::Else => "ELSE",
+            Self::False => "FALSE",
+            Self::Fun => "FUN",
+            Self::For => "FOR",
+            Self::If => "IF",
+            Self::Nil => "NIL",
+            Self::Or => "OR",
+            Self::Print => "PRINT",
+            Self::Return => "RETURN",
+            Self::Super => "SUPER",
+            Self::This => "THIS",
+            Self::True => "TRUE",
+            Self::Var => "VAR",
+            Self::While => "WHILE",
+        };
+        f.write_str(formatted)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Literal {
+    Number(f64),
+    String(String),
+}
+
+impl Display for Literal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::EndOfFile => write!(f, "EOF  null"),
-            Self::LeftParen => write!(f, "LEFT_PAREN ( null"),
-            Self::RightParen => write!(f, "RIGHT_PAREN ) null"),
-            Self::LeftBrace => write!(f, "LEFT_BRACE {{ null"),
-            Self::RightBrace => write!(f, "RIGHT_BRACE }} null"),
-            Self::Comma => write!(f, "COMMA , null"),
-            Self::Dot => write!(f, "DOT . null"),
-            Self::Semicolon => write!(f, "SEMICOLON ; null"),
-            Self::Minus => write!(f, "MINUS - null"),
-            Self::Plus => write!(f, "PLUS + null"),
-            Self::Star => write!(f, "STAR * null"),
-            Self::Slash => write!(f, "SLASH / null"),
-            Self::Bang => write!(f, "BANG ! null"),
-            Self::Equal => write!(f, "EQUAL = null"),
-            Self::Greater => write!(f, "GREATER > null"),
-            Self::Less => write!(f, "LESS < null"),
-            Self::BangEqual => write!(f, "BANG_EQUAL != null"),
-            Self::EqualEqual => write!(f, "EQUAL_EQUAL == null"),
-            Self::GreaterEqual => write!(f, "GREATER_EQUAL >= null"),
-            Self::LessEqual => write!(f, "LESS_EQUAL <= null"),
-            Self::StringLiteral(value) => write!(f, "STRING_LITERAL \"{value}\" {value:?}"),
-            Self::NumberLiteral(value) => write!(f, "NUMBER_LITERAL {value} {value:?}"),
-            Self::Identifier(value) => write!(f, "IDENTIFIER {value} {value}"),
-            Self::And => write!(f, "AND and null"),
-            Self::Class => write!(f, "CLASS class null"),
-            Self::Else => write!(f, "ELSE else null"),
-            Self::False => write!(f, "FALSE false null"),
-            Self::Fun => write!(f, "FUN fun null"),
-            Self::For => write!(f, "FOR for null"),
-            Self::If => write!(f, "IF if null"),
-            Self::Nil => write!(f, "NIL nil null"),
-            Self::Or => write!(f, "OR or null"),
-            Self::Print => write!(f, "PRINT print null"),
-            Self::Return => write!(f, "RETURN return null"),
-            Self::Super => write!(f, "SUPER super null"),
-            Self::This => write!(f, "THIS this null"),
-            Self::True => write!(f, "TRUE true null"),
-            Self::Var => write!(f, "VAR var null"),
-            Self::While => write!(f, "WHILE while null"),
+            Self::Number(value) => {
+                if value % 1.0 == 0.0 {
+                    write!(f, "{value:.1}")
+                } else {
+                    write!(f, "{value}")
+                }
+            },
+            Self::String(value) => write!(f, "{value}"),
         }
+    }
+}
+
+impl From<f64> for Literal {
+    fn from(value: f64) -> Self {
+        Self::Number(value)
+    }
+}
+
+impl From<String> for Literal {
+    fn from(value: String) -> Self {
+        Self::String(value)
+    }
+}
+
+impl From<&str> for Literal {
+    fn from(value: &str) -> Self {
+        Self::String(value.to_string())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Token {
+    kind: TokenKind,
+    literal: Option<Literal>,
+    lexeme: String,
+    location: Location,
+}
+
+impl Token {
+    pub const fn new(
+        kind: TokenKind,
+        literal: Option<Literal>,
+        lexeme: String,
+        location: Location,
+    ) -> Self {
+        Self {
+            kind,
+            literal,
+            lexeme,
+            location,
+        }
+    }
+
+    pub fn new_nonliteral(
+        kind: TokenKind,
+        lexeme: impl Into<String>,
+        location: impl Into<Location>,
+    ) -> Self {
+        Self {
+            kind,
+            literal: None,
+            lexeme: lexeme.into(),
+            location: location.into(),
+        }
+    }
+
+    pub fn new_literal(
+        literal: impl Into<Literal>,
+        lexeme: impl Into<String>,
+        location: impl Into<Location>,
+    ) -> Self {
+        let literal = literal.into();
+        let kind = match literal {
+            Literal::Number(_) => TokenKind::NumberLiteral,
+            Literal::String(_) => TokenKind::StringLiteral,
+        };
+        Self {
+            kind,
+            literal: Some(literal),
+            lexeme: lexeme.into(),
+            location: location.into(),
+        }
+    }
+
+    pub fn new_identifier(lexeme: impl Into<String>, location: impl Into<Location>) -> Self {
+        Self {
+            kind: TokenKind::Identifier,
+            literal: None,
+            lexeme: lexeme.into(),
+            location: location.into(),
+        }
+    }
+
+    pub const fn kind(&self) -> TokenKind {
+        self.kind
+    }
+
+    pub const fn literal(&self) -> Option<&Literal> {
+        self.literal.as_ref()
+    }
+
+    pub fn lexeme(&self) -> &str {
+        &self.lexeme
+    }
+
+    pub const fn location(&self) -> Location {
+        self.location
+    }
+}
+
+impl Display for Token {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let literal = self
+            .literal
+            .as_ref()
+            .map_or_else(|| "null".to_string(), ToString::to_string);
+        write!(f, "{} {} {literal}", self.kind, self.lexeme)
     }
 }
 

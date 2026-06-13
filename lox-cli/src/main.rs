@@ -24,7 +24,7 @@ fn main() -> anyhow::Result<()> {
         Command::Tokenize { source } => {
             let mut source_code = open_source_reader(source)?;
             source_code.tokenize().for_each(|item| match item {
-                Ok(token) => println!("{token:?}"),
+                Ok(token) => println!("{token}"),
                 Err(error) => eprintln!("\n{error}\n"),
             });
         },

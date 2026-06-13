@@ -19,6 +19,12 @@ impl Display for Location {
     }
 }
 
+impl From<(usize, usize)> for Location {
+    fn from((line, char): (usize, usize)) -> Self {
+        Self { line, char }
+    }
+}
+
 impl Location {
     pub const fn line(&self) -> usize {
         self.line
@@ -35,6 +41,12 @@ impl Location {
     pub const fn advance_line(&mut self) {
         self.line += 1;
         self.char = 0;
+    }
+
+    pub const fn revert(&mut self, num_chars: usize) {
+        if self.char > num_chars {
+            self.char -= num_chars;
+        }
     }
 }
 
