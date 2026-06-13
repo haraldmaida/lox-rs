@@ -102,7 +102,7 @@ impl Display for Literal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Number(value) => {
-                if value % 1.0 == 0.0 {
+                if (value.trunc() - *value).abs() < 5. * f64::EPSILON {
                     write!(f, "{value:.1}")
                 } else {
                     write!(f, "{value}")
