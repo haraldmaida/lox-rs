@@ -356,6 +356,34 @@ fn tokenize_number_literal_with_trailing_dot() {
 }
 
 #[test]
+fn tokenize_number_literal_with_leading_dot() {
+    let mut source_code = "400 .655";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::new_literal(400., "400", (1, 1))),
+        Ok(Token::new_nonliteral(TokenKind::Dot, ".", (1, 5))),
+        Ok(Token::new_literal(655., "655", (1, 6))),
+        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (1, 8))),
+    ]);
+}
+
+#[test]
+fn tokenize_number_literal_with_two_dots() {
+    let mut source_code = "123.456.789";
+
+    let tokens = source_code.tokenize().collect::<Vec<_>>();
+
+    assert_that!(tokens).contains_exactly([
+        Ok(Token::new_literal(123.456, "123.456", (1, 1))),
+        Ok(Token::new_nonliteral(TokenKind::Dot, ".", (1, 8))),
+        Ok(Token::new_literal(789., "789", (1, 9))),
+        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (1, 11))),
+    ]);
+}
+
+#[test]
 fn tokenize_number_literal_with_trailing_dot_at_end_of_file() {
     let mut source_code = " 777.";
 

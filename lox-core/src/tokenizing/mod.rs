@@ -122,9 +122,10 @@ enum LexingState {
     MaybeLessEqual,
     MaybeLineComment,
     LineComment,
-    StringLiteral,
-    NumberLiteral,
+    StringStarted,
+    NumberStarted,
     MaybeDecimalPoint,
+    FractionDigitsStarted,
     Identifier,
     EndOfFile,
 }
@@ -321,11 +322,11 @@ where
                                 self.start_location = self.current_location;
                             },
                             '"' => {
-                                self.state = LexingState::StringLiteral;
+                                self.state = LexingState::StringStarted;
                                 self.start_location = self.current_location;
                             },
                             _ if chr.is_ascii_digit() => {
-                                self.state = LexingState::NumberLiteral;
+                                self.state = LexingState::NumberStarted;
                                 self.start_location = self.current_location;
                             },
                             _ if chr.is_ascii_alphabetic() || chr == '_' => {
@@ -503,7 +504,7 @@ where
                         // ignore characters in line comment
                     },
                 },
-                LexingState::StringLiteral => match next_chr {
+                LexingState::StringStarted => match next_chr {
                     None => {
                         self.state = LexingState::Initial;
                         let lexeme = mem::take(&mut self.current_lexeme);
@@ -521,7 +522,7 @@ where
                     },
                     Some(chr) => self.current_lexeme.push(chr),
                 },
-                LexingState::NumberLiteral => match next_chr {
+                LexingState::NumberStarted => match next_chr {
                     None => {
                         self.state = LexingState::Initial;
                         let lexeme = mem::take(&mut self.current_lexeme);
@@ -546,7 +547,7 @@ where
                         return Some(parse_number_token(lexeme, self.start_location));
                     },
                     Some(chr) if chr.is_ascii_digit() => {
-                        self.state = LexingState::NumberLiteral;
+                        self.state = LexingState::FractionDigitsStarted;
                         self.current_lexeme.push('.');
                         self.current_lexeme.push(chr);
                     },
@@ -557,6 +558,20 @@ where
                         } else {
                             self.current_lexeme.push('.');
                         }
+                        self.revert_char(chr);
+                        let lexeme = mem::take(&mut self.current_lexeme);
+                        return Some(parse_number_token(lexeme, self.start_location));
+                    },
+                },
+                LexingState::FractionDigitsStarted => match next_chr {
+                    None => {
+                        self.state = LexingState::Initial;
+                        let lexeme = mem::take(&mut self.current_lexeme);
+                        return Some(parse_number_token(lexeme, self.start_location));
+                    },
+                    Some(chr) if chr.is_ascii_digit() => self.current_lexeme.push(chr),
+                    Some(chr) => {
+                        self.state = LexingState::Initial;
                         self.revert_char(chr);
                         let lexeme = mem::take(&mut self.current_lexeme);
                         return Some(parse_number_token(lexeme, self.start_location));
