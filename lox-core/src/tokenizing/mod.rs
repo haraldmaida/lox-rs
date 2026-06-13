@@ -1,4 +1,5 @@
 use crate::source::{Location, SourceCode};
+use crate::token::Token;
 use std::collections::VecDeque;
 use std::fmt::{self, Debug, Display};
 use std::{io, mem};
@@ -62,95 +63,6 @@ impl LexingError {
 
     pub const fn location(&self) -> Location {
         self.location
-    }
-}
-
-#[derive(Clone, PartialEq)]
-pub enum Token {
-    EndOfFile,
-    Comma,
-    LeftParen,
-    RightParen,
-    LeftBrace,
-    RightBrace,
-    Dot,
-    Semicolon,
-    Minus,
-    Plus,
-    Star,
-    Slash,
-    Bang,
-    Equal,
-    Less,
-    Greater,
-    BangEqual,
-    EqualEqual,
-    GreaterEqual,
-    LessEqual,
-    StringLiteral(String),
-    NumberLiteral(f64),
-    Identifier(String),
-    And,
-    Class,
-    Else,
-    False,
-    Fun,
-    For,
-    If,
-    Nil,
-    Or,
-    Print,
-    Return,
-    Super,
-    This,
-    True,
-    Var,
-    While,
-}
-
-impl Debug for Token {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::EndOfFile => write!(f, "EOF  null"),
-            Self::Comma => write!(f, "COMMA , null"),
-            Self::LeftParen => write!(f, "LEFT_PAREN ( null"),
-            Self::RightParen => write!(f, "RIGHT_PAREN ) null"),
-            Self::LeftBrace => write!(f, "LEFT_BRACE {{ null"),
-            Self::RightBrace => write!(f, "RIGHT_BRACE }} null"),
-            Self::Dot => write!(f, "DOT . null"),
-            Self::Semicolon => write!(f, "SEMICOLON ; null"),
-            Self::Minus => write!(f, "MINUS - null"),
-            Self::Plus => write!(f, "PLUS + null"),
-            Self::Star => write!(f, "STAR * null"),
-            Self::Slash => write!(f, "SLASH / null"),
-            Self::Bang => write!(f, "BANG ! null"),
-            Self::Equal => write!(f, "EQUAL = null"),
-            Self::Less => write!(f, "LESS < null"),
-            Self::Greater => write!(f, "GREATER > null"),
-            Self::BangEqual => write!(f, "BANG_EQUAL != null"),
-            Self::EqualEqual => write!(f, "EQUAL_EQUAL == null"),
-            Self::GreaterEqual => write!(f, "GREATER_EQUAL >= null"),
-            Self::LessEqual => write!(f, "LESS_EQUAL <= null"),
-            Self::StringLiteral(value) => write!(f, "STRING_LITERAL \"{value}\" {value:?}"),
-            Self::NumberLiteral(value) => write!(f, "NUMBER_LITERAL {value} {value:?}"),
-            Self::Identifier(value) => write!(f, "IDENTIFIER {value} {value}"),
-            Self::And => write!(f, "AND and null"),
-            Self::Class => write!(f, "CLASS class null"),
-            Self::Else => write!(f, "ELSE else null"),
-            Self::False => write!(f, "FALSE false null"),
-            Self::Fun => write!(f, "FUN fun null"),
-            Self::For => write!(f, "FOR for null"),
-            Self::If => write!(f, "IF if null"),
-            Self::Nil => write!(f, "NIL nil null"),
-            Self::Or => write!(f, "OR or null"),
-            Self::Print => write!(f, "PRINT print null"),
-            Self::Return => write!(f, "RETURN return null"),
-            Self::Super => write!(f, "SUPER super null"),
-            Self::This => write!(f, "THIS this null"),
-            Self::True => write!(f, "TRUE true null"),
-            Self::Var => write!(f, "VAR var null"),
-            Self::While => write!(f, "WHILE while null"),
-        }
     }
 }
 
