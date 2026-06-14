@@ -133,10 +133,10 @@ impl From<&str> for Literal {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
-    kind: TokenKind,
-    literal: Option<Literal>,
-    lexeme: String,
-    location: Location,
+    pub kind: TokenKind,
+    pub literal: Option<Literal>,
+    pub lexeme: String,
+    pub location: Location,
 }
 
 impl Token {

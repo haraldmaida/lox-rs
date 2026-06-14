@@ -52,8 +52,8 @@ impl From<io::Error> for LexingErrorCode {
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 #[error("{code} at {location}")]
 pub struct LexingError {
-    code: LexingErrorCode,
-    location: Location,
+    pub(crate) code: LexingErrorCode,
+    pub(crate) location: Location,
 }
 
 impl LexingError {
