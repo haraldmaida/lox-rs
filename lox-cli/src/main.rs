@@ -11,7 +11,7 @@ mod cli;
 
 use crate::cli::{Cli, Command};
 use clap::Parser;
-use lox_core::tokenizing::Tokenize;
+use lox_core::tokenize::Tokenize;
 use std::fs::File;
 use std::io;
 use std::io::{BufReader, Read};
