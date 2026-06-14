@@ -1,5 +1,28 @@
 use crate::token::Token;
 
+pub trait ExprVisitor {
+    type Output;
+
+    fn visit_assign_expr(&mut self, expr: &Assign) -> Self::Output;
+    fn visit_binary_expr(&mut self, expr: &Binary) -> Self::Output;
+    fn visit_call_expr(&mut self, expr: &Call) -> Self::Output;
+    fn visit_get_expr(&mut self, expr: &Get) -> Self::Output;
+    fn visit_grouping_expr(&mut self, expr: &Grouping) -> Self::Output;
+    fn visit_literal_expr(&mut self, expr: &Literal) -> Self::Output;
+    fn visit_logical_expr(&mut self, expr: &Logical) -> Self::Output;
+    fn visit_set_expr(&mut self, expr: &Set) -> Self::Output;
+    fn visit_super_expr(&mut self, expr: &Super) -> Self::Output;
+    fn visit_this_expr(&mut self, expr: &This) -> Self::Output;
+    fn visit_unary_expr(&mut self, expr: &Unary) -> Self::Output;
+    fn visit_variable_expr(&mut self, expr: &Variable) -> Self::Output;
+}
+
+pub trait ExprElement {
+    fn accept<V>(&self, visitor: &mut V) -> <V as ExprVisitor>::Output
+    where
+        V: ExprVisitor;
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Assign(Assign),
@@ -17,27 +40,58 @@ pub enum Expr {
 }
 
 macro_rules! impl_expr {
-    ($expr_type:ty, $variant:ident) => {
+    ($expr_type:ty, $variant:ident, $visitor_method:ident) => {
         impl From<$expr_type> for Expr {
             fn from(expr: $expr_type) -> Self {
                 Self::$variant(expr)
             }
         }
+
+        impl ExprElement for $expr_type {
+            fn accept<V>(&self, visitor: &mut V) -> <V as ExprVisitor>::Output
+            where
+                V: ExprVisitor,
+            {
+                visitor.$visitor_method(self)
+            }
+        }
     };
 }
 
-impl_expr!(Assign, Assign);
-impl_expr!(Binary, Binary);
-impl_expr!(Call, Call);
-impl_expr!(Get, Get);
-impl_expr!(Grouping, Grouping);
-impl_expr!(Literal, Literal);
-impl_expr!(Logical, Logical);
-impl_expr!(Set, Set);
-impl_expr!(Super, Super);
-impl_expr!(This, This);
-impl_expr!(Unary, Unary);
-impl_expr!(Variable, Variable);
+impl_expr!(Assign, Assign, visit_assign_expr);
+impl_expr!(Binary, Binary, visit_binary_expr);
+impl_expr!(Call, Call, visit_call_expr);
+impl_expr!(Get, Get, visit_get_expr);
+impl_expr!(Grouping, Grouping, visit_grouping_expr);
+impl_expr!(Literal, Literal, visit_literal_expr);
+impl_expr!(Logical, Logical, visit_logical_expr);
+impl_expr!(Set, Set, visit_set_expr);
+impl_expr!(Super, Super, visit_super_expr);
+impl_expr!(This, This, visit_this_expr);
+impl_expr!(Unary, Unary, visit_unary_expr);
+impl_expr!(Variable, Variable, visit_variable_expr);
+
+impl ExprElement for Expr {
+    fn accept<V>(&self, visitor: &mut V) -> <V as ExprVisitor>::Output
+    where
+        V: ExprVisitor,
+    {
+        match self {
+            Self::Assign(expr) => visitor.visit_assign_expr(expr),
+            Self::Binary(expr) => visitor.visit_binary_expr(expr),
+            Self::Call(expr) => visitor.visit_call_expr(expr),
+            Self::Get(expr) => visitor.visit_get_expr(expr),
+            Self::Grouping(expr) => visitor.visit_grouping_expr(expr),
+            Self::Literal(expr) => visitor.visit_literal_expr(expr),
+            Self::Logical(expr) => visitor.visit_logical_expr(expr),
+            Self::Set(expr) => visitor.visit_set_expr(expr),
+            Self::Super(expr) => visitor.visit_super_expr(expr),
+            Self::This(expr) => visitor.visit_this_expr(expr),
+            Self::Unary(expr) => visitor.visit_unary_expr(expr),
+            Self::Variable(expr) => visitor.visit_variable_expr(expr),
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Assign {

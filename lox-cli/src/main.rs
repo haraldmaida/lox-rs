@@ -11,6 +11,8 @@ mod cli;
 
 use crate::cli::{Cli, Command};
 use clap::Parser;
+use lox_core::ast_printer::AstPrinter;
+use lox_core::parse::Parse;
 use lox_core::tokenize::Tokenize;
 use std::fs::File;
 use std::io;
@@ -27,6 +29,17 @@ fn main() -> anyhow::Result<()> {
                 Ok(token) => println!("{token}"),
                 Err(error) => eprintln!("\n{error}\n"),
             });
+        },
+        Command::Parse { source } => {
+            let mut source_code = open_source_reader(source)?;
+            match source_code.tokenize().parse() {
+                Ok(ast) => {
+                    let mut output = String::new();
+                    AstPrinter::print(&ast, &mut output)?;
+                    println!("{output}");
+                },
+                Err(error) => eprintln!("\n{error}\n"),
+            }
         },
     }
 

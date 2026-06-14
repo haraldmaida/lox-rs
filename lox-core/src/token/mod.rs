@@ -47,46 +47,90 @@ pub enum TokenKind {
 
 impl Display for TokenKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let formatted = match self {
-            Self::EndOfFile => "EOF",
-            Self::LeftParen => "LEFT_PAREN",
-            Self::RightParen => "RIGHT_PAREN",
-            Self::LeftBrace => "LEFT_BRACE",
-            Self::RightBrace => "RIGHT_BRACE",
-            Self::Comma => "COMMA",
-            Self::Dot => "DOT",
-            Self::Semicolon => "SEMICOLON",
-            Self::Minus => "MINUS",
-            Self::Plus => "PLUS",
-            Self::Star => "STAR",
-            Self::Slash => "SLASH",
-            Self::Bang => "BANG",
-            Self::Equal => "EQUAL",
-            Self::Greater => "GREATER",
-            Self::Less => "LESS",
-            Self::BangEqual => "BANG_EQUAL",
-            Self::EqualEqual => "EQUAL_EQUAL",
-            Self::GreaterEqual => "GREATER_EQUAL",
-            Self::LessEqual => "LESS_EQUAL",
-            Self::StringLiteral => "STRING_LITERAL",
-            Self::NumberLiteral => "NUMBER_LITERAL",
-            Self::Identifier => "IDENTIFIER",
-            Self::And => "AND",
-            Self::Class => "CLASS",
-            Self::Else => "ELSE",
-            Self::False => "FALSE",
-            Self::Fun => "FUN",
-            Self::For => "FOR",
-            Self::If => "IF",
-            Self::Nil => "NIL",
-            Self::Or => "OR",
-            Self::Print => "PRINT",
-            Self::Return => "RETURN",
-            Self::Super => "SUPER",
-            Self::This => "THIS",
-            Self::True => "TRUE",
-            Self::Var => "VAR",
-            Self::While => "WHILE",
+        let formatted = if f.alternate() {
+            match self {
+                Self::EndOfFile => "EOF",
+                Self::LeftParen => "'('",
+                Self::RightParen => "')'",
+                Self::LeftBrace => "'{'",
+                Self::RightBrace => "'}'",
+                Self::Comma => "','",
+                Self::Dot => "'.'",
+                Self::Semicolon => "';'",
+                Self::Minus => "'-'",
+                Self::Plus => "'+'",
+                Self::Star => "'*'",
+                Self::Slash => "'/'",
+                Self::Bang => "'!'",
+                Self::Equal => "'='",
+                Self::Greater => "'>'",
+                Self::Less => "'<'",
+                Self::BangEqual => "'!=",
+                Self::EqualEqual => "'=='",
+                Self::GreaterEqual => "'>='",
+                Self::LessEqual => "'<='",
+                Self::StringLiteral => "string literal",
+                Self::NumberLiteral => "number literal",
+                Self::Identifier => "identifier",
+                Self::And => "and",
+                Self::Class => "class",
+                Self::Else => "else",
+                Self::False => "false",
+                Self::Fun => "fun",
+                Self::For => "for",
+                Self::If => "if",
+                Self::Nil => "nil",
+                Self::Or => "or",
+                Self::Print => "print",
+                Self::Return => "return",
+                Self::Super => "super",
+                Self::This => "this",
+                Self::True => "true",
+                Self::Var => "var",
+                Self::While => "while",
+            }
+        } else {
+            match self {
+                Self::EndOfFile => "EOF",
+                Self::LeftParen => "LEFT_PAREN",
+                Self::RightParen => "RIGHT_PAREN",
+                Self::LeftBrace => "LEFT_BRACE",
+                Self::RightBrace => "RIGHT_BRACE",
+                Self::Comma => "COMMA",
+                Self::Dot => "DOT",
+                Self::Semicolon => "SEMICOLON",
+                Self::Minus => "MINUS",
+                Self::Plus => "PLUS",
+                Self::Star => "STAR",
+                Self::Slash => "SLASH",
+                Self::Bang => "BANG",
+                Self::Equal => "EQUAL",
+                Self::Greater => "GREATER",
+                Self::Less => "LESS",
+                Self::BangEqual => "BANG_EQUAL",
+                Self::EqualEqual => "EQUAL_EQUAL",
+                Self::GreaterEqual => "GREATER_EQUAL",
+                Self::LessEqual => "LESS_EQUAL",
+                Self::StringLiteral => "STRING_LITERAL",
+                Self::NumberLiteral => "NUMBER_LITERAL",
+                Self::Identifier => "IDENTIFIER",
+                Self::And => "AND",
+                Self::Class => "CLASS",
+                Self::Else => "ELSE",
+                Self::False => "FALSE",
+                Self::Fun => "FUN",
+                Self::For => "FOR",
+                Self::If => "IF",
+                Self::Nil => "NIL",
+                Self::Or => "OR",
+                Self::Print => "PRINT",
+                Self::Return => "RETURN",
+                Self::Super => "SUPER",
+                Self::This => "THIS",
+                Self::True => "TRUE",
+                Self::Var => "VAR",
+                Self::While => "WHILE",
+            }
         };
         f.write_str(formatted)
     }
@@ -213,11 +257,15 @@ impl Token {
 
 impl Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let literal = self
-            .literal
-            .as_ref()
-            .map_or_else(|| "null".to_string(), ToString::to_string);
-        write!(f, "{} {} {literal}", self.kind, self.lexeme)
+        if f.alternate() {
+            f.write_str(&self.lexeme)
+        } else {
+            let literal = self
+                .literal
+                .as_ref()
+                .map_or_else(|| "null".to_string(), ToString::to_string);
+            write!(f, "{} {} {literal}", self.kind, self.lexeme)
+        }
     }
 }
 

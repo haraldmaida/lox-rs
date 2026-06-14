@@ -3,6 +3,8 @@ use crate::source::Location;
 use crate::token;
 use crate::token::{Token, TokenKind};
 use crate::tokenize::{LexingError, LexingErrorCode};
+use std::fmt;
+use std::fmt::Display;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SyntaxErrorCode {
@@ -35,6 +37,41 @@ impl From<LexingErrorCode> for SyntaxErrorCode {
 pub struct SyntaxError {
     code: SyntaxErrorCode,
     location: Location,
+}
+
+impl Display for SyntaxError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let location = self.location;
+        match &self.code {
+            SyntaxErrorCode::CharacterAfterEndOfFile(chr) => {
+                write!(f, "{location}: character '{chr}' after end of file")
+            },
+            SyntaxErrorCode::ExpectedExpression(lexeme) => {
+                write!(f, "{location}: expected expression at {lexeme}")
+            },
+            SyntaxErrorCode::InvalidNumberLiteral(value) => {
+                write!(f, "{location}: invalid number literal at {value}")
+            },
+            SyntaxErrorCode::IoError(message) => {
+                write!(f, "{location}: {message}")
+            },
+            SyntaxErrorCode::MissingToken(kind) => {
+                write!(f, "{location}: missing {kind:#}")
+            },
+            SyntaxErrorCode::UnexpectedEndOfInput => {
+                write!(f, "{location}: unexpected end of input")
+            },
+            SyntaxErrorCode::UnexpectedCharacter(chr) => {
+                write!(f, "{location}: unexpected character '{chr}'")
+            },
+            SyntaxErrorCode::UnexpectedToken(token) => {
+                write!(f, "{location}: unexpected token '{token:#}'")
+            },
+            SyntaxErrorCode::UnterminatedStringLiteral(lexeme) => {
+                write!(f, "{location}: unterminated string literal {lexeme}")
+            },
+        }
+    }
 }
 
 impl SyntaxError {

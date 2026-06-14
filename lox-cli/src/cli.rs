@@ -7,8 +7,13 @@ pub struct Cli {
 
 #[derive(clap::Subcommand, Debug)]
 pub enum Command {
-    /// Tokenize a source code file
+    /// Tokenize a source code file and print the list of tokens
     Tokenize {
+        /// Path to the source code file
+        source: String,
+    },
+    /// Parse a source code file and print the AST
+    Parse {
         /// Path to the source code file
         source: String,
     },

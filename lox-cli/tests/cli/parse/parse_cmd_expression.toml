@@ -1,0 +1,6 @@
+args = ["parse", "tests/sources/expression.lox"]
+status.code = 0
+stdout = """
+(- (+ (* 5 (group (- 17 (group (+ 4 1))))) (* 60 2)) (group (+ (/ (group (+ 120 60)) 2) 30)))
+"""
+stderr = ""
