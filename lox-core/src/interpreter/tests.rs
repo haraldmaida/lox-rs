@@ -148,7 +148,7 @@ fn evaluate_literal_nil() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Nil);
+    assert_that!(value).ok().is_equal_to(Value::Nil);
 }
 
 #[test]
@@ -158,7 +158,7 @@ fn evaluate_literal_bool() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(true));
+    assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
 
 #[test]
@@ -166,7 +166,7 @@ fn evaluate_literal_number() {
     let expr = Expr::from(Literal::Number(123.456));
 
     let mut interpreter = Interpreter::default();
-    let Value::Number(value) = interpreter.evaluate(&expr) else {
+    let Ok(Value::Number(value)) = interpreter.evaluate(&expr) else {
         panic!("expected a number");
     };
 
@@ -180,7 +180,9 @@ fn evaluate_literal_string() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::String("Hello, world!".to_string()));
+    assert_that!(value)
+        .ok()
+        .is_equal_to(Value::String("Hello, world!".to_string()));
 }
 
 #[test]
@@ -188,7 +190,7 @@ fn evaluate_grouping_expression() {
     let expr = Expr::from(Grouping::new(Literal::Number(123.456)));
 
     let mut interpreter = Interpreter::default();
-    let Value::Number(value) = interpreter.evaluate(&expr) else {
+    let Ok(Value::Number(value)) = interpreter.evaluate(&expr) else {
         panic!("expected a number");
     };
 
@@ -203,7 +205,7 @@ fn evaluate_unary_expr_minus() {
     ));
 
     let mut interpreter = Interpreter::default();
-    let Value::Number(value) = interpreter.evaluate(&expr) else {
+    let Ok(Value::Number(value)) = interpreter.evaluate(&expr) else {
         panic!("expected a number");
     };
 
@@ -220,7 +222,7 @@ fn evaluate_unary_expr_bang_for_true() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(false));
+    assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
 
 #[test]
@@ -233,7 +235,7 @@ fn evaluate_unary_expr_bang_for_false() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(true));
+    assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
 
 #[test]
@@ -246,7 +248,7 @@ fn evaluate_unary_expr_bang_for_number_0() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(false));
+    assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
 
 #[test]
@@ -259,7 +261,7 @@ fn evaluate_unary_expr_bang_for_string() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(false));
+    assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
 
 #[test]
@@ -271,7 +273,7 @@ fn evaluate_binary_expr_minus_with_numbers() {
     ));
 
     let mut interpreter = Interpreter::default();
-    let Value::Number(value) = interpreter.evaluate(&expr) else {
+    let Ok(Value::Number(value)) = interpreter.evaluate(&expr) else {
         panic!("expected a number");
     };
 
@@ -287,7 +289,7 @@ fn evaluate_binary_expr_plus_with_numbers() {
     ));
 
     let mut interpreter = Interpreter::default();
-    let Value::Number(value) = interpreter.evaluate(&expr) else {
+    let Ok(Value::Number(value)) = interpreter.evaluate(&expr) else {
         panic!("expected a number");
     };
 
@@ -305,7 +307,9 @@ fn evaluate_binary_expr_plus_with_strings() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::String("Hello, world!".into()));
+    assert_that!(value)
+        .ok()
+        .is_equal_to(Value::String("Hello, world!".into()));
 }
 
 #[test]
@@ -317,7 +321,7 @@ fn evaluate_binary_expr_star_with_numbers() {
     ));
 
     let mut interpreter = Interpreter::default();
-    let Value::Number(value) = interpreter.evaluate(&expr) else {
+    let Ok(Value::Number(value)) = interpreter.evaluate(&expr) else {
         panic!("expected a number");
     };
 
@@ -333,7 +337,7 @@ fn evaluate_binary_expr_slash_with_numbers() {
     ));
 
     let mut interpreter = Interpreter::default();
-    let Value::Number(value) = interpreter.evaluate(&expr) else {
+    let Ok(Value::Number(value)) = interpreter.evaluate(&expr) else {
         panic!("expected a number");
     };
 
@@ -351,7 +355,7 @@ fn evaluate_binary_expr_bangequal_with_numbers() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(true));
+    assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
 
 #[test]
@@ -365,7 +369,7 @@ fn evaluate_binary_expr_bangequal_with_booleans() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(true));
+    assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
 
 #[test]
@@ -379,7 +383,7 @@ fn evaluate_binary_expr_bangequal_with_strings() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(false));
+    assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
 
 #[test]
@@ -393,7 +397,7 @@ fn evaluate_binary_expr_bangequal_with_nils() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(false));
+    assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
 
 #[test]
@@ -407,7 +411,7 @@ fn evaluate_binary_expr_equalequal_with_numbers() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(false));
+    assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
 
 #[test]
@@ -421,7 +425,7 @@ fn evaluate_binary_expr_equalequal_with_booleans() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(false));
+    assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
 
 #[test]
@@ -435,7 +439,7 @@ fn evaluate_binary_expr_equalequal_with_strings() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(true));
+    assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
 
 #[test]
@@ -449,7 +453,7 @@ fn evaluate_binary_expr_equalequal_with_nils() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(true));
+    assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
 
 #[test]
@@ -463,7 +467,7 @@ fn evaluate_binary_expr_greater_with_numbers() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(false));
+    assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
 
 #[test]
@@ -477,7 +481,7 @@ fn evaluate_binary_expr_greater_with_booleans() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(true));
+    assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
 
 #[test]
@@ -491,7 +495,7 @@ fn evaluate_binary_expr_greater_with_strings() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(true));
+    assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
 
 #[test]
@@ -505,7 +509,7 @@ fn evaluate_binary_expr_greater_with_nils() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(false));
+    assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
 
 #[test]
@@ -519,7 +523,7 @@ fn evaluate_binary_expr_greaterequal_with_numbers() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(false));
+    assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
 
 #[test]
@@ -533,7 +537,7 @@ fn evaluate_binary_expr_greaterequal_with_booleans() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(true));
+    assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
 
 #[test]
@@ -547,7 +551,7 @@ fn evaluate_binary_expr_greaterequal_with_strings() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(true));
+    assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
 
 #[test]
@@ -561,7 +565,7 @@ fn evaluate_binary_expr_greaterequal_with_nils() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(true));
+    assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
 
 #[test]
@@ -575,7 +579,7 @@ fn evaluate_binary_expr_less_with_numbers() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(true));
+    assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
 
 #[test]
@@ -589,7 +593,7 @@ fn evaluate_binary_expr_less_with_booleans() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(false));
+    assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
 
 #[test]
@@ -603,7 +607,7 @@ fn evaluate_binary_expr_less_with_strings() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(true));
+    assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
 
 #[test]
@@ -617,7 +621,7 @@ fn evaluate_binary_expr_less_with_nils() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(false));
+    assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
 
 #[test]
@@ -631,7 +635,7 @@ fn evaluate_binary_expr_lessequal_with_numbers() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(true));
+    assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
 
 #[test]
@@ -645,7 +649,7 @@ fn evaluate_binary_expr_lessequal_with_booleans() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(true));
+    assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
 
 #[test]
@@ -659,7 +663,7 @@ fn evaluate_binary_expr_lessequal_with_strings() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(true));
+    assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
 
 #[test]
@@ -673,5 +677,5 @@ fn evaluate_binary_expr_lessequal_with_nils() {
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
 
-    assert_that!(value).is_equal_to(Value::Bool(true));
+    assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }

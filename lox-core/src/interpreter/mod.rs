@@ -2,7 +2,7 @@ use crate::expr::{
     Assign, Binary, Call, Expr, ExprElement, ExprVisitor, Get, Grouping, Literal, Logical, Set,
     Super, This, Unary, Variable,
 };
-use crate::token::TokenKind;
+use crate::token::{Token, TokenKind};
 
 #[cfg(test)]
 mod tests;
@@ -35,50 +35,77 @@ impl Value {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RuntimeErrorCode {
+    NumberOperandExpected,
+    StringOperandExpected,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RuntimeError {
+    code: RuntimeErrorCode,
+    token: Token,
+}
+
+impl RuntimeError {
+    pub const fn new(code: RuntimeErrorCode, token: Token) -> Self {
+        Self { code, token }
+    }
+
+    pub const fn code(&self) -> RuntimeErrorCode {
+        self.code
+    }
+
+    pub const fn token(&self) -> &Token {
+        &self.token
+    }
+}
+
+/// A tree-walk interpreter for Lox.
 #[derive(Default)]
 pub struct Interpreter {}
 
 impl Interpreter {
-    pub fn evaluate(&mut self, expr: &Expr) -> Value {
+    pub fn evaluate(&mut self, expr: &Expr) -> Result<Value, RuntimeError> {
         expr.accept(self)
     }
 }
 
 impl ExprVisitor for Interpreter {
-    type Output = Value;
+    type Output = Result<Value, RuntimeError>;
 
     fn visit_assign_expr(&mut self, _expr: &Assign) -> Self::Output {
         todo!()
     }
 
     fn visit_binary_expr(&mut self, expr: &Binary) -> Self::Output {
-        let left = self.evaluate(expr.left());
-        let right = self.evaluate(expr.right());
+        let left = self.evaluate(expr.left())?;
+        let right = self.evaluate(expr.right())?;
 
         match expr.operator().kind() {
-            TokenKind::BangEqual => Value::Bool(left != right),
-            TokenKind::EqualEqual => Value::Bool(left == right),
-            TokenKind::Greater => Value::Bool(left > right),
-            TokenKind::GreaterEqual => Value::Bool(left >= right),
-            TokenKind::Less => Value::Bool(left < right),
-            TokenKind::LessEqual => Value::Bool(left <= right),
+            TokenKind::BangEqual => Ok(Value::Bool(left != right)),
+            TokenKind::EqualEqual => Ok(Value::Bool(left == right)),
+            TokenKind::Greater => Ok(Value::Bool(left > right)),
+            TokenKind::GreaterEqual => Ok(Value::Bool(left >= right)),
+            TokenKind::Less => Ok(Value::Bool(left < right)),
+            TokenKind::LessEqual => Ok(Value::Bool(left <= right)),
             TokenKind::Minus => match (left, right) {
-                (Value::Number(left), Value::Number(right)) => Value::Number(left - right),
+                (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left - right)),
                 _ => todo!("error handling for binary operation"),
             },
             TokenKind::Plus => match (left, right) {
-                (Value::Number(left), Value::Number(right)) => Value::Number(left + right),
+                (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left + right)),
                 (Value::String(left), Value::String(right)) => {
-                    Value::String(format!("{left}{right}"))
+                    Ok(Value::String(format!("{left}{right}")))
                 },
                 _ => todo!("error handling for binary operation"),
             },
             TokenKind::Slash => match (left, right) {
-                (Value::Number(left), Value::Number(right)) => Value::Number(left / right),
+                (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left / right)),
                 _ => todo!("error handling for binary operation"),
             },
             TokenKind::Star => match (left, right) {
-                (Value::Number(left), Value::Number(right)) => Value::Number(left * right),
+                (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left * right)),
                 _ => todo!("error handling for binary operation"),
             },
             _ => todo!("error handling for binary operation"),
@@ -99,10 +126,10 @@ impl ExprVisitor for Interpreter {
 
     fn visit_literal_expr(&mut self, expr: &Literal) -> Self::Output {
         match expr {
-            Literal::Nil => Value::Nil,
-            Literal::Bool(value) => Value::Bool(*value),
-            Literal::Number(value) => Value::Number(*value),
-            Literal::String(value) => Value::String(value.clone()),
+            Literal::Nil => Ok(Value::Nil),
+            Literal::Bool(value) => Ok(Value::Bool(*value)),
+            Literal::Number(value) => Ok(Value::Number(*value)),
+            Literal::String(value) => Ok(Value::String(value.clone())),
         }
     }
 
@@ -123,16 +150,16 @@ impl ExprVisitor for Interpreter {
     }
 
     fn visit_unary_expr(&mut self, expr: &Unary) -> Self::Output {
-        let right = self.evaluate(expr.right());
+        let right = self.evaluate(expr.right())?;
         match expr.operator().kind() {
             TokenKind::Minus => {
                 if let Value::Number(number) = right {
-                    Value::Number(-number)
+                    Ok(Value::Number(-number))
                 } else {
                     todo!("error handling for unary operation")
                 }
             },
-            TokenKind::Bang => Value::Bool(!right.is_truthy()),
+            TokenKind::Bang => Ok(Value::Bool(!right.is_truthy())),
             _ => todo!("error handling for unary operation"),
         }
     }
