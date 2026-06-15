@@ -37,8 +37,11 @@ impl Value {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuntimeErrorCode {
-    NumberOperandExpected,
-    StringOperandExpected,
+    NotABinaryOperator,
+    NotAnUnaryOperator,
+    OperandNotANumber,
+    OperandNotANumberOrString,
+    OperandsOfDifferentType,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -91,24 +94,45 @@ impl ExprVisitor for Interpreter {
             TokenKind::LessEqual => Ok(Value::Bool(left <= right)),
             TokenKind::Minus => match (left, right) {
                 (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left - right)),
-                _ => todo!("error handling for binary operation"),
+                _ => Err(RuntimeError::new(
+                    RuntimeErrorCode::OperandNotANumber,
+                    expr.operator().clone(),
+                )),
             },
             TokenKind::Plus => match (left, right) {
                 (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left + right)),
                 (Value::String(left), Value::String(right)) => {
                     Ok(Value::String(format!("{left}{right}")))
                 },
-                _ => todo!("error handling for binary operation"),
+                (Value::String(_), Value::Number(_)) | (Value::Number(_), Value::String(_)) => {
+                    Err(RuntimeError::new(
+                        RuntimeErrorCode::OperandsOfDifferentType,
+                        expr.operator().clone(),
+                    ))
+                },
+                _ => Err(RuntimeError::new(
+                    RuntimeErrorCode::OperandNotANumberOrString,
+                    expr.operator().clone(),
+                )),
             },
             TokenKind::Slash => match (left, right) {
                 (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left / right)),
-                _ => todo!("error handling for binary operation"),
+                _ => Err(RuntimeError::new(
+                    RuntimeErrorCode::OperandNotANumber,
+                    expr.operator().clone(),
+                )),
             },
             TokenKind::Star => match (left, right) {
                 (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left * right)),
-                _ => todo!("error handling for binary operation"),
+                _ => Err(RuntimeError::new(
+                    RuntimeErrorCode::OperandNotANumber,
+                    expr.operator().clone(),
+                )),
             },
-            _ => todo!("error handling for binary operation"),
+            _ => Err(RuntimeError::new(
+                RuntimeErrorCode::NotABinaryOperator,
+                expr.operator().clone(),
+            )),
         }
     }
 
@@ -152,15 +176,21 @@ impl ExprVisitor for Interpreter {
     fn visit_unary_expr(&mut self, expr: &Unary) -> Self::Output {
         let right = self.evaluate(expr.right())?;
         match expr.operator().kind() {
+            TokenKind::Bang => Ok(Value::Bool(!right.is_truthy())),
             TokenKind::Minus => {
                 if let Value::Number(number) = right {
                     Ok(Value::Number(-number))
                 } else {
-                    todo!("error handling for unary operation")
+                    Err(RuntimeError::new(
+                        RuntimeErrorCode::OperandNotANumber,
+                        expr.operator().clone(),
+                    ))
                 }
             },
-            TokenKind::Bang => Ok(Value::Bool(!right.is_truthy())),
-            _ => todo!("error handling for unary operation"),
+            _ => Err(RuntimeError::new(
+                RuntimeErrorCode::NotAnUnaryOperator,
+                expr.operator().clone(),
+            )),
         }
     }
 

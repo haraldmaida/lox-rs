@@ -198,21 +198,6 @@ fn evaluate_grouping_expression() {
 }
 
 #[test]
-fn evaluate_unary_expr_minus() {
-    let expr = Expr::from(Unary::new(
-        token(TokenKind::Minus, "-", (1, 2)),
-        Literal::Number(123.456),
-    ));
-
-    let mut interpreter = Interpreter::default();
-    let Ok(Value::Number(value)) = interpreter.evaluate(&expr) else {
-        panic!("expected a number");
-    };
-
-    assert_that!(value).is_close_to(-123.456);
-}
-
-#[test]
 fn evaluate_unary_expr_bang_for_true() {
     let expr = Expr::from(Unary::new(
         token(TokenKind::Bang, "!", (1, 2)),
@@ -265,6 +250,85 @@ fn evaluate_unary_expr_bang_for_string() {
 }
 
 #[test]
+fn evaluate_unary_expr_minus_with_number() {
+    let expr = Expr::from(Unary::new(
+        token(TokenKind::Minus, "-", (1, 2)),
+        Literal::Number(123.456),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let Ok(Value::Number(value)) = interpreter.evaluate(&expr) else {
+        panic!("expected a number");
+    };
+
+    assert_that!(value).is_close_to(-123.456);
+}
+
+#[test]
+fn evaluate_unary_expr_minus_with_boolean_returns_runtime_error() {
+    let expr = Expr::from(Unary::new(
+        token(TokenKind::Minus, "-", (1, 2)),
+        Literal::Bool(true),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.evaluate(&expr);
+
+    assert_that!(result).has_error(RuntimeError::new(
+        RuntimeErrorCode::OperandNotANumber,
+        token(TokenKind::Minus, "-", (1, 2)),
+    ));
+}
+
+#[test]
+fn evaluate_unary_expr_minus_with_string_returns_runtime_error() {
+    let expr = Expr::from(Unary::new(
+        token(TokenKind::Minus, "-", (1, 2)),
+        Literal::String("Hello, world!".to_string()),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.evaluate(&expr);
+
+    assert_that!(result).has_error(RuntimeError::new(
+        RuntimeErrorCode::OperandNotANumber,
+        token(TokenKind::Minus, "-", (1, 2)),
+    ));
+}
+
+#[test]
+fn evaluate_unary_expr_minus_with_nil_returns_runtime_error() {
+    let expr = Expr::from(Unary::new(
+        token(TokenKind::Minus, "-", (1, 2)),
+        Literal::Nil,
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.evaluate(&expr);
+
+    assert_that!(result).has_error(RuntimeError::new(
+        RuntimeErrorCode::OperandNotANumber,
+        token(TokenKind::Minus, "-", (1, 2)),
+    ));
+}
+
+#[test]
+fn evaluate_unary_expr_with_illegal_operator() {
+    let expr = Expr::from(Unary::new(
+        token(TokenKind::Plus, "+", (1, 2)),
+        Literal::Number(123.456),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.evaluate(&expr);
+
+    assert_that!(result).has_error(RuntimeError::new(
+        RuntimeErrorCode::NotAnUnaryOperator,
+        token(TokenKind::Plus, "+", (1, 2)),
+    ));
+}
+
+#[test]
 fn evaluate_binary_expr_minus_with_numbers() {
     let expr = Expr::from(Binary::new(
         Literal::Number(123.456),
@@ -278,6 +342,57 @@ fn evaluate_binary_expr_minus_with_numbers() {
     };
 
     assert_that!(value).is_close_to(-665.556);
+}
+
+#[test]
+fn evaluate_binary_expr_minus_with_booleans_returns_runtime_error() {
+    let expr = Expr::from(Binary::new(
+        Literal::Bool(true),
+        token(TokenKind::Minus, "-", (1, 2)),
+        Literal::Bool(false),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.evaluate(&expr);
+
+    assert_that!(result).has_error(RuntimeError::new(
+        RuntimeErrorCode::OperandNotANumber,
+        token(TokenKind::Minus, "-", (1, 2)),
+    ));
+}
+
+#[test]
+fn evaluate_binary_expr_minus_with_strings_returns_runtime_error() {
+    let expr = Expr::from(Binary::new(
+        Literal::Number(123.456),
+        token(TokenKind::Minus, "-", (1, 2)),
+        Literal::String("Hello, world!".to_string()),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.evaluate(&expr);
+
+    assert_that!(result).has_error(RuntimeError::new(
+        RuntimeErrorCode::OperandNotANumber,
+        token(TokenKind::Minus, "-", (1, 2)),
+    ));
+}
+
+#[test]
+fn evaluate_binary_expr_minus_with_nil_returns_runtime_error() {
+    let expr = Expr::from(Binary::new(
+        Literal::Nil,
+        token(TokenKind::Minus, "-", (1, 2)),
+        Literal::Number(123.456),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.evaluate(&expr);
+
+    assert_that!(result).has_error(RuntimeError::new(
+        RuntimeErrorCode::OperandNotANumber,
+        token(TokenKind::Minus, "-", (1, 2)),
+    ));
 }
 
 #[test]
@@ -313,6 +428,74 @@ fn evaluate_binary_expr_plus_with_strings() {
 }
 
 #[test]
+fn evaluate_binary_expr_plus_with_string_and_number_returns_runtime_error() {
+    let expr = Expr::from(Binary::new(
+        Literal::String("Anna".to_string()),
+        token(TokenKind::Plus, "+", (1, 2)),
+        Literal::Number(123.456),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.evaluate(&expr);
+
+    assert_that!(result).has_error(RuntimeError::new(
+        RuntimeErrorCode::OperandsOfDifferentType,
+        token(TokenKind::Plus, "+", (1, 2)),
+    ));
+}
+
+#[test]
+fn evaluate_binary_expr_plus_with_number_and_string_returns_runtime_error() {
+    let expr = Expr::from(Binary::new(
+        Literal::Number(123.456),
+        token(TokenKind::Plus, "+", (1, 2)),
+        Literal::String("Anna".to_string()),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.evaluate(&expr);
+
+    assert_that!(result).has_error(RuntimeError::new(
+        RuntimeErrorCode::OperandsOfDifferentType,
+        token(TokenKind::Plus, "+", (1, 2)),
+    ));
+}
+
+#[test]
+fn evaluate_binary_expr_plus_with_booleans_returns_runtime_error() {
+    let expr = Expr::from(Binary::new(
+        Literal::Bool(true),
+        token(TokenKind::Plus, "+", (1, 2)),
+        Literal::Bool(false),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.evaluate(&expr);
+
+    assert_that!(result).has_error(RuntimeError::new(
+        RuntimeErrorCode::OperandNotANumberOrString,
+        token(TokenKind::Plus, "+", (1, 2)),
+    ));
+}
+
+#[test]
+fn evaluate_binary_expr_plus_with_nil_returns_runtime_error() {
+    let expr = Expr::from(Binary::new(
+        Literal::Nil,
+        token(TokenKind::Plus, "+", (1, 2)),
+        Literal::Number(123.456),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.evaluate(&expr);
+
+    assert_that!(result).has_error(RuntimeError::new(
+        RuntimeErrorCode::OperandNotANumberOrString,
+        token(TokenKind::Plus, "+", (1, 2)),
+    ));
+}
+
+#[test]
 fn evaluate_binary_expr_star_with_numbers() {
     let expr = Expr::from(Binary::new(
         Literal::Number(-123.456),
@@ -329,6 +512,57 @@ fn evaluate_binary_expr_star_with_numbers() {
 }
 
 #[test]
+fn evaluate_binary_expr_star_with_booleans_returns_runtime_error() {
+    let expr = Expr::from(Binary::new(
+        Literal::Bool(true),
+        token(TokenKind::Star, "*", (1, 2)),
+        Literal::Bool(false),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.evaluate(&expr);
+
+    assert_that!(result).has_error(RuntimeError::new(
+        RuntimeErrorCode::OperandNotANumber,
+        token(TokenKind::Star, "*", (1, 2)),
+    ));
+}
+
+#[test]
+fn evaluate_binary_expr_star_with_strings_returns_runtime_error() {
+    let expr = Expr::from(Binary::new(
+        Literal::String("Hello, world!".to_string()),
+        token(TokenKind::Star, "*", (1, 2)),
+        Literal::Number(123.456),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.evaluate(&expr);
+
+    assert_that!(result).has_error(RuntimeError::new(
+        RuntimeErrorCode::OperandNotANumber,
+        token(TokenKind::Star, "*", (1, 2)),
+    ));
+}
+
+#[test]
+fn evaluate_binary_expr_star_with_nil_returns_runtime_error() {
+    let expr = Expr::from(Binary::new(
+        Literal::Nil,
+        token(TokenKind::Star, "*", (1, 2)),
+        Literal::Number(123.456),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.evaluate(&expr);
+
+    assert_that!(result).has_error(RuntimeError::new(
+        RuntimeErrorCode::OperandNotANumber,
+        token(TokenKind::Star, "*", (1, 2)),
+    ));
+}
+
+#[test]
 fn evaluate_binary_expr_slash_with_numbers() {
     let expr = Expr::from(Binary::new(
         Literal::Number(123.456),
@@ -342,6 +576,57 @@ fn evaluate_binary_expr_slash_with_numbers() {
     };
 
     assert_that!(value).is_close_to(0.156_469_103_131_511_3);
+}
+
+#[test]
+fn evaluate_binary_expr_slash_with_booleans_returns_runtime_error() {
+    let expr = Expr::from(Binary::new(
+        Literal::Bool(true),
+        token(TokenKind::Slash, "/", (1, 2)),
+        Literal::Bool(false),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.evaluate(&expr);
+
+    assert_that!(result).has_error(RuntimeError::new(
+        RuntimeErrorCode::OperandNotANumber,
+        token(TokenKind::Slash, "/", (1, 2)),
+    ));
+}
+
+#[test]
+fn evaluate_binary_expr_slash_with_strings_returns_runtime_error() {
+    let expr = Expr::from(Binary::new(
+        Literal::String("Hello, world!".to_string()),
+        token(TokenKind::Slash, "/", (1, 2)),
+        Literal::Number(123.456),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.evaluate(&expr);
+
+    assert_that!(result).has_error(RuntimeError::new(
+        RuntimeErrorCode::OperandNotANumber,
+        token(TokenKind::Slash, "/", (1, 2)),
+    ));
+}
+
+#[test]
+fn evaluate_binary_expr_slash_with_nil_returns_runtime_error() {
+    let expr = Expr::from(Binary::new(
+        Literal::Nil,
+        token(TokenKind::Slash, "/", (1, 2)),
+        Literal::Number(123.456),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.evaluate(&expr);
+
+    assert_that!(result).has_error(RuntimeError::new(
+        RuntimeErrorCode::OperandNotANumber,
+        token(TokenKind::Slash, "/", (1, 2)),
+    ));
 }
 
 #[test]
@@ -678,4 +963,21 @@ fn evaluate_binary_expr_lessequal_with_nils() {
     let value = interpreter.evaluate(&expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
+}
+
+#[test]
+fn evaluate_binary_expr_with_illegal_operator() {
+    let expr = Expr::from(Binary::new(
+        Literal::Number(123.456),
+        token(TokenKind::Bang, "!", (1, 2)),
+        Literal::Number(789.012),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.evaluate(&expr);
+
+    assert_that!(result).has_error(RuntimeError::new(
+        RuntimeErrorCode::NotABinaryOperator,
+        token(TokenKind::Bang, "!", (1, 2)),
+    ));
 }
