@@ -39,6 +39,8 @@ pub struct SyntaxError {
     location: Location,
 }
 
+impl std::error::Error for SyntaxError {}
+
 impl Display for SyntaxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let location = self.location;
