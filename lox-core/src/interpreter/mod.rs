@@ -7,7 +7,7 @@ use crate::token::TokenKind;
 #[cfg(test)]
 mod tests;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Value {
     Nil,
     Bool(bool),
@@ -56,6 +56,12 @@ impl ExprVisitor for Interpreter {
         let right = self.evaluate(expr.right());
 
         match expr.operator().kind() {
+            TokenKind::BangEqual => Value::Bool(left != right),
+            TokenKind::EqualEqual => Value::Bool(left == right),
+            TokenKind::Greater => Value::Bool(left > right),
+            TokenKind::GreaterEqual => Value::Bool(left >= right),
+            TokenKind::Less => Value::Bool(left < right),
+            TokenKind::LessEqual => Value::Bool(left <= right),
             TokenKind::Minus => match (left, right) {
                 (Value::Number(left), Value::Number(right)) => Value::Number(left - right),
                 _ => todo!("error handling for binary operation"),
