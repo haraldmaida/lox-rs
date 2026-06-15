@@ -51,8 +51,32 @@ impl ExprVisitor for Interpreter {
         todo!()
     }
 
-    fn visit_binary_expr(&mut self, _expr: &Binary) -> Self::Output {
-        todo!()
+    fn visit_binary_expr(&mut self, expr: &Binary) -> Self::Output {
+        let left = self.evaluate(expr.left());
+        let right = self.evaluate(expr.right());
+
+        match expr.operator().kind() {
+            TokenKind::Minus => match (left, right) {
+                (Value::Number(left), Value::Number(right)) => Value::Number(left - right),
+                _ => todo!("error handling for binary operation"),
+            },
+            TokenKind::Plus => match (left, right) {
+                (Value::Number(left), Value::Number(right)) => Value::Number(left + right),
+                (Value::String(left), Value::String(right)) => {
+                    Value::String(format!("{left}{right}"))
+                },
+                _ => todo!("error handling for binary operation"),
+            },
+            TokenKind::Slash => match (left, right) {
+                (Value::Number(left), Value::Number(right)) => Value::Number(left / right),
+                _ => todo!("error handling for binary operation"),
+            },
+            TokenKind::Star => match (left, right) {
+                (Value::Number(left), Value::Number(right)) => Value::Number(left * right),
+                _ => todo!("error handling for binary operation"),
+            },
+            _ => todo!("error handling for binary operation"),
+        }
     }
 
     fn visit_call_expr(&mut self, _expr: &Call) -> Self::Output {

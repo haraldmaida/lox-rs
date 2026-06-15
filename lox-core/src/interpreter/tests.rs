@@ -64,9 +64,11 @@ fn evaluate_literal_number() {
     let expr = Expr::from(Literal::Number(123.456));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let Value::Number(value) = interpreter.evaluate(&expr) else {
+        panic!("expected a number");
+    };
 
-    assert_that!(value).is_equal_to(Value::Number(123.456));
+    assert_that!(value).is_close_to(123.456);
 }
 
 #[test]
@@ -84,9 +86,11 @@ fn evaluate_grouping_expression() {
     let expr = Expr::from(Grouping::new(Literal::Number(123.456)));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let Value::Number(value) = interpreter.evaluate(&expr) else {
+        panic!("expected a number");
+    };
 
-    assert_that!(value).is_equal_to(Value::Number(123.456));
+    assert_that!(value).is_close_to(123.456);
 }
 
 #[test]
@@ -97,9 +101,11 @@ fn evaluate_unary_expr_minus() {
     ));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let Value::Number(value) = interpreter.evaluate(&expr) else {
+        panic!("expected a number");
+    };
 
-    assert_that!(value).is_equal_to(Value::Number(-123.456));
+    assert_that!(value).is_close_to(-123.456);
 }
 
 #[test]
@@ -152,4 +158,82 @@ fn evaluate_unary_expr_bang_for_string() {
     let value = interpreter.evaluate(&expr);
 
     assert_that!(value).is_equal_to(Value::Bool(false));
+}
+
+#[test]
+fn evaluate_binary_expr_minus_with_numbers() {
+    let expr = Expr::from(Binary::new(
+        Literal::Number(123.456),
+        token(TokenKind::Minus, "-", (1, 2)),
+        Literal::Number(789.012),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let Value::Number(value) = interpreter.evaluate(&expr) else {
+        panic!("expected a number");
+    };
+
+    assert_that!(value).is_close_to(-665.556);
+}
+
+#[test]
+fn evaluate_binary_expr_plus_with_numbers() {
+    let expr = Expr::from(Binary::new(
+        Literal::Number(123.456),
+        token(TokenKind::Plus, "+", (1, 2)),
+        Literal::Number(789.012),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let Value::Number(value) = interpreter.evaluate(&expr) else {
+        panic!("expected a number");
+    };
+
+    assert_that!(value).is_close_to(912.468);
+}
+
+#[test]
+fn evaluate_binary_expr_plus_with_strings() {
+    let expr = Expr::from(Binary::new(
+        Literal::String("Hello, ".to_string()),
+        token(TokenKind::Plus, "+", (1, 2)),
+        Literal::String("world!".to_string()),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let value = interpreter.evaluate(&expr);
+
+    assert_that!(value).is_equal_to(Value::String("Hello, world!".into()));
+}
+
+#[test]
+fn evaluate_binary_expr_star_with_numbers() {
+    let expr = Expr::from(Binary::new(
+        Literal::Number(-123.456),
+        token(TokenKind::Star, "*", (1, 2)),
+        Literal::Number(789.012),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let Value::Number(value) = interpreter.evaluate(&expr) else {
+        panic!("expected a number");
+    };
+
+    assert_that!(value).is_close_to(-97_408.265_472);
+}
+
+#[test]
+fn evaluate_binary_expr_slash_with_numbers() {
+    let expr = Expr::from(Binary::new(
+        Literal::Number(123.456),
+        token(TokenKind::Slash, "/", (1, 2)),
+        Literal::Number(789.012),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let Value::Number(value) = interpreter.evaluate(&expr) else {
+        panic!("expected a number");
+    };
+
+    assert_that!(value).is_close_to(0.156_469_103_131_511_3);
 }
