@@ -2,6 +2,7 @@ use super::*;
 use crate::expr::Expr;
 use crate::token::{TokenKind, token};
 use asserting::prelude::*;
+use proptest::prelude::*;
 
 mod value {
     use super::*;
@@ -21,29 +22,20 @@ mod value {
         assert_that!(Value::Bool(true).is_truthy()).is_true();
     }
 
-    #[test]
-    fn number_0_is_truthy() {
-        assert_that!(Value::Number(0.).is_truthy()).is_true();
-    }
+    proptest! {
+        #[test]
+        fn any_number_including_0_and_negative_numbers_is_truthy(
+            num in any::<f64>(),
+        ) {
+            prop_assert!(Value::Number(num).is_truthy());
+        }
 
-    #[test]
-    fn number_1_is_truthy() {
-        assert_that!(Value::Number(1.).is_truthy()).is_true();
-    }
-
-    #[test]
-    fn number_minus_1_is_truthy() {
-        assert_that!(Value::Number(-1.).is_truthy()).is_true();
-    }
-
-    #[test]
-    fn empty_string_is_truthy() {
-        assert_that!(Value::String(String::new()).is_truthy()).is_true();
-    }
-
-    #[test]
-    fn string_of_char_0_is_truthy() {
-        assert_that!(Value::String("0".into()).is_truthy()).is_true();
+        #[test]
+        fn any_string_including_empty_strings_and_string_of_char_0_is_truthy(
+            string in any::<String>(),
+        ) {
+            prop_assert!(Value::String(string).is_truthy());
+        }
     }
 }
 
