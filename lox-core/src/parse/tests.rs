@@ -1,12 +1,8 @@
-use super::{Location, *};
+use super::*;
 use crate::expr::{Binary, Literal, Unary};
-use crate::token::TokenKind;
+use crate::token::{TokenKind, token};
 use crate::tokenize::Tokenize;
 use asserting::prelude::*;
-
-fn token(kind: TokenKind, lexeme: impl Into<String>, location: impl Into<Location>) -> Token {
-    Token::new(kind, None, lexeme.into(), location.into())
-}
 
 #[ignore = "Not implemented yet"]
 #[test]

@@ -269,5 +269,9 @@ impl Display for Token {
     }
 }
 
+pub fn token(kind: TokenKind, lexeme: impl Into<String>, location: impl Into<Location>) -> Token {
+    Token::new(kind, None, lexeme.into(), location.into())
+}
+
 #[cfg(test)]
 mod tests;
