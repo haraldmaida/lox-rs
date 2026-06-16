@@ -2,7 +2,7 @@ use crate::expr::{
     Assign, Binary, Call, Expr, ExprElement, ExprVisitor, Get, Grouping, Literal, Logical, Set,
     Super, This, Unary, Variable,
 };
-use crate::stmt::{Expression, Print, Stmt, StmtElement, StmtVisitor};
+use crate::stmt::{Expression, Print, Stmt, StmtElement, StmtVisitor, Var};
 use crate::token::{Token, TokenKind};
 use miette::{Diagnostic, SourceSpan};
 use std::fmt;
@@ -273,5 +273,9 @@ impl StmtVisitor for Interpreter {
         let value = self.evaluate(stmt.expression())?;
         println!("{value}");
         Ok(())
+    }
+
+    fn visit_var_stmt(&mut self, stmt: &Var) -> Self::Output {
+        todo!()
     }
 }

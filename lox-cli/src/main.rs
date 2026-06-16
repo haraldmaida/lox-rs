@@ -51,9 +51,19 @@ fn main() -> miette::Result<()> {
         },
         Command::Interpret { source } => {
             let source_code = read_source_file(source)?;
-            let program = source_code.tokenize().parse()?;
-            let mut interpreter = Interpreter::default();
-            interpreter.interpret(&program);
+            match source_code.tokenize().parse() {
+                Ok(program) => {
+                    let mut interpreter = Interpreter::default();
+                    interpreter.interpret(&program);
+                },
+                Err(syntax_errors) => {
+                    for error in syntax_errors {
+                        let error = Report::from(error)
+                            .with_source_code(NamedSource::new(source, source_code.clone()));
+                        eprintln!("\n{error}\n");
+                    }
+                },
+            }
         },
     }
 

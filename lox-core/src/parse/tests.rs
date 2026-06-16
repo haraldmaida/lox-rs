@@ -1,6 +1,6 @@
 use super::*;
 use crate::expr::{Binary, Literal, Unary};
-use crate::stmt::Print;
+use crate::stmt::{Print, Var};
 use crate::token::{TokenKind, token};
 use crate::tokenize::Tokenize;
 use asserting::prelude::*;
@@ -267,10 +267,10 @@ fn parse_expression_statement_missing_semicolon() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).err().is_equal_to(SyntaxError {
+    assert_that!(result).err().contains_exactly([SyntaxError {
         code: SyntaxErrorCode::MissingToken(TokenKind::Semicolon),
         location: (6, 0).into(),
-    });
+    }]);
 }
 
 #[test]
@@ -289,7 +289,7 @@ fn parse_expression_statement() {
 }
 
 #[test]
-fn parse_print_statement() {
+fn parse_print_string_literal() {
     let source_code = "print \"Hello, World!\";";
 
     let result = source_code.tokenize().parse();
@@ -298,5 +298,32 @@ fn parse_print_statement() {
         .ok()
         .is_equal_to(Program::from_iter([Stmt::Print(Print::new(Expr::from(
             Literal::String("Hello, World!".into()),
+        )))]));
+}
+
+#[test]
+fn parse_declaration_of_variable() {
+    let source_code = "var x = 42;";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result)
+        .ok()
+        .is_equal_to(Program::from_iter([Stmt::Var(Var::new(
+            token(TokenKind::Identifier, "x", (4, 1)),
+            Some(Expr::from(Literal::Number(42.))),
+        ))]));
+}
+
+#[test]
+fn parse_print_variable() {
+    let source_code = "print foo;";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result)
+        .ok()
+        .is_equal_to(Program::from_iter([Stmt::Print(Print::new(Expr::from(
+            Variable::new(token(TokenKind::Identifier, "foo", (6, 3))),
         )))]));
 }

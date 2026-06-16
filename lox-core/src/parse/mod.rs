@@ -1,6 +1,6 @@
-use crate::expr::{Binary, Expr, Grouping, Literal, Unary};
+use crate::expr::{Binary, Expr, Grouping, Literal, Unary, Variable};
 use crate::program::Program;
-use crate::stmt::{Expression, Print, Stmt};
+use crate::stmt::{Expression, Print, Stmt, Var};
 use crate::token;
 use crate::token::{Token, TokenKind};
 use crate::tokenize::{LexingError, LexingErrorCode};
@@ -98,7 +98,7 @@ impl From<LexingError> for SyntaxError {
 }
 
 pub trait Parse<'a> {
-    fn parse(self) -> Result<Program<'a>, SyntaxError>;
+    fn parse(self) -> Result<Program<'a>, Vec<SyntaxError>>;
 
     fn parse_expr(self) -> Result<Expr<'a>, SyntaxError>;
 }
@@ -107,7 +107,7 @@ impl<'a, T> Parse<'a> for T
 where
     T: 'a + IntoIterator<Item = Result<Token<'a>, LexingError>>,
 {
-    fn parse(self) -> Result<Program<'a>, SyntaxError> {
+    fn parse(self) -> Result<Program<'a>, Vec<SyntaxError>> {
         Parser::from(self).program()
     }
 
@@ -163,7 +163,7 @@ where
         self.peeked = Some(Ok(token));
     }
 
-    fn consume(&mut self, token_kind: TokenKind) -> Result<Token<'_>, SyntaxError> {
+    fn consume(&mut self, token_kind: TokenKind) -> Result<Token<'a>, SyntaxError> {
         match self.advance()? {
             Some(token) if token.kind == token_kind => Ok(token),
             Some(token) => {
@@ -203,26 +203,64 @@ where
         Ok(())
     }
 
-    pub fn program(&mut self) -> Result<Program<'a>, SyntaxError> {
+    pub fn program(&mut self) -> Result<Program<'a>, Vec<SyntaxError>> {
+        let mut errors = Vec::new();
         let mut statements = Vec::new();
         loop {
-            match self.statement() {
+            match self.declaration() {
                 None => break,
                 Some(Ok(stmt)) => statements.push(stmt),
                 Some(Err(err)) => {
-                    //TODO implement error recovery strategy
-                    return Err(err);
+                    errors.push(err);
+                    if let Err(error) = self.synchronize() {
+                        errors.push(error);
+                        break;
+                    }
                 },
             }
         }
-        Ok(Program::new(statements))
+        if errors.is_empty() {
+            Ok(Program::new(statements))
+        } else {
+            Err(errors)
+        }
+    }
+
+    pub fn declaration(&mut self) -> Option<Result<Stmt<'a>, SyntaxError>> {
+        match self.advance() {
+            Ok(None) => None,
+            Ok(Some(token)) => match token.kind {
+                TokenKind::EndOfFile => None,
+                TokenKind::Var => Some(self.var_declaration()),
+                _ => {
+                    self.revert(token);
+                    self.statement()
+                },
+            },
+            Err(err) => Some(Err(err)),
+        }
+    }
+
+    pub fn var_declaration(&mut self) -> Result<Stmt<'a>, SyntaxError> {
+        let name = self.consume(TokenKind::Identifier)?;
+        let initializer = match self.advance()? {
+            None => None,
+            Some(token) => match token.kind {
+                TokenKind::Equal => Some(self.expression()?),
+                _ => {
+                    self.revert(token);
+                    None
+                },
+            },
+        };
+        self.consume(TokenKind::Semicolon)?;
+        Ok(Var::new(name, initializer).into())
     }
 
     pub fn statement(&mut self) -> Option<Result<Stmt<'a>, SyntaxError>> {
         match self.advance() {
             Ok(None) => None,
             Ok(Some(token)) => match token.kind {
-                TokenKind::EndOfFile => None,
                 TokenKind::Print => Some(self.print_statement()),
                 _ => {
                     self.revert(token);
@@ -361,6 +399,7 @@ where
                         unreachable!("invalid string token {token:?}! please file a bug report.")
                     }
                 },
+                TokenKind::Identifier => Ok(Variable::new(token).into()),
                 TokenKind::LeftParen => {
                     let expr = self.expression()?;
                     self.consume(TokenKind::RightParen)?;

@@ -1,4 +1,5 @@
 use crate::expr::Expr;
+use crate::token::Token;
 use std::borrow::Borrow;
 use std::ops::Deref;
 
@@ -7,6 +8,7 @@ pub trait StmtVisitor {
 
     fn visit_expression_stmt(&mut self, stmt: &Expression) -> Self::Output;
     fn visit_print_stmt(&mut self, stmt: &Print) -> Self::Output;
+    fn visit_var_stmt(&mut self, stmt: &Var) -> Self::Output;
 }
 
 pub trait StmtElement {
@@ -19,6 +21,7 @@ pub trait StmtElement {
 pub enum Stmt<'a> {
     Expression(Expression<'a>),
     Print(Print<'a>),
+    Var(Var<'a>),
 }
 
 macro_rules! impl_stmt {
@@ -44,6 +47,7 @@ macro_rules! impl_stmt {
 
 impl_stmt!(Expression<'a>, Expression, visit_expression_stmt);
 impl_stmt!(Print<'a>, Print, visit_print_stmt);
+impl_stmt!(Var<'a>, Var, visit_var_stmt);
 
 impl StmtElement for Stmt<'_> {
     fn accept<V>(&self, visitor: &mut V) -> <V as StmtVisitor>::Output
@@ -53,6 +57,7 @@ impl StmtElement for Stmt<'_> {
         match self {
             Self::Expression(stmt) => visitor.visit_expression_stmt(stmt),
             Self::Print(stmt) => visitor.visit_print_stmt(stmt),
+            Self::Var(stmt) => visitor.visit_var_stmt(stmt),
         }
     }
 }
@@ -105,5 +110,28 @@ impl<'a> Print<'a> {
 
     pub const fn expression(&self) -> &Expr<'a> {
         &self.expression
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Var<'a> {
+    name: Token<'a>,
+    initializer: Option<Expr<'a>>,
+}
+
+impl<'a> Var<'a> {
+    pub fn new(name: Token<'a>, initializer: impl Into<Option<Expr<'a>>>) -> Self {
+        Self {
+            name,
+            initializer: initializer.into(),
+        }
+    }
+
+    pub const fn name(&self) -> &Token<'a> {
+        &self.name
+    }
+
+    pub const fn initializer(&self) -> Option<&Expr<'a>> {
+        self.initializer.as_ref()
     }
 }
