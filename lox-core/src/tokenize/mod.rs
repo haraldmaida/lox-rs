@@ -1,22 +1,18 @@
-use crate::source::{Location, SourceCode};
 use crate::token::{Literal, Token, TokenKind};
-use std::collections::VecDeque;
+use miette::{Diagnostic, SourceSpan};
 use std::fmt::{self, Debug, Display};
-use std::{io, mem};
+use std::io;
 
-pub trait Tokenize<'a>
-where
-    Self: SourceCode<'a>,
-{
-    fn tokenize(&'a mut self) -> Tokens<<Self as SourceCode<'a>>::Chars>;
+pub trait Tokenize<'a> {
+    fn tokenize(&'a self) -> Tokens<'a>;
 }
 
 impl<'a, S> Tokenize<'a> for S
 where
-    S: 'a + SourceCode<'a>,
+    S: AsRef<str>,
 {
-    fn tokenize(&'a mut self) -> Tokens<<Self as SourceCode<'a>>::Chars> {
-        Tokens::new(self.chars())
+    fn tokenize(&'a self) -> Tokens<'a> {
+        Tokens::new(self.as_ref())
     }
 }
 
@@ -33,7 +29,9 @@ impl Display for LexingErrorCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::IoError(message) => write!(f, "{message}"),
-            Self::CharacterAfterEndOfFile(chr) => write!(f, "character '{chr}' after end of file"),
+            Self::CharacterAfterEndOfFile(chr) => {
+                write!(f, "character '{chr}' after end of file detected")
+            },
             Self::InvalidNumberLiteral(value) => write!(f, "invalid number literal {value}"),
             Self::UnexpectedCharacter(chr) => write!(f, "unexpected character '{chr}'"),
             Self::UnterminatedStringLiteral(value) => {
@@ -49,11 +47,14 @@ impl From<io::Error> for LexingErrorCode {
     }
 }
 
-#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
-#[error("{code} at {location}")]
+#[derive(thiserror::Error, Diagnostic, Debug, Clone, PartialEq, Eq)]
+#[error("{code}")]
 pub struct LexingError {
     pub(crate) code: LexingErrorCode,
-    pub(crate) location: Location,
+    #[help]
+    pub(crate) help: Option<String>,
+    #[label]
+    pub(crate) location: SourceSpan,
 }
 
 impl LexingError {
@@ -61,22 +62,26 @@ impl LexingError {
         &self.code
     }
 
-    pub const fn location(&self) -> Location {
+    pub fn help(&self) -> Option<&str> {
+        self.help.as_deref()
+    }
+
+    pub const fn location(&self) -> SourceSpan {
         self.location
     }
 }
 
-pub struct LexingResult {
-    tokens: Vec<Token>,
+pub struct LexingResult<'a> {
+    tokens: Vec<Token<'a>>,
     errors: Vec<LexingError>,
 }
 
-impl LexingResult {
-    pub const fn new(tokens: Vec<Token>, errors: Vec<LexingError>) -> Self {
+impl<'a> LexingResult<'a> {
+    pub const fn new(tokens: Vec<Token<'a>>, errors: Vec<LexingError>) -> Self {
         Self { tokens, errors }
     }
 
-    pub fn tokens(&self) -> &[Token] {
+    pub fn tokens(&self) -> &[Token<'a>] {
         &self.tokens
     }
 
@@ -84,7 +89,7 @@ impl LexingResult {
         &self.errors
     }
 
-    pub fn into_result(self) -> Result<Vec<Token>, Vec<LexingError>> {
+    pub fn into_result(self) -> Result<Vec<Token<'a>>, Vec<LexingError>> {
         if self.errors.is_empty() {
             Ok(self.tokens)
         } else {
@@ -93,8 +98,8 @@ impl LexingResult {
     }
 }
 
-impl FromIterator<Result<Token, LexingError>> for LexingResult {
-    fn from_iter<I: IntoIterator<Item = Result<Token, LexingError>>>(iter: I) -> Self {
+impl<'a> FromIterator<Result<Token<'a>, LexingError>> for LexingResult<'a> {
+    fn from_iter<I: IntoIterator<Item = Result<Token<'a>, LexingError>>>(iter: I) -> Self {
         let iterator = iter.into_iter();
         let (lower_bound, _) = iterator.size_hint();
 
@@ -137,211 +142,178 @@ impl Default for LexingState {
     }
 }
 
-pub struct Tokens<I> {
-    source: I,
+/// A lexer for Lox.
+///
+/// The implementation uses a finite state machine.
+pub struct Tokens<'a> {
+    source: &'a str,
     state: LexingState,
-    start_location: Location,
-    current_lexeme: String,
-    current_location: Location,
-    open_chars: VecDeque<char>,
+    /// Byte offset of the start of the current lexeme.
+    start_offset: usize,
+    /// Byte offset of the next character.
+    current_offset: usize,
 }
 
-impl<I> Tokens<I>
-where
-    I: Iterator<Item = Result<char, io::Error>>,
-{
-    pub fn new(source: I) -> Self {
+impl<'a> Tokens<'a> {
+    pub fn new(source: &'a str) -> Self {
         Self {
             source,
             state: LexingState::default(),
-            start_location: Location::default(),
-            current_lexeme: String::new(),
-            current_location: Location::default(),
-            open_chars: VecDeque::with_capacity(2),
+            start_offset: 0,
+            current_offset: 0,
         }
-    }
-
-    fn advance_to_next_char(&mut self) -> Option<Result<char, LexingError>> {
-        let next_chr = self
-            .open_chars
-            .pop_front()
-            .map(Ok)
-            .or_else(|| self.source.next());
-
-        match next_chr {
-            None => None,
-            Some(Ok('\n')) => {
-                self.current_location.advance_line();
-                Some(Ok('\n'))
-            },
-            Some(Ok(chr)) => {
-                self.current_location.advance_char();
-                Some(Ok(chr))
-            },
-            Some(Err(error)) => Some(Err(LexingError {
-                code: error.into(),
-                location: self.current_location,
-            })),
-        }
-    }
-
-    fn revert_char(&mut self, chr: char) {
-        self.open_chars.push_back(chr);
-        self.current_location.revert(1);
     }
 }
 
-impl<I> Iterator for Tokens<I>
-where
-    I: Iterator<Item = Result<char, io::Error>>,
-{
-    type Item = Result<Token, LexingError>;
+impl<'a> Tokens<'a> {
+    fn advance_to_next_char(&mut self) -> Option<char> {
+        self.source[self.current_offset..]
+            .chars()
+            .next()
+            .inspect(|chr| {
+                self.current_offset += chr.len_utf8();
+            })
+    }
+
+    const fn revert_char(&mut self, chr: char) {
+        self.current_offset -= chr.len_utf8();
+    }
+
+    fn start_location(&self) -> SourceSpan {
+        (self.start_offset, self.current_offset - self.start_offset).into()
+    }
+
+    fn current_location(&self, length: usize) -> SourceSpan {
+        (self.current_offset, length).into()
+    }
+
+    fn current_lexeme(&self) -> &'a str {
+        &self.source[self.start_offset..self.current_offset]
+    }
+
+    fn nonliteral_token(&self, kind: TokenKind) -> Token<'a> {
+        let location = self.start_location();
+        let lexeme = self.current_lexeme();
+        Token::new(kind, None, lexeme, location)
+    }
+
+    #[allow(clippy::unnecessary_wraps)]
+    fn unescape_string_token(&self) -> Result<Token<'a>, LexingError> {
+        let location = self.start_location();
+        let lexeme = self.current_lexeme();
+        // Lox has no escaping, so just remove the ".
+        // Since it has no escaping, strings can't contain ", so trim won't trim multiple
+        let value = lexeme.trim_matches('"');
+        Ok(Token::new(
+            TokenKind::StringLiteral,
+            Some(Literal::String(value)),
+            lexeme,
+            location,
+        ))
+    }
+
+    fn parse_number_token(&self) -> Result<Token<'a>, LexingError> {
+        let location = self.start_location();
+        let lexeme = self.current_lexeme();
+        match lexeme.parse::<f64>() {
+            Ok(value) => Ok(Token::new(
+                TokenKind::NumberLiteral,
+                Some(Literal::Number(value)),
+                lexeme,
+                location,
+            )),
+            Err(_) => Err(LexingError {
+                code: LexingErrorCode::InvalidNumberLiteral(lexeme.into()),
+                help: None,
+                location,
+            }),
+        }
+    }
+}
+
+impl<'a> Iterator for Tokens<'a> {
+    type Item = Result<Token<'a>, LexingError>;
 
     #[allow(clippy::too_many_lines)]
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let next_chr = match self.advance_to_next_char() {
-                None => None,
-                Some(Ok(chr)) => Some(chr),
-                Some(Err(error)) => {
-                    return Some(Err(error));
-                },
-            };
+            let next_chr = self.advance_to_next_char();
             match self.state {
                 LexingState::Initial => match next_chr {
                     None => {
                         self.state = LexingState::EndOfFile;
-                        let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(Ok(nonliteral_token(
+                        return Some(Ok(Token::new(
                             TokenKind::EndOfFile,
-                            lexeme,
-                            self.current_location,
+                            None,
+                            "",
+                            self.current_location(0),
                         )));
                     },
                     Some(chr) => {
-                        self.current_lexeme.push(chr);
+                        self.start_offset = self.current_offset - chr.len_utf8();
                         match chr {
                             ',' => {
-                                let lexeme = mem::take(&mut self.current_lexeme);
-                                return Some(Ok(nonliteral_token(
-                                    TokenKind::Comma,
-                                    lexeme,
-                                    self.current_location,
-                                )));
+                                return Some(Ok(self.nonliteral_token(TokenKind::Comma)));
                             },
                             '(' => {
-                                let lexeme = mem::take(&mut self.current_lexeme);
-                                return Some(Ok(nonliteral_token(
-                                    TokenKind::LeftParen,
-                                    lexeme,
-                                    self.current_location,
-                                )));
+                                return Some(Ok(self.nonliteral_token(TokenKind::LeftParen)));
                             },
                             ')' => {
-                                let lexeme = mem::take(&mut self.current_lexeme);
-                                return Some(Ok(nonliteral_token(
-                                    TokenKind::RightParen,
-                                    lexeme,
-                                    self.current_location,
-                                )));
+                                return Some(Ok(self.nonliteral_token(TokenKind::RightParen)));
                             },
                             '{' => {
-                                let lexeme = mem::take(&mut self.current_lexeme);
-                                return Some(Ok(nonliteral_token(
-                                    TokenKind::LeftBrace,
-                                    lexeme,
-                                    self.current_location,
-                                )));
+                                return Some(Ok(self.nonliteral_token(TokenKind::LeftBrace)));
                             },
                             '}' => {
-                                let lexeme = mem::take(&mut self.current_lexeme);
-                                return Some(Ok(nonliteral_token(
-                                    TokenKind::RightBrace,
-                                    lexeme,
-                                    self.current_location,
-                                )));
+                                return Some(Ok(self.nonliteral_token(TokenKind::RightBrace)));
                             },
                             '.' => {
-                                let lexeme = mem::take(&mut self.current_lexeme);
-                                return Some(Ok(nonliteral_token(
-                                    TokenKind::Dot,
-                                    lexeme,
-                                    self.current_location,
-                                )));
+                                return Some(Ok(self.nonliteral_token(TokenKind::Dot)));
                             },
                             ';' => {
-                                let lexeme = mem::take(&mut self.current_lexeme);
-                                return Some(Ok(nonliteral_token(
-                                    TokenKind::Semicolon,
-                                    lexeme,
-                                    self.current_location,
-                                )));
+                                return Some(Ok(self.nonliteral_token(TokenKind::Semicolon)));
                             },
                             '-' => {
-                                let lexeme = mem::take(&mut self.current_lexeme);
-                                return Some(Ok(nonliteral_token(
-                                    TokenKind::Minus,
-                                    lexeme,
-                                    self.current_location,
-                                )));
+                                return Some(Ok(self.nonliteral_token(TokenKind::Minus)));
                             },
                             '+' => {
-                                let lexeme = mem::take(&mut self.current_lexeme);
-                                return Some(Ok(nonliteral_token(
-                                    TokenKind::Plus,
-                                    lexeme,
-                                    self.current_location,
-                                )));
+                                return Some(Ok(self.nonliteral_token(TokenKind::Plus)));
                             },
                             '*' => {
-                                let lexeme = mem::take(&mut self.current_lexeme);
-                                return Some(Ok(nonliteral_token(
-                                    TokenKind::Star,
-                                    lexeme,
-                                    self.current_location,
-                                )));
+                                return Some(Ok(self.nonliteral_token(TokenKind::Star)));
                             },
                             '/' => {
                                 self.state = LexingState::MaybeLineComment;
-                                self.start_location = self.current_location;
                             },
                             '!' => {
                                 self.state = LexingState::MaybeBangEqual;
-                                self.start_location = self.current_location;
                             },
                             '=' => {
                                 self.state = LexingState::MaybeEqualEqual;
-                                self.start_location = self.current_location;
                             },
                             '<' => {
                                 self.state = LexingState::MaybeLessEqual;
-                                self.start_location = self.current_location;
                             },
                             '>' => {
                                 self.state = LexingState::MaybeGreaterEqual;
-                                self.start_location = self.current_location;
                             },
                             '"' => {
                                 self.state = LexingState::StringStarted;
-                                self.start_location = self.current_location;
                             },
                             _ if chr.is_ascii_digit() => {
                                 self.state = LexingState::NumberStarted;
-                                self.start_location = self.current_location;
                             },
                             _ if chr.is_ascii_alphabetic() || chr == '_' => {
                                 self.state = LexingState::Identifier;
-                                self.start_location = self.current_location;
                             },
                             _ if chr.is_whitespace() => {
                                 // ignore whitespace
-                                self.current_lexeme.pop();
                             },
                             _ => {
-                                self.current_lexeme.clear();
                                 return Some(Err(LexingError {
                                     code: LexingErrorCode::UnexpectedCharacter(chr),
-                                    location: self.current_location,
+                                    help: None,
+                                    location: self.start_location(),
                                 }));
                             },
                         }
@@ -350,150 +322,75 @@ where
                 LexingState::MaybeBangEqual => match next_chr {
                     None => {
                         self.state = LexingState::Initial;
-                        let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(Ok(nonliteral_token(
-                            TokenKind::Bang,
-                            lexeme,
-                            self.start_location,
-                        )));
+                        return Some(Ok(self.nonliteral_token(TokenKind::Bang)));
                     },
                     Some('=') => {
                         self.state = LexingState::Initial;
-                        self.current_lexeme.push('=');
-                        let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(Ok(nonliteral_token(
-                            TokenKind::BangEqual,
-                            lexeme,
-                            self.start_location,
-                        )));
+                        return Some(Ok(self.nonliteral_token(TokenKind::BangEqual)));
                     },
                     Some(chr) => {
                         self.state = LexingState::Initial;
                         self.revert_char(chr);
-                        let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(Ok(nonliteral_token(
-                            TokenKind::Bang,
-                            lexeme,
-                            self.start_location,
-                        )));
+                        return Some(Ok(self.nonliteral_token(TokenKind::Bang)));
                     },
                 },
                 LexingState::MaybeEqualEqual => match next_chr {
                     None => {
                         self.state = LexingState::Initial;
-                        let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(Ok(nonliteral_token(
-                            TokenKind::Equal,
-                            lexeme,
-                            self.start_location,
-                        )));
+                        return Some(Ok(self.nonliteral_token(TokenKind::Equal)));
                     },
                     Some('=') => {
                         self.state = LexingState::Initial;
-                        self.current_lexeme.push('=');
-                        let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(Ok(nonliteral_token(
-                            TokenKind::EqualEqual,
-                            lexeme,
-                            self.start_location,
-                        )));
+                        return Some(Ok(self.nonliteral_token(TokenKind::EqualEqual)));
                     },
                     Some(chr) => {
                         self.state = LexingState::Initial;
                         self.revert_char(chr);
-                        let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(Ok(nonliteral_token(
-                            TokenKind::Equal,
-                            lexeme,
-                            self.start_location,
-                        )));
+                        return Some(Ok(self.nonliteral_token(TokenKind::Equal)));
                     },
                 },
                 LexingState::MaybeGreaterEqual => match next_chr {
                     None => {
                         self.state = LexingState::Initial;
-                        let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(Ok(nonliteral_token(
-                            TokenKind::Greater,
-                            lexeme,
-                            self.start_location,
-                        )));
+                        return Some(Ok(self.nonliteral_token(TokenKind::Greater)));
                     },
                     Some('=') => {
                         self.state = LexingState::Initial;
-                        self.current_lexeme.push('=');
-                        let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(Ok(nonliteral_token(
-                            TokenKind::GreaterEqual,
-                            lexeme,
-                            self.start_location,
-                        )));
+                        return Some(Ok(self.nonliteral_token(TokenKind::GreaterEqual)));
                     },
                     Some(chr) => {
                         self.state = LexingState::Initial;
                         self.revert_char(chr);
-                        let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(Ok(nonliteral_token(
-                            TokenKind::Greater,
-                            lexeme,
-                            self.start_location,
-                        )));
+                        return Some(Ok(self.nonliteral_token(TokenKind::Greater)));
                     },
                 },
                 LexingState::MaybeLessEqual => match next_chr {
                     None => {
                         self.state = LexingState::Initial;
-                        let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(Ok(nonliteral_token(
-                            TokenKind::Less,
-                            lexeme,
-                            self.start_location,
-                        )));
+                        return Some(Ok(self.nonliteral_token(TokenKind::Less)));
                     },
                     Some('=') => {
                         self.state = LexingState::Initial;
-                        self.current_lexeme.push('=');
-                        let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(Ok(nonliteral_token(
-                            TokenKind::LessEqual,
-                            lexeme,
-                            self.start_location,
-                        )));
+                        return Some(Ok(self.nonliteral_token(TokenKind::LessEqual)));
                     },
                     Some(chr) => {
                         self.state = LexingState::Initial;
                         self.revert_char(chr);
-                        let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(Ok(nonliteral_token(
-                            TokenKind::Less,
-                            lexeme,
-                            self.start_location,
-                        )));
+                        return Some(Ok(self.nonliteral_token(TokenKind::Less)));
                     },
                 },
                 LexingState::MaybeLineComment => match next_chr {
                     None => {
                         self.state = LexingState::Initial;
-                        let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(Ok(nonliteral_token(
-                            TokenKind::Slash,
-                            lexeme,
-                            self.start_location,
-                        )));
+                        return Some(Ok(self.nonliteral_token(TokenKind::Slash)));
                     },
                     Some('/') => {
                         self.state = LexingState::LineComment;
-                        self.current_lexeme.clear();
                     },
                     Some(chr) => {
                         self.state = LexingState::Initial;
                         self.revert_char(chr);
-                        let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(Ok(nonliteral_token(
-                            TokenKind::Slash,
-                            lexeme,
-                            self.start_location,
-                        )));
+                        return Some(Ok(self.nonliteral_token(TokenKind::Slash)));
                     },
                 },
                 LexingState::LineComment => match next_chr {
@@ -507,90 +404,80 @@ where
                 LexingState::StringStarted => match next_chr {
                     None => {
                         self.state = LexingState::Initial;
-                        let lexeme = mem::take(&mut self.current_lexeme);
                         return Some(Err(LexingError {
-                            code: LexingErrorCode::UnterminatedStringLiteral(lexeme),
-                            location: self.start_location,
+                            code: LexingErrorCode::UnterminatedStringLiteral(
+                                self.current_lexeme().into(),
+                            ),
+                            help: None,
+                            location: self.start_location(),
                         }));
                     },
                     Some('"') => {
                         self.state = LexingState::Initial;
-                        self.current_lexeme.push('"');
-                        let lexeme = mem::take(&mut self.current_lexeme);
-                        let value = lexeme.trim_matches('"').to_string();
-                        return Some(Ok(string_literal(lexeme, value, self.start_location)));
+                        return Some(self.unescape_string_token());
                     },
-                    Some(chr) => self.current_lexeme.push(chr),
+                    Some(_chr) => {},
                 },
                 LexingState::NumberStarted => match next_chr {
                     None => {
                         self.state = LexingState::Initial;
-                        let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(parse_number_token(lexeme, self.start_location));
+                        return Some(self.parse_number_token());
                     },
                     Some('.') => {
                         self.state = LexingState::MaybeDecimalPoint;
                     },
-                    Some(chr) if chr.is_ascii_digit() => self.current_lexeme.push(chr),
+                    Some(chr) if chr.is_ascii_digit() => {},
                     Some(chr) => {
                         self.state = LexingState::Initial;
                         self.revert_char(chr);
-                        let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(parse_number_token(lexeme, self.start_location));
+                        return Some(self.parse_number_token());
                     },
                 },
                 LexingState::MaybeDecimalPoint => match next_chr {
                     None => {
                         self.state = LexingState::Initial;
-                        self.current_lexeme.push('.');
-                        let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(parse_number_token(lexeme, self.start_location));
+                        return Some(self.parse_number_token());
                     },
                     Some(chr) if chr.is_ascii_digit() => {
                         self.state = LexingState::FractionDigitsStarted;
-                        self.current_lexeme.push('.');
-                        self.current_lexeme.push(chr);
                     },
                     Some(chr) => {
                         self.state = LexingState::Initial;
                         if chr.is_ascii_alphabetic() || chr == '_' {
                             self.revert_char('.');
-                        } else {
-                            self.current_lexeme.push('.');
                         }
                         self.revert_char(chr);
-                        let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(parse_number_token(lexeme, self.start_location));
+                        return Some(self.parse_number_token());
                     },
                 },
                 LexingState::FractionDigitsStarted => match next_chr {
                     None => {
                         self.state = LexingState::Initial;
-                        let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(parse_number_token(lexeme, self.start_location));
+                        return Some(self.parse_number_token());
                     },
-                    Some(chr) if chr.is_ascii_digit() => self.current_lexeme.push(chr),
+                    Some(chr) if chr.is_ascii_digit() => {},
                     Some(chr) => {
                         self.state = LexingState::Initial;
                         self.revert_char(chr);
-                        let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(parse_number_token(lexeme, self.start_location));
+                        return Some(self.parse_number_token());
                     },
                 },
                 LexingState::Identifier => match next_chr {
                     None => {
                         self.state = LexingState::Initial;
-                        let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(Ok(keyword_or_identifier(lexeme, self.start_location)));
+                        return Some(Ok(keyword_or_identifier(
+                            self.current_lexeme(),
+                            self.start_location(),
+                        )));
                     },
-                    Some(chr) if chr.is_ascii_alphanumeric() || chr == '_' => {
-                        self.current_lexeme.push(chr);
-                    },
+                    Some(chr) if chr.is_ascii_alphanumeric() || chr == '_' => {},
                     Some(chr) => {
                         self.state = LexingState::Initial;
                         self.revert_char(chr);
-                        let lexeme = mem::take(&mut self.current_lexeme);
-                        return Some(Ok(keyword_or_identifier(lexeme, self.start_location)));
+                        return Some(Ok(keyword_or_identifier(
+                            self.current_lexeme(),
+                            self.start_location(),
+                        )));
                     },
                 },
                 LexingState::EndOfFile => match next_chr {
@@ -599,7 +486,8 @@ where
                         // this should be unreachable, but just in case
                         return Some(Err(LexingError {
                             code: LexingErrorCode::CharacterAfterEndOfFile(chr),
-                            location: self.current_location,
+                            help: None,
+                            location: self.start_location(),
                         }));
                     },
                 },
@@ -608,40 +496,8 @@ where
     }
 }
 
-fn parse_number_token(lexeme: String, location: Location) -> Result<Token, LexingError> {
-    match lexeme.parse::<f64>() {
-        Ok(value) => Ok(number_literal(lexeme, value, location)),
-        Err(_) => Err(LexingError {
-            code: LexingErrorCode::InvalidNumberLiteral(lexeme),
-            location,
-        }),
-    }
-}
-
-const fn nonliteral_token(kind: TokenKind, lexeme: String, location: Location) -> Token {
-    Token::new(kind, None, lexeme, location)
-}
-
-const fn number_literal(lexeme: String, value: f64, location: Location) -> Token {
-    Token::new(
-        TokenKind::NumberLiteral,
-        Some(Literal::Number(value)),
-        lexeme,
-        location,
-    )
-}
-
-const fn string_literal(lexeme: String, value: String, location: Location) -> Token {
-    Token::new(
-        TokenKind::StringLiteral,
-        Some(Literal::String(value)),
-        lexeme,
-        location,
-    )
-}
-
-fn keyword_or_identifier(lexeme: String, location: Location) -> Token {
-    let token_kind = match &lexeme[..] {
+fn keyword_or_identifier(lexeme: &str, location: SourceSpan) -> Token<'_> {
+    let token_kind = match lexeme {
         "and" => TokenKind::And,
         "class" => TokenKind::Class,
         "else" => TokenKind::Else,

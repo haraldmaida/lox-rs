@@ -1,4 +1,4 @@
-use super::{Location, *};
+use super::*;
 use asserting::prelude::*;
 
 mod token_kind {
@@ -286,8 +286,8 @@ mod token {
         let token = Token {
             kind: TokenKind::EndOfFile,
             literal: None,
-            lexeme: String::new(),
-            location: Location::default(),
+            lexeme: "",
+            location: (2, 1).into(),
         };
         let display_string = token.to_string();
         assert_that!(display_string).is_equal_to("EOF  null");
@@ -297,9 +297,9 @@ mod token {
     fn display_format_string_literal() {
         let token = Token {
             kind: TokenKind::StringLiteral,
-            literal: Some(Literal::String("Hello, World!".to_string())),
-            lexeme: "\"Hello, World!\"".to_string(),
-            location: Location::default(),
+            literal: Some(Literal::String("Hello, World!")),
+            lexeme: "\"Hello, World!\"",
+            location: (2, 1).into(),
         };
         let display_string = token.to_string();
         assert_that!(display_string).is_equal_to("STRING_LITERAL \"Hello, World!\" Hello, World!");
@@ -310,8 +310,8 @@ mod token {
         let token = Token {
             kind: TokenKind::NumberLiteral,
             literal: Some(Literal::Number(123.)),
-            lexeme: "123".to_string(),
-            location: Location::default(),
+            lexeme: "123",
+            location: (2, 1).into(),
         };
         let display_string = token.to_string();
         assert_that!(display_string).is_equal_to("NUMBER_LITERAL 123 123.0");
@@ -322,8 +322,8 @@ mod token {
         let token = Token {
             kind: TokenKind::NumberLiteral,
             literal: Some(Literal::Number(123.456)),
-            lexeme: "123.456".to_string(),
-            location: Location::default(),
+            lexeme: "123.456",
+            location: (2, 1).into(),
         };
         let display_string = token.to_string();
         assert_that!(display_string).is_equal_to("NUMBER_LITERAL 123.456 123.456");
@@ -334,8 +334,8 @@ mod token {
         let token = Token {
             kind: TokenKind::Identifier,
             literal: None,
-            lexeme: "foo".to_string(),
-            location: Location::default(),
+            lexeme: "foo",
+            location: (2, 1).into(),
         };
         let display_string = token.to_string();
         assert_that!(display_string).is_equal_to("IDENTIFIER foo null");

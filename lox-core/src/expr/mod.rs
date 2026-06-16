@@ -24,30 +24,32 @@ pub trait ExprElement {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Expr {
-    Assign(Assign),
-    Binary(Binary),
-    Call(Call),
-    Get(Get),
-    Grouping(Grouping),
+pub enum Expr<'a> {
+    Assign(Assign<'a>),
+    Binary(Binary<'a>),
+    Call(Call<'a>),
+    Get(Get<'a>),
+    Grouping(Grouping<'a>),
     Literal(Literal),
-    Logical(Logical),
-    Set(Set),
-    Super(Super),
-    This(This),
-    Unary(Unary),
-    Variable(Variable),
+    Logical(Logical<'a>),
+    Set(Set<'a>),
+    Super(Super<'a>),
+    This(This<'a>),
+    Unary(Unary<'a>),
+    Variable(Variable<'a>),
 }
 
 macro_rules! impl_expr {
     ($expr_type:ty, $variant:ident, $visitor_method:ident) => {
-        impl From<$expr_type> for Expr {
+        #[allow(single_use_lifetimes)]
+        impl<'a> From<$expr_type> for Expr<'a> {
             fn from(expr: $expr_type) -> Self {
                 Self::$variant(expr)
             }
         }
 
-        impl ExprElement for $expr_type {
+        #[allow(single_use_lifetimes, unused_lifetimes)]
+        impl<'a> ExprElement for $expr_type {
             fn accept<V>(&self, visitor: &mut V) -> <V as ExprVisitor>::Output
             where
                 V: ExprVisitor,
@@ -58,20 +60,20 @@ macro_rules! impl_expr {
     };
 }
 
-impl_expr!(Assign, Assign, visit_assign_expr);
-impl_expr!(Binary, Binary, visit_binary_expr);
-impl_expr!(Call, Call, visit_call_expr);
-impl_expr!(Get, Get, visit_get_expr);
-impl_expr!(Grouping, Grouping, visit_grouping_expr);
+impl_expr!(Assign<'a>, Assign, visit_assign_expr);
+impl_expr!(Binary<'a>, Binary, visit_binary_expr);
+impl_expr!(Call<'a>, Call, visit_call_expr);
+impl_expr!(Get<'a>, Get, visit_get_expr);
+impl_expr!(Grouping<'a>, Grouping, visit_grouping_expr);
 impl_expr!(Literal, Literal, visit_literal_expr);
-impl_expr!(Logical, Logical, visit_logical_expr);
-impl_expr!(Set, Set, visit_set_expr);
-impl_expr!(Super, Super, visit_super_expr);
-impl_expr!(This, This, visit_this_expr);
-impl_expr!(Unary, Unary, visit_unary_expr);
-impl_expr!(Variable, Variable, visit_variable_expr);
+impl_expr!(Logical<'a>, Logical, visit_logical_expr);
+impl_expr!(Set<'a>, Set, visit_set_expr);
+impl_expr!(Super<'a>, Super, visit_super_expr);
+impl_expr!(This<'a>, This, visit_this_expr);
+impl_expr!(Unary<'a>, Unary, visit_unary_expr);
+impl_expr!(Variable<'a>, Variable, visit_variable_expr);
 
-impl ExprElement for Expr {
+impl ExprElement for Expr<'_> {
     fn accept<V>(&self, visitor: &mut V) -> <V as ExprVisitor>::Output
     where
         V: ExprVisitor,
@@ -94,37 +96,37 @@ impl ExprElement for Expr {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Assign {
-    name: Token,
-    value: Box<Expr>,
+pub struct Assign<'a> {
+    name: Token<'a>,
+    value: Box<Expr<'a>>,
 }
 
-impl Assign {
-    pub fn new(name: Token, value: impl Into<Expr>) -> Self {
+impl<'a> Assign<'a> {
+    pub fn new(name: Token<'a>, value: impl Into<Expr<'a>>) -> Self {
         Self {
             name,
             value: Box::new(value.into()),
         }
     }
 
-    pub const fn name(&self) -> &Token {
+    pub const fn name(&self) -> &Token<'a> {
         &self.name
     }
 
-    pub fn value(&self) -> &Expr {
+    pub fn value(&self) -> &Expr<'a> {
         &self.value
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Binary {
-    left: Box<Expr>,
-    operator: Token,
-    right: Box<Expr>,
+pub struct Binary<'a> {
+    left: Box<Expr<'a>>,
+    operator: Token<'a>,
+    right: Box<Expr<'a>>,
 }
 
-impl Binary {
-    pub fn new(left: impl Into<Expr>, operator: Token, right: impl Into<Expr>) -> Self {
+impl<'a> Binary<'a> {
+    pub fn new(left: impl Into<Expr<'a>>, operator: Token<'a>, right: impl Into<Expr<'a>>) -> Self {
         Self {
             left: Box::new(left.into()),
             operator,
@@ -132,28 +134,28 @@ impl Binary {
         }
     }
 
-    pub const fn left(&self) -> &Expr {
+    pub const fn left(&self) -> &Expr<'a> {
         &self.left
     }
 
-    pub const fn operator(&self) -> &Token {
+    pub const fn operator(&self) -> &Token<'a> {
         &self.operator
     }
 
-    pub const fn right(&self) -> &Expr {
+    pub const fn right(&self) -> &Expr<'a> {
         &self.right
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Call {
-    callee: Box<Expr>,
-    paren: Token,
-    arguments: Vec<Expr>,
+pub struct Call<'a> {
+    callee: Box<Expr<'a>>,
+    paren: Token<'a>,
+    arguments: Vec<Expr<'a>>,
 }
 
-impl Call {
-    pub fn new(callee: impl Into<Expr>, paren: Token, arguments: Vec<Expr>) -> Self {
+impl<'a> Call<'a> {
+    pub fn new(callee: impl Into<Expr<'a>>, paren: Token<'a>, arguments: Vec<Expr<'a>>) -> Self {
         Self {
             callee: Box::new(callee.into()),
             paren,
@@ -161,55 +163,55 @@ impl Call {
         }
     }
 
-    pub const fn callee(&self) -> &Expr {
+    pub const fn callee(&self) -> &Expr<'a> {
         &self.callee
     }
 
-    pub const fn paren(&self) -> &Token {
+    pub const fn paren(&self) -> &Token<'a> {
         &self.paren
     }
 
-    pub fn arguments(&self) -> &[Expr] {
+    pub fn arguments(&self) -> &[Expr<'a>] {
         &self.arguments
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Get {
-    object: Box<Expr>,
-    name: Token,
+pub struct Get<'a> {
+    object: Box<Expr<'a>>,
+    name: Token<'a>,
 }
 
-impl Get {
-    pub fn new(object: impl Into<Expr>, name: Token) -> Self {
+impl<'a> Get<'a> {
+    pub fn new(object: impl Into<Expr<'a>>, name: Token<'a>) -> Self {
         Self {
             object: Box::new(object.into()),
             name,
         }
     }
 
-    pub const fn object(&self) -> &Expr {
+    pub const fn object(&self) -> &Expr<'a> {
         &self.object
     }
 
-    pub const fn name(&self) -> &Token {
+    pub const fn name(&self) -> &Token<'a> {
         &self.name
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Grouping {
-    expression: Box<Expr>,
+pub struct Grouping<'a> {
+    expression: Box<Expr<'a>>,
 }
 
-impl Grouping {
-    pub fn new(expression: impl Into<Expr>) -> Self {
+impl<'a> Grouping<'a> {
+    pub fn new(expression: impl Into<Expr<'a>>) -> Self {
         Self {
             expression: Box::new(expression.into()),
         }
     }
 
-    pub const fn expression(&self) -> &Expr {
+    pub const fn expression(&self) -> &Expr<'a> {
         &self.expression
     }
 }
@@ -259,14 +261,14 @@ impl From<&str> for Literal {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Logical {
-    left: Box<Expr>,
-    operator: Token,
-    right: Box<Expr>,
+pub struct Logical<'a> {
+    left: Box<Expr<'a>>,
+    operator: Token<'a>,
+    right: Box<Expr<'a>>,
 }
 
-impl Logical {
-    pub fn new(left: impl Into<Expr>, operator: Token, right: impl Into<Expr>) -> Self {
+impl<'a> Logical<'a> {
+    pub fn new(left: impl Into<Expr<'a>>, operator: Token<'a>, right: impl Into<Expr<'a>>) -> Self {
         Self {
             left: Box::new(left.into()),
             operator,
@@ -274,28 +276,28 @@ impl Logical {
         }
     }
 
-    pub const fn left(&self) -> &Expr {
+    pub const fn left(&self) -> &Expr<'a> {
         &self.left
     }
 
-    pub const fn operator(&self) -> &Token {
+    pub const fn operator(&self) -> &Token<'a> {
         &self.operator
     }
 
-    pub const fn right(&self) -> &Expr {
+    pub const fn right(&self) -> &Expr<'a> {
         &self.right
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Set {
-    object: Box<Expr>,
-    name: Token,
-    value: Box<Expr>,
+pub struct Set<'a> {
+    object: Box<Expr<'a>>,
+    name: Token<'a>,
+    value: Box<Expr<'a>>,
 }
 
-impl Set {
-    pub fn new(object: impl Into<Expr>, name: Token, value: impl Into<Expr>) -> Self {
+impl<'a> Set<'a> {
+    pub fn new(object: impl Into<Expr<'a>>, name: Token<'a>, value: impl Into<Expr<'a>>) -> Self {
         Self {
             object: Box::new(object.into()),
             name,
@@ -303,88 +305,88 @@ impl Set {
         }
     }
 
-    pub const fn object(&self) -> &Expr {
+    pub const fn object(&self) -> &Expr<'a> {
         &self.object
     }
 
-    pub const fn name(&self) -> &Token {
+    pub const fn name(&self) -> &Token<'a> {
         &self.name
     }
 
-    pub const fn value(&self) -> &Expr {
+    pub const fn value(&self) -> &Expr<'a> {
         &self.value
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Super {
-    keyword: Token,
-    method: Token,
+pub struct Super<'a> {
+    keyword: Token<'a>,
+    method: Token<'a>,
 }
 
-impl Super {
-    pub const fn new(keyword: Token, method: Token) -> Self {
+impl<'a> Super<'a> {
+    pub const fn new(keyword: Token<'a>, method: Token<'a>) -> Self {
         Self { keyword, method }
     }
 
-    pub const fn keyword(&self) -> &Token {
+    pub const fn keyword(&self) -> &Token<'a> {
         &self.keyword
     }
 
-    pub const fn method(&self) -> &Token {
+    pub const fn method(&self) -> &Token<'a> {
         &self.method
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct This {
-    keyword: Token,
+pub struct This<'a> {
+    keyword: Token<'a>,
 }
 
-impl This {
-    pub const fn new(keyword: Token) -> Self {
+impl<'a> This<'a> {
+    pub const fn new(keyword: Token<'a>) -> Self {
         Self { keyword }
     }
 
-    pub const fn keyword(&self) -> &Token {
+    pub const fn keyword(&self) -> &Token<'a> {
         &self.keyword
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Unary {
-    operator: Token,
-    right: Box<Expr>,
+pub struct Unary<'a> {
+    operator: Token<'a>,
+    right: Box<Expr<'a>>,
 }
 
-impl Unary {
-    pub fn new(operator: Token, right: impl Into<Expr>) -> Self {
+impl<'a> Unary<'a> {
+    pub fn new(operator: Token<'a>, right: impl Into<Expr<'a>>) -> Self {
         Self {
             operator,
             right: Box::new(right.into()),
         }
     }
 
-    pub const fn operator(&self) -> &Token {
+    pub const fn operator(&self) -> &Token<'a> {
         &self.operator
     }
 
-    pub const fn right(&self) -> &Expr {
+    pub const fn right(&self) -> &Expr<'a> {
         &self.right
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Variable {
-    name: Token,
+pub struct Variable<'a> {
+    name: Token<'a>,
 }
 
-impl Variable {
-    pub const fn new(name: Token) -> Self {
+impl<'a> Variable<'a> {
+    pub const fn new(name: Token<'a>) -> Self {
         Self { name }
     }
 
-    pub const fn name(&self) -> &Token {
+    pub const fn name(&self) -> &Token<'a> {
         &self.name
     }
 }

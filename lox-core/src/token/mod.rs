@@ -1,4 +1,4 @@
-use crate::source::Location;
+use miette::SourceSpan;
 use std::fmt;
 use std::fmt::{Debug, Display};
 
@@ -136,13 +136,13 @@ impl Display for TokenKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Literal {
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Literal<'a> {
     Number(f64),
-    String(String),
+    String(&'a str),
 }
 
-impl Display for Literal {
+impl Display for Literal<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Number(value) => {
@@ -157,38 +157,32 @@ impl Display for Literal {
     }
 }
 
-impl From<f64> for Literal {
+impl From<f64> for Literal<'_> {
     fn from(value: f64) -> Self {
         Self::Number(value)
     }
 }
 
-impl From<String> for Literal {
-    fn from(value: String) -> Self {
+impl<'a> From<&'a str> for Literal<'a> {
+    fn from(value: &'a str) -> Self {
         Self::String(value)
     }
 }
 
-impl From<&str> for Literal {
-    fn from(value: &str) -> Self {
-        Self::String(value.to_string())
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Token {
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Token<'a> {
     pub kind: TokenKind,
-    pub literal: Option<Literal>,
-    pub lexeme: String,
-    pub location: Location,
+    pub literal: Option<Literal<'a>>,
+    pub lexeme: &'a str,
+    pub location: SourceSpan,
 }
 
-impl Token {
+impl<'a> Token<'a> {
     pub const fn new(
         kind: TokenKind,
-        literal: Option<Literal>,
-        lexeme: String,
-        location: Location,
+        literal: Option<Literal<'a>>,
+        lexeme: &'a str,
+        location: SourceSpan,
     ) -> Self {
         Self {
             kind,
@@ -200,21 +194,21 @@ impl Token {
 
     pub fn new_nonliteral(
         kind: TokenKind,
-        lexeme: impl Into<String>,
-        location: impl Into<Location>,
+        lexeme: &'a str,
+        location: impl Into<SourceSpan>,
     ) -> Self {
         Self {
             kind,
             literal: None,
-            lexeme: lexeme.into(),
+            lexeme,
             location: location.into(),
         }
     }
 
     pub fn new_literal(
-        literal: impl Into<Literal>,
-        lexeme: impl Into<String>,
-        location: impl Into<Location>,
+        literal: impl Into<Literal<'a>>,
+        lexeme: &'a str,
+        location: impl Into<SourceSpan>,
     ) -> Self {
         let literal = literal.into();
         let kind = match literal {
@@ -224,16 +218,16 @@ impl Token {
         Self {
             kind,
             literal: Some(literal),
-            lexeme: lexeme.into(),
+            lexeme,
             location: location.into(),
         }
     }
 
-    pub fn new_identifier(lexeme: impl Into<String>, location: impl Into<Location>) -> Self {
+    pub fn new_identifier(lexeme: &'a str, location: impl Into<SourceSpan>) -> Self {
         Self {
             kind: TokenKind::Identifier,
             literal: None,
-            lexeme: lexeme.into(),
+            lexeme,
             location: location.into(),
         }
     }
@@ -242,23 +236,23 @@ impl Token {
         self.kind
     }
 
-    pub const fn literal(&self) -> Option<&Literal> {
+    pub const fn literal(&self) -> Option<&Literal<'a>> {
         self.literal.as_ref()
     }
 
-    pub fn lexeme(&self) -> &str {
-        &self.lexeme
+    pub const fn lexeme(&self) -> &str {
+        self.lexeme
     }
 
-    pub const fn location(&self) -> Location {
+    pub const fn location(&self) -> SourceSpan {
         self.location
     }
 }
 
-impl Display for Token {
+impl Display for Token<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if f.alternate() {
-            f.write_str(&self.lexeme)
+            f.write_str(self.lexeme)
         } else {
             let literal = self
                 .literal
@@ -269,8 +263,8 @@ impl Display for Token {
     }
 }
 
-pub fn token(kind: TokenKind, lexeme: impl Into<String>, location: impl Into<Location>) -> Token {
-    Token::new(kind, None, lexeme.into(), location.into())
+pub fn token(kind: TokenKind, lexeme: &str, location: impl Into<SourceSpan>) -> Token<'_> {
+    Token::new(kind, None, lexeme, location.into())
 }
 
 #[cfg(test)]

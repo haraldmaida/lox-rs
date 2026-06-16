@@ -3,6 +3,9 @@ use crate::expr::{
     Super, This, Unary, Variable,
 };
 use crate::token::{Token, TokenKind};
+use miette::{Diagnostic, SourceSpan};
+use std::fmt;
+use std::fmt::Display;
 
 #[cfg(test)]
 mod tests;
@@ -44,23 +47,52 @@ pub enum RuntimeErrorCode {
     OperandsOfDifferentType,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+impl Display for RuntimeErrorCode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        todo!()
+    }
+}
+
+#[derive(thiserror::Error, Diagnostic, Debug, Clone, PartialEq, Eq)]
 pub struct RuntimeError {
     code: RuntimeErrorCode,
-    token: Token,
+    operation: TokenKind,
+    #[help]
+    help: Option<String>,
+    #[label]
+    location: SourceSpan,
+}
+
+impl Display for RuntimeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        todo!()
+    }
 }
 
 impl RuntimeError {
-    pub const fn new(code: RuntimeErrorCode, token: Token) -> Self {
-        Self { code, token }
+    pub const fn new(code: RuntimeErrorCode, token: Token<'_>) -> Self {
+        Self {
+            code,
+            operation: token.kind,
+            help: None,
+            location: token.location,
+        }
     }
 
     pub const fn code(&self) -> RuntimeErrorCode {
         self.code
     }
 
-    pub const fn token(&self) -> &Token {
-        &self.token
+    pub const fn operation(&self) -> TokenKind {
+        self.operation
+    }
+
+    pub fn help(&self) -> Option<&str> {
+        self.help.as_deref()
+    }
+
+    pub const fn location(&self) -> SourceSpan {
+        self.location
     }
 }
 
@@ -69,7 +101,7 @@ impl RuntimeError {
 pub struct Interpreter {}
 
 impl Interpreter {
-    pub fn evaluate(&mut self, expr: &Expr) -> Result<Value, RuntimeError> {
+    pub fn evaluate(&mut self, expr: &Expr<'_>) -> Result<Value, RuntimeError> {
         expr.accept(self)
     }
 }
@@ -96,7 +128,7 @@ impl ExprVisitor for Interpreter {
                 (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left - right)),
                 _ => Err(RuntimeError::new(
                     RuntimeErrorCode::OperandNotANumber,
-                    expr.operator().clone(),
+                    *expr.operator(),
                 )),
             },
             TokenKind::Plus => match (left, right) {
@@ -104,34 +136,31 @@ impl ExprVisitor for Interpreter {
                 (Value::String(left), Value::String(right)) => {
                     Ok(Value::String(format!("{left}{right}")))
                 },
-                (Value::String(_), Value::Number(_)) | (Value::Number(_), Value::String(_)) => {
-                    Err(RuntimeError::new(
-                        RuntimeErrorCode::OperandsOfDifferentType,
-                        expr.operator().clone(),
-                    ))
-                },
+                (Value::String(_), Value::Number(_)) | (Value::Number(_), Value::String(_)) => Err(
+                    RuntimeError::new(RuntimeErrorCode::OperandsOfDifferentType, *expr.operator()),
+                ),
                 _ => Err(RuntimeError::new(
                     RuntimeErrorCode::OperandNotANumberOrString,
-                    expr.operator().clone(),
+                    *expr.operator(),
                 )),
             },
             TokenKind::Slash => match (left, right) {
                 (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left / right)),
                 _ => Err(RuntimeError::new(
                     RuntimeErrorCode::OperandNotANumber,
-                    expr.operator().clone(),
+                    *expr.operator(),
                 )),
             },
             TokenKind::Star => match (left, right) {
                 (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left * right)),
                 _ => Err(RuntimeError::new(
                     RuntimeErrorCode::OperandNotANumber,
-                    expr.operator().clone(),
+                    *expr.operator(),
                 )),
             },
             _ => Err(RuntimeError::new(
                 RuntimeErrorCode::NotABinaryOperator,
-                expr.operator().clone(),
+                *expr.operator(),
             )),
         }
     }
@@ -183,13 +212,13 @@ impl ExprVisitor for Interpreter {
                 } else {
                     Err(RuntimeError::new(
                         RuntimeErrorCode::OperandNotANumber,
-                        expr.operator().clone(),
+                        *expr.operator(),
                     ))
                 }
             },
             _ => Err(RuntimeError::new(
                 RuntimeErrorCode::NotAnUnaryOperator,
-                expr.operator().clone(),
+                *expr.operator(),
             )),
         }
     }
