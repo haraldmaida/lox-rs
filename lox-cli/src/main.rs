@@ -14,10 +14,11 @@ use clap::Parser;
 use lox_core::ast_printer::AstPrinter;
 use lox_core::parse::Parse;
 use lox_core::tokenize::Tokenize;
+use miette::{IntoDiagnostic, NamedSource, Report, WrapErr};
+use std::fs;
 use std::path::Path;
-use std::{fs, io};
 
-fn main() -> anyhow::Result<()> {
+fn main() -> miette::Result<()> {
     let cli = Cli::parse();
 
     match &cli.command {
@@ -25,7 +26,11 @@ fn main() -> anyhow::Result<()> {
             let source_code = read_source_file(source)?;
             source_code.tokenize().for_each(|item| match item {
                 Ok(token) => println!("{token}"),
-                Err(error) => eprintln!("\n{error}\n"),
+                Err(error) => {
+                    let error = Report::from(error)
+                        .with_source_code(NamedSource::new(source, source_code.clone()));
+                    eprintln!("\n{error}\n");
+                },
             });
         },
         Command::Parse { source } => {
@@ -36,7 +41,11 @@ fn main() -> anyhow::Result<()> {
                     AstPrinter::print(&ast, &mut output)?;
                     println!("{output}");
                 },
-                Err(error) => eprintln!("\n{error}\n"),
+                Err(error) => {
+                    let error = Report::from(error)
+                        .with_source_code(NamedSource::new(source, source_code.clone()));
+                    eprintln!("\n{error}\n");
+                },
             }
         },
     }
@@ -44,6 +53,9 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn read_source_file(source_file: impl AsRef<Path>) -> Result<String, io::Error> {
+fn read_source_file(source_file: impl AsRef<Path>) -> Result<String, miette::Error> {
+    let source_file = source_file.as_ref();
     fs::read_to_string(source_file)
+        .into_diagnostic()
+        .wrap_err_with(|| format!("failed to read source file {}", source_file.display()))
 }

@@ -69,10 +69,9 @@ impl From<LexingErrorCode> for SyntaxErrorCode {
 
 #[derive(thiserror::Error, Diagnostic, Debug, Clone, PartialEq, Eq)]
 #[error("{code}")]
+#[diagnostic()]
 pub struct SyntaxError {
     code: SyntaxErrorCode,
-    #[help]
-    help: Option<String>,
     #[label]
     location: SourceSpan,
 }
@@ -82,26 +81,15 @@ impl SyntaxError {
         &self.code
     }
 
-    pub fn help(&self) -> Option<&str> {
-        self.help.as_deref()
-    }
-
     pub const fn location(&self) -> SourceSpan {
         self.location
     }
 }
 
 impl From<LexingError> for SyntaxError {
-    fn from(
-        LexingError {
-            code,
-            help,
-            location,
-        }: LexingError,
-    ) -> Self {
+    fn from(LexingError { code, location }: LexingError) -> Self {
         Self {
             code: code.into(),
-            help,
             location,
         }
     }
@@ -150,7 +138,6 @@ where
     const fn error(&self, code: SyntaxErrorCode) -> SyntaxError {
         SyntaxError {
             code,
-            help: None,
             location: self.last_location,
         }
     }
@@ -173,12 +160,10 @@ where
             Some(token) if token.kind == token_kind => Ok(token),
             Some(token) => Err(SyntaxError {
                 code: SyntaxErrorCode::UnexpectedToken(token.kind),
-                help: None,
                 location: token.location,
             }),
             None => Err(SyntaxError {
                 code: SyntaxErrorCode::MissingToken(token_kind),
-                help: None,
                 location: self.last_location,
             }),
         }

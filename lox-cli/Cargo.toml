@@ -6,9 +6,12 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
+# workspace internal dependencies
 lox-core = { workspace = true }
-anyhow = { workspace = true }
+
+# external dependencies
 clap = { workspace = true }
+miette = { workspace = true }
 
 [dev-dependencies]
 trycmd = "1"

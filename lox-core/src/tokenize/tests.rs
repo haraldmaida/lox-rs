@@ -21,7 +21,6 @@ mod lexing_error {
     fn display_format_io_error() {
         let error = LexingError {
             code: LexingErrorCode::IoError("I/O error".to_string()),
-            help: None,
             location: (1, 0).into(),
         };
 
@@ -32,7 +31,6 @@ mod lexing_error {
     fn display_format_unexpected_character() {
         let error = LexingError {
             code: LexingErrorCode::UnexpectedCharacter('§'),
-            help: None,
             location: (74, 23).into(),
         };
 
@@ -188,7 +186,6 @@ fn tokenize_unexpected_character_at_line_1_char_4() {
         Ok(Token::new_nonliteral(TokenKind::LeftBrace, "{", (2, 1))),
         Err(LexingError {
             code: LexingErrorCode::UnexpectedCharacter('§'),
-            help: None,
             location: (3, 2).into(),
         }),
         Ok(Token::new_nonliteral(TokenKind::RightBrace, "}", (5, 1))),
@@ -210,7 +207,6 @@ fn tokenize_unexpected_character_at_line_3_char_1() {
         Ok(Token::new_nonliteral(TokenKind::Semicolon, ";", (2, 1))),
         Err(LexingError {
             code: LexingErrorCode::UnexpectedCharacter('§'),
-            help: None,
             location: (4, 2).into(),
         }),
         Ok(Token::new_nonliteral(TokenKind::RightBrace, "}", (6, 1))),
@@ -267,7 +263,6 @@ fn tokenize_string_literal_which_is_unterminated() {
     assert_that!(tokens).contains_exactly([
         Err(LexingError {
             code: LexingErrorCode::UnterminatedStringLiteral("\"some text".to_string()),
-            help: None,
             location: (0, 10).into(),
         }),
         Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (10, 0))),

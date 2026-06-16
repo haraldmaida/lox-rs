@@ -49,11 +49,18 @@ pub enum RuntimeErrorCode {
 
 impl Display for RuntimeErrorCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!()
+        f.write_str(match self {
+            Self::NotABinaryOperator => "not a binary operator where a binary operator like '=', '+', '-', '*' or '/' is expected",
+            Self::NotAnUnaryOperator => "not an unary operator where an unary operator like '!' or '-'  is expected",
+            Self::OperandNotANumber => "operand is not a number but the operator requires all operands to be numbers",
+            Self::OperandNotANumberOrString => "operand is not a number or a string but the operator requires all operands to be either numbers or strings",
+            Self::OperandsOfDifferentType => "operands are of different type but the operator requires all operands to be of the same type",
+        })
     }
 }
 
 #[derive(thiserror::Error, Diagnostic, Debug, Clone, PartialEq, Eq)]
+#[error("{code}")]
 pub struct RuntimeError {
     code: RuntimeErrorCode,
     operation: TokenKind,
@@ -61,12 +68,6 @@ pub struct RuntimeError {
     help: Option<String>,
     #[label]
     location: SourceSpan,
-}
-
-impl Display for RuntimeError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!()
-    }
 }
 
 impl RuntimeError {

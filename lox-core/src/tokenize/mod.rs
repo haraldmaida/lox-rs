@@ -49,10 +49,9 @@ impl From<io::Error> for LexingErrorCode {
 
 #[derive(thiserror::Error, Diagnostic, Debug, Clone, PartialEq, Eq)]
 #[error("{code}")]
+#[diagnostic()]
 pub struct LexingError {
     pub(crate) code: LexingErrorCode,
-    #[help]
-    pub(crate) help: Option<String>,
     #[label]
     pub(crate) location: SourceSpan,
 }
@@ -60,10 +59,6 @@ pub struct LexingError {
 impl LexingError {
     pub const fn code(&self) -> &LexingErrorCode {
         &self.code
-    }
-
-    pub fn help(&self) -> Option<&str> {
-        self.help.as_deref()
     }
 
     pub const fn location(&self) -> SourceSpan {
@@ -224,7 +219,6 @@ impl<'a> Tokens<'a> {
             )),
             Err(_) => Err(LexingError {
                 code: LexingErrorCode::InvalidNumberLiteral(lexeme.into()),
-                help: None,
                 location,
             }),
         }
@@ -312,7 +306,6 @@ impl<'a> Iterator for Tokens<'a> {
                             _ => {
                                 return Some(Err(LexingError {
                                     code: LexingErrorCode::UnexpectedCharacter(chr),
-                                    help: None,
                                     location: self.start_location(),
                                 }));
                             },
@@ -408,7 +401,6 @@ impl<'a> Iterator for Tokens<'a> {
                             code: LexingErrorCode::UnterminatedStringLiteral(
                                 self.current_lexeme().into(),
                             ),
-                            help: None,
                             location: self.start_location(),
                         }));
                     },
@@ -486,7 +478,6 @@ impl<'a> Iterator for Tokens<'a> {
                         // this should be unreachable, but just in case
                         return Some(Err(LexingError {
                             code: LexingErrorCode::CharacterAfterEndOfFile(chr),
-                            help: None,
                             location: self.start_location(),
                         }));
                     },

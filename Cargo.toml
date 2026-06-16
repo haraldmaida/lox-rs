@@ -16,11 +16,9 @@ license = "MIT OR Apache-2.0"
 lox-core = { path = "lox-core" }
 
 # external dependencies
-anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 miette = { version = "7", features = ["fancy"] }
 thiserror = "2"
-utf8-chars = "3"
 
 # dev-dependencies
 asserting = "0.14"
