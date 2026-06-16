@@ -22,3 +22,9 @@ impl<'a> FromIterator<Stmt<'a>> for Program<'a> {
         Self(Vec::from_iter(statements))
     }
 }
+
+impl<'a> AsRef<[Stmt<'a>]> for Program<'a> {
+    fn as_ref(&self) -> &[Stmt<'a>] {
+        &self.0
+    }
+}

@@ -1,0 +1,6 @@
+args = ["interpret", "tests/sources/print_expression.lox"]
+status.code = 0
+stdout = """
+60
+"""
+stderr = ""

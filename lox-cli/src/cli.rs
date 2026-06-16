@@ -17,4 +17,10 @@ pub enum Command {
         /// Path to the source code file
         source: String,
     },
+    /// Interpret the program in a source code file
+    #[command(alias = "run")]
+    Interpret {
+        /// Path to the source code file
+        source: String,
+    },
 }

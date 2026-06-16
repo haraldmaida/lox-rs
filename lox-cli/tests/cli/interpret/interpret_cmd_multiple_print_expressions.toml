@@ -1,0 +1,8 @@
+args = ["interpret", "tests/sources/multiple_print_expressions.lox"]
+status.code = 0
+stdout = """
+one
+true
+3
+"""
+stderr = ""

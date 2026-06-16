@@ -71,6 +71,10 @@ impl<'a> Expression<'a> {
     pub fn new(expr: impl Into<Expr<'a>>) -> Self {
         Self(expr.into())
     }
+
+    pub const fn expression(&self) -> &Expr<'a> {
+        &self.0
+    }
 }
 
 impl<'a> Deref for Expression<'a> {
@@ -89,15 +93,17 @@ impl<'a> Borrow<Expr<'a>> for Expression<'a> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Print<'a> {
-    expr: Expr<'a>,
+    expression: Expr<'a>,
 }
 
 impl<'a> Print<'a> {
     pub fn new(expr: impl Into<Expr<'a>>) -> Self {
-        Self { expr: expr.into() }
+        Self {
+            expression: expr.into(),
+        }
     }
 
-    pub const fn expr(&self) -> &Expr<'a> {
-        &self.expr
+    pub const fn expression(&self) -> &Expr<'a> {
+        &self.expression
     }
 }

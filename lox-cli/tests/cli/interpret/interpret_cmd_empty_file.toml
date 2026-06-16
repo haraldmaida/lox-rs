@@ -1,0 +1,4 @@
+args = ["interpret", "tests/sources/empty.lox"]
+status.code = 0
+stdout = ""
+stderr = ""

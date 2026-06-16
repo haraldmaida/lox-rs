@@ -2,6 +2,7 @@ use crate::expr::{
     Assign, Binary, Call, Expr, ExprElement, ExprVisitor, Get, Grouping, Literal, Logical, Set,
     Super, This, Unary, Variable,
 };
+use crate::stmt::{Expression, Print, Stmt, StmtElement, StmtVisitor};
 use crate::token::{Token, TokenKind};
 use miette::{Diagnostic, SourceSpan};
 use std::fmt;
@@ -16,6 +17,17 @@ pub enum Value {
     Bool(bool),
     Number(f64),
     String(String),
+}
+
+impl Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Nil => write!(f, "nil"),
+            Self::Bool(value) => write!(f, "{value}"),
+            Self::Number(value) => write!(f, "{value}"),
+            Self::String(value) => write!(f, "{value}"),
+        }
+    }
 }
 
 impl Value {
@@ -40,7 +52,11 @@ impl Value {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuntimeErrorCode {
+    /// This error should never occur. However, if it does occur, it is a bug
+    /// in the parser. Please report an issue!
     NotABinaryOperator,
+    /// This error should never occur. However, if it does occur, it is a bug
+    /// in the parser. Please report an issue!
     NotAnUnaryOperator,
     OperandNotANumber,
     OperandNotANumberOrString,
@@ -102,8 +118,24 @@ impl RuntimeError {
 pub struct Interpreter {}
 
 impl Interpreter {
-    pub fn evaluate(&mut self, expr: &Expr<'_>) -> Result<Value, RuntimeError> {
-        expr.accept(self)
+    pub fn interpret<'a, P>(&mut self, program: P)
+    where
+        P: AsRef<[Stmt<'a>]>,
+    {
+        let statements = program.as_ref();
+        for stmt in statements {
+            if let Err(error) = self.execute(stmt) {
+                eprintln!("{error}");
+            }
+        }
+    }
+
+    pub fn execute(&mut self, statement: &Stmt<'_>) -> Result<(), RuntimeError> {
+        statement.accept(self)
+    }
+
+    pub fn evaluate(&mut self, expression: &Expr<'_>) -> Result<Value, RuntimeError> {
+        expression.accept(self)
     }
 }
 
@@ -226,5 +258,20 @@ impl ExprVisitor for Interpreter {
 
     fn visit_variable_expr(&mut self, _expr: &Variable) -> Self::Output {
         todo!()
+    }
+}
+
+impl StmtVisitor for Interpreter {
+    type Output = Result<(), RuntimeError>;
+
+    fn visit_expression_stmt(&mut self, stmt: &Expression) -> Self::Output {
+        self.evaluate(stmt.expression())?;
+        Ok(())
+    }
+
+    fn visit_print_stmt(&mut self, stmt: &Print) -> Self::Output {
+        let value = self.evaluate(stmt.expression())?;
+        println!("{value}");
+        Ok(())
     }
 }

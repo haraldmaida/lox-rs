@@ -12,6 +12,7 @@ mod cli;
 use crate::cli::{Cli, Command};
 use clap::Parser;
 use lox_core::ast_printer::AstPrinter;
+use lox_core::interpreter::Interpreter;
 use lox_core::parse::Parse;
 use lox_core::tokenize::Tokenize;
 use miette::{IntoDiagnostic, NamedSource, Report, WrapErr};
@@ -47,6 +48,12 @@ fn main() -> miette::Result<()> {
                     eprintln!("\n{error}\n");
                 },
             }
+        },
+        Command::Interpret { source } => {
+            let source_code = read_source_file(source)?;
+            let program = source_code.tokenize().parse()?;
+            let mut interpreter = Interpreter::default();
+            interpreter.interpret(&program);
         },
     }
 

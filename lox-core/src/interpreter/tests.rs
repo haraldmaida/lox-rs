@@ -139,6 +139,77 @@ mod value {
             prop_assert!(Value::String(a) != Value::String(b));
         }
     }
+
+    #[test]
+    fn display_format_nil() {
+        let value = Value::Nil;
+
+        let formatted = value.to_string();
+
+        assert_that!(formatted).is_equal_to("nil");
+    }
+
+    #[test]
+    fn display_format_boolean_false() {
+        let value = Value::Bool(false);
+
+        let formatted = value.to_string();
+
+        assert_that!(formatted).is_equal_to("false");
+    }
+
+    #[test]
+    fn display_format_boolean_true() {
+        let value = Value::Bool(true);
+
+        let formatted = value.to_string();
+
+        assert_that!(formatted).is_equal_to("true");
+    }
+
+    #[test]
+    fn display_format_number() {
+        let value = Value::Number(123_456.789_012);
+
+        let formatted = value.to_string();
+
+        assert_that!(formatted).is_equal_to("123456.789012");
+    }
+
+    proptest! {
+        #[test]
+        fn display_format_number_with_no_fractional_part_does_not_contain_decimal_point(
+            num in any::<i32>().prop_map(f64::from),
+        ) {
+            let value = Value::Number(num);
+
+            let formatted = value.to_string();
+
+            assert_that!(formatted).does_not_end_with(".0").does_not_contain('.');
+        }
+    }
+
+    #[test]
+    fn display_format_string() {
+        let value = Value::String("Hello, world!".into());
+
+        let formatted = format!("{value}");
+
+        assert_that!(formatted).is_equal_to("Hello, world!");
+    }
+
+    proptest! {
+        #[test]
+        fn display_format_string_does_not_contain_double_quotes(
+            strg in any::<String>().prop_filter("string not surrounded by \")", |strg| !strg.starts_with('"') && !strg.ends_with('"')),
+        ) {
+            let value = Value::String(strg);
+
+            let formatted = format!("{value}");
+
+            assert_that!(formatted).does_not_start_with('"').does_not_end_with('"');
+        }
+    }
 }
 
 #[test]
@@ -980,4 +1051,18 @@ fn evaluate_binary_expr_with_illegal_operator() {
         RuntimeErrorCode::NotABinaryOperator,
         token(TokenKind::Bang, "!", (1, 2)),
     ));
+}
+
+#[test]
+fn execute_print_stmt_with_expression() {
+    let stmt = Stmt::from(Print::new(Expr::from(Binary::new(
+        Literal::Number(84.),
+        token(TokenKind::Plus, "/", (1, 2)),
+        Literal::Number(2.),
+    ))));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.execute(&stmt);
+
+    assert_that!(result).is_ok();
 }
