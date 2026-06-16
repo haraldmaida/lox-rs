@@ -1,0 +1,103 @@
+use crate::expr::Expr;
+use std::borrow::Borrow;
+use std::ops::Deref;
+
+pub trait StmtVisitor {
+    type Output;
+
+    fn visit_expression_stmt(&mut self, stmt: &Expression) -> Self::Output;
+    fn visit_print_stmt(&mut self, stmt: &Print) -> Self::Output;
+}
+
+pub trait StmtElement {
+    fn accept<V>(&self, visitor: &mut V) -> <V as StmtVisitor>::Output
+    where
+        V: StmtVisitor;
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Stmt<'a> {
+    Expression(Expression<'a>),
+    Print(Print<'a>),
+}
+
+macro_rules! impl_stmt {
+    ($stmt_type:ty, $variant:ident, $visitor_method:ident) => {
+        #[allow(single_use_lifetimes)]
+        impl<'a> From<$stmt_type> for Stmt<'a> {
+            fn from(stmt: $stmt_type) -> Self {
+                Self::$variant(stmt)
+            }
+        }
+
+        #[allow(single_use_lifetimes, unused_lifetimes)]
+        impl<'a> StmtElement for $stmt_type {
+            fn accept<V>(&self, visitor: &mut V) -> <V as StmtVisitor>::Output
+            where
+                V: StmtVisitor,
+            {
+                visitor.$visitor_method(self)
+            }
+        }
+    };
+}
+
+impl_stmt!(Expression<'a>, Expression, visit_expression_stmt);
+impl_stmt!(Print<'a>, Print, visit_print_stmt);
+
+impl StmtElement for Stmt<'_> {
+    fn accept<V>(&self, visitor: &mut V) -> <V as StmtVisitor>::Output
+    where
+        V: StmtVisitor,
+    {
+        match self {
+            Self::Expression(stmt) => visitor.visit_expression_stmt(stmt),
+            Self::Print(stmt) => visitor.visit_print_stmt(stmt),
+        }
+    }
+}
+
+impl<'a> From<Expr<'a>> for Stmt<'a> {
+    fn from(expr: Expr<'a>) -> Self {
+        Self::Expression(Expression::new(expr))
+    }
+}
+
+/// An expression statement.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Expression<'a>(Expr<'a>);
+
+impl<'a> Expression<'a> {
+    pub fn new(expr: impl Into<Expr<'a>>) -> Self {
+        Self(expr.into())
+    }
+}
+
+impl<'a> Deref for Expression<'a> {
+    type Target = Expr<'a>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'a> Borrow<Expr<'a>> for Expression<'a> {
+    fn borrow(&self) -> &Expr<'a> {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Print<'a> {
+    expr: Expr<'a>,
+}
+
+impl<'a> Print<'a> {
+    pub fn new(expr: impl Into<Expr<'a>>) -> Self {
+        Self { expr: expr.into() }
+    }
+
+    pub const fn expr(&self) -> &Expr<'a> {
+        &self.expr
+    }
+}

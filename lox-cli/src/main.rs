@@ -35,7 +35,7 @@ fn main() -> miette::Result<()> {
         },
         Command::Parse { source } => {
             let source_code = read_source_file(source)?;
-            match source_code.tokenize().parse() {
+            match source_code.tokenize().parse_expr() {
                 Ok(ast) => {
                     let mut output = String::new();
                     AstPrinter::print(&ast, &mut output)?;

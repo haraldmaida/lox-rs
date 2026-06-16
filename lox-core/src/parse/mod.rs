@@ -1,4 +1,6 @@
 use crate::expr::{Binary, Expr, Grouping, Literal, Unary};
+use crate::program::Program;
+use crate::stmt::{Expression, Print, Stmt};
 use crate::token;
 use crate::token::{Token, TokenKind};
 use crate::tokenize::{LexingError, LexingErrorCode};
@@ -9,7 +11,7 @@ use std::fmt::Display;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SyntaxErrorCode {
     CharacterAfterEndOfFile(char),
-    ExpectedExpression(String),
+    InvalidExpression(String),
     InvalidNumberLiteral(String),
     IoError(String),
     MissingToken(TokenKind),
@@ -25,8 +27,8 @@ impl Display for SyntaxErrorCode {
             Self::CharacterAfterEndOfFile(chr) => {
                 write!(f, "character '{chr}' after end of file")
             },
-            Self::ExpectedExpression(lexeme) => {
-                write!(f, "expected expression at {lexeme}")
+            Self::InvalidExpression(lexeme) => {
+                write!(f, "not a valid expression at {lexeme}")
             },
             Self::InvalidNumberLiteral(value) => {
                 write!(f, "invalid number literal at {value}")
@@ -96,14 +98,20 @@ impl From<LexingError> for SyntaxError {
 }
 
 pub trait Parse<'a> {
-    fn parse(self) -> Result<Expr<'a>, SyntaxError>;
+    fn parse(self) -> Result<Program<'a>, SyntaxError>;
+
+    fn parse_expr(self) -> Result<Expr<'a>, SyntaxError>;
 }
 
 impl<'a, T> Parse<'a> for T
 where
     T: 'a + IntoIterator<Item = Result<Token<'a>, LexingError>>,
 {
-    fn parse(self) -> Result<Expr<'a>, SyntaxError> {
+    fn parse(self) -> Result<Program<'a>, SyntaxError> {
+        Parser::from(self).program()
+    }
+
+    fn parse_expr(self) -> Result<Expr<'a>, SyntaxError> {
         Parser::from(self).expression()
     }
 }
@@ -158,10 +166,13 @@ where
     fn consume(&mut self, token_kind: TokenKind) -> Result<Token<'_>, SyntaxError> {
         match self.advance()? {
             Some(token) if token.kind == token_kind => Ok(token),
-            Some(token) => Err(SyntaxError {
-                code: SyntaxErrorCode::UnexpectedToken(token.kind),
-                location: token.location,
-            }),
+            Some(token) => {
+                self.revert(token);
+                Err(SyntaxError {
+                    code: SyntaxErrorCode::MissingToken(token_kind),
+                    location: token.location,
+                })
+            },
             None => Err(SyntaxError {
                 code: SyntaxErrorCode::MissingToken(token_kind),
                 location: self.last_location,
@@ -190,6 +201,48 @@ where
             }
         }
         Ok(())
+    }
+
+    pub fn program(&mut self) -> Result<Program<'a>, SyntaxError> {
+        let mut statements = Vec::new();
+        loop {
+            match self.statement() {
+                None => break,
+                Some(Ok(stmt)) => statements.push(stmt),
+                Some(Err(err)) => {
+                    //TODO implement error recovery strategy
+                    return Err(err);
+                },
+            }
+        }
+        Ok(Program::new(statements))
+    }
+
+    pub fn statement(&mut self) -> Option<Result<Stmt<'a>, SyntaxError>> {
+        match self.advance() {
+            Ok(None) => None,
+            Ok(Some(token)) => match token.kind {
+                TokenKind::EndOfFile => None,
+                TokenKind::Print => Some(self.print_statement()),
+                _ => {
+                    self.revert(token);
+                    Some(self.expression_statement())
+                },
+            },
+            Err(err) => Some(Err(err)),
+        }
+    }
+
+    pub fn print_statement(&mut self) -> Result<Stmt<'a>, SyntaxError> {
+        let expr = self.expression()?;
+        self.consume(TokenKind::Semicolon)?;
+        Ok(Print::new(expr).into())
+    }
+
+    pub fn expression_statement(&mut self) -> Result<Stmt<'a>, SyntaxError> {
+        let expr = self.expression()?;
+        self.consume(TokenKind::Semicolon)?;
+        Ok(Expression::new(expr).into())
     }
 
     pub fn expression(&mut self) -> Result<Expr<'a>, SyntaxError> {
@@ -316,7 +369,7 @@ where
                 _ => {
                     let lexeme = token.lexeme;
                     self.revert(token);
-                    Err(self.error(SyntaxErrorCode::ExpectedExpression(lexeme.into())))
+                    Err(self.error(SyntaxErrorCode::InvalidExpression(lexeme.into())))
                 },
             },
             None => Err(self.error(SyntaxErrorCode::UnexpectedEndOfInput)),
