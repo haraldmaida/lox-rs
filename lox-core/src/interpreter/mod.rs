@@ -1,4 +1,5 @@
 use crate::data::{Symbol, Value};
+use crate::environment::Environment;
 use crate::expr::{
     Assign, Binary, Call, Expr, ExprElement, ExprVisitor, Get, Grouping, Literal, Logical, Set,
     Super, This, Unary, Variable,
@@ -87,9 +88,15 @@ impl RuntimeError {
 
 /// A tree-walk interpreter for Lox.
 #[derive(Default)]
-pub struct Interpreter {}
+pub struct Interpreter {
+    environment: Environment,
+}
 
 impl Interpreter {
+    pub const fn environment(&self) -> &Environment {
+        &self.environment
+    }
+
     pub fn interpret<'a, P>(&mut self, program: P)
     where
         P: AsRef<[Stmt<'a>]>,
@@ -228,8 +235,11 @@ impl ExprVisitor for Interpreter {
         }
     }
 
-    fn visit_variable_expr(&mut self, _expr: &Variable) -> Self::Output {
-        todo!()
+    fn visit_variable_expr(&mut self, expr: &Variable) -> Self::Output {
+        let symbol = Symbol::intern(expr.name().lexeme());
+        self.environment.get(symbol).cloned().ok_or_else(|| {
+            RuntimeError::new(RuntimeErrorCode::UndefinedVariable(symbol), *expr.name())
+        })
     }
 }
 
@@ -248,6 +258,13 @@ impl StmtVisitor for Interpreter {
     }
 
     fn visit_var_stmt(&mut self, stmt: &Var) -> Self::Output {
-        todo!()
+        let value = if let Some(initializer) = stmt.initializer() {
+            self.evaluate(initializer)?
+        } else {
+            Value::Nil
+        };
+        let symbol = Symbol::intern(stmt.name().lexeme());
+        self.environment.define(symbol, value);
+        Ok(())
     }
 }

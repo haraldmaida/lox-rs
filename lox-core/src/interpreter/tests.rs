@@ -846,14 +846,92 @@ fn evaluate_binary_expr_with_illegal_operator() {
 
 #[test]
 fn execute_print_stmt_with_expression() {
-    let stmt = Stmt::from(Print::new(Expr::from(Binary::new(
+    let stmt = Stmt::from(Print::new(Binary::new(
         Literal::Number(84.),
         token(TokenKind::Plus, "/", (1, 2)),
         Literal::Number(2.),
-    ))));
+    )));
 
     let mut interpreter = Interpreter::default();
     let result = interpreter.execute(&stmt);
 
     assert_that!(result).is_ok();
+}
+
+#[test]
+fn execute_var_stmt_with_initializer() {
+    let stmt = Stmt::from(Var::new(
+        token(TokenKind::Identifier, "my_var", (4, 6)),
+        Expr::from(Binary::new(
+            Literal::Number(40.),
+            token(TokenKind::Plus, "+", (17, 1)),
+            Literal::Number(2.),
+        )),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.execute(&stmt);
+
+    assert_that!(result).is_ok();
+    assert_that!(interpreter.environment().get("my_var".into()))
+        .is_equal_to(Some(&Value::Number(42.)));
+}
+
+#[test]
+fn execute_var_stmt_without_initializer() {
+    let stmt = Stmt::from(Var::new(token(TokenKind::Identifier, "foo", (4, 3)), None));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.execute(&stmt);
+
+    assert_that!(result).is_ok();
+    assert_that!(interpreter.environment().get("foo".into())).is_equal_to(Some(&Value::Nil));
+}
+
+#[test]
+fn execute_var_stmt_with_variable_expression() {
+    let declare_a = Stmt::from(Var::new(
+        token(TokenKind::Identifier, "a", (4, 1)),
+        Expr::from(Literal::Number(3.)),
+    ));
+    let declare_b = Stmt::from(Var::new(
+        token(TokenKind::Identifier, "b", (14, 1)),
+        Expr::from(Literal::Number(2.)),
+    ));
+    let stmt = Stmt::from(Var::new(
+        token(TokenKind::Identifier, "foo", (24, 3)),
+        Expr::from(Binary::new(
+            Variable::new(token(TokenKind::Identifier, "a", (30, 1))),
+            token(TokenKind::Plus, "+", (32, 1)),
+            Variable::new(token(TokenKind::Identifier, "b", (34, 1))),
+        )),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.execute(&declare_a);
+    assert_that!(result).is_ok();
+    let result = interpreter.execute(&declare_b);
+    assert_that!(result).is_ok();
+
+    let result = interpreter.execute(&stmt);
+
+    assert_that!(result).is_ok();
+    assert_that!(interpreter.environment().get("foo".into())).is_equal_to(Some(&Value::Number(5.)));
+}
+
+#[test]
+fn execute_print_stmt_of_undefined_variable() {
+    let stmt = Stmt::from(Print::new(Variable::new(token(
+        TokenKind::Identifier,
+        "foo",
+        (4, 3),
+    ))));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.execute(&stmt);
+
+    assert_that!(result).err().is_equal_to(RuntimeError::new(
+        RuntimeErrorCode::UndefinedVariable("foo".into()),
+        token(TokenKind::Identifier, "foo", (4, 3)),
+    ));
 }
