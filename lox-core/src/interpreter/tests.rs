@@ -874,7 +874,7 @@ fn execute_var_stmt_with_initializer() {
 
     assert_that!(result).is_ok();
     assert_that!(interpreter.environment().get("my_var".into()))
-        .is_equal_to(Some(&Value::Number(42.)));
+        .is_equal_to(Ok(&Value::Number(42.)));
 }
 
 #[test]
@@ -885,7 +885,7 @@ fn execute_var_stmt_without_initializer() {
     let result = interpreter.execute(&stmt);
 
     assert_that!(result).is_ok();
-    assert_that!(interpreter.environment().get("foo".into())).is_equal_to(Some(&Value::Nil));
+    assert_that!(interpreter.environment().get("foo".into())).is_equal_to(Ok(&Value::Nil));
 }
 
 #[test]
@@ -898,7 +898,7 @@ fn execute_var_stmt_with_variable_expression() {
         token(TokenKind::Identifier, "b", (14, 1)),
         Expr::from(Literal::Number(2.)),
     ));
-    let stmt = Stmt::from(Var::new(
+    let var_stmt = Stmt::from(Var::new(
         token(TokenKind::Identifier, "foo", (24, 3)),
         Expr::from(Binary::new(
             Variable::new(token(TokenKind::Identifier, "a", (30, 1))),
@@ -913,10 +913,10 @@ fn execute_var_stmt_with_variable_expression() {
     let result = interpreter.execute(&declare_b);
     assert_that!(result).is_ok();
 
-    let result = interpreter.execute(&stmt);
+    let result = interpreter.execute(&var_stmt);
 
     assert_that!(result).is_ok();
-    assert_that!(interpreter.environment().get("foo".into())).is_equal_to(Some(&Value::Number(5.)));
+    assert_that!(interpreter.environment().get("foo".into())).is_equal_to(Ok(&Value::Number(5.)));
 }
 
 #[test]
@@ -934,4 +934,55 @@ fn execute_print_stmt_of_undefined_variable() {
         RuntimeErrorCode::UndefinedVariable("foo".into()),
         token(TokenKind::Identifier, "foo", (4, 3)),
     ));
+}
+
+#[test]
+fn evaluate_assign_expr_stmt_to_existing_variable() {
+    let declare_foo = Stmt::from(Var::new(
+        token(TokenKind::Identifier, "foo", (4, 3)),
+        Expr::from(Literal::Number(123.)),
+    ));
+
+    let assign_to_foo = Expr::from(Assign::new(
+        token(TokenKind::Identifier, "foo", (23, 3)),
+        Expr::from(Literal::Number(99.)),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let declare_result = interpreter.execute(&declare_foo);
+    assert_that!(declare_result).is_ok();
+
+    let assign_result = interpreter.evaluate(&assign_to_foo);
+
+    assert_that!(assign_result).is_equal_to(Ok(Value::Number(99.)));
+    assert_that!(interpreter.environment().get("foo".into())).is_equal_to(Ok(&Value::Number(99.)));
+}
+
+#[test]
+fn evaluate_assign_expr_stmt_to_not_existing_variable() {
+    let declare_foo = Stmt::from(Var::new(
+        token(TokenKind::Identifier, "a", (4, 1)),
+        Expr::from(Literal::Number(123.)),
+    ));
+
+    let assign_to_foo = Expr::from(Assign::new(
+        token(TokenKind::Identifier, "foo", (23, 3)),
+        Expr::from(Literal::Number(99.)),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let declare_result = interpreter.execute(&declare_foo);
+    assert_that!(declare_result).is_ok();
+
+    let assign_result = interpreter.evaluate(&assign_to_foo);
+
+    assert_that!(assign_result)
+        .err()
+        .is_equal_to(RuntimeError::new(
+            RuntimeErrorCode::UndefinedVariable("foo".into()),
+            token(TokenKind::Identifier, "foo", (23, 3)),
+        ));
+    assert_that!(interpreter.environment().get("foo".into()))
+        .is_equal_to(Err(EnvironmentError::UndefinedVariable("foo".into())));
+    assert_that!(interpreter.environment().get("a".into())).is_equal_to(Ok(&Value::Number(123.)));
 }

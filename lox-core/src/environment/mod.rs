@@ -1,6 +1,12 @@
 use crate::data::{Symbol, Value};
 use hashbrown::HashMap;
 
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
+pub enum EnvironmentError {
+    #[error("variable '{0}' is not defined")]
+    UndefinedVariable(Symbol),
+}
+
 #[derive(Default, Debug)]
 pub struct Environment {
     values: HashMap<Symbol, Value>,
@@ -11,8 +17,19 @@ impl Environment {
         self.values.insert(symbol, value);
     }
 
-    pub fn get(&self, symbol: Symbol) -> Option<&Value> {
-        self.values.get(&symbol)
+    pub fn get(&self, symbol: Symbol) -> Result<&Value, EnvironmentError> {
+        self.values
+            .get(&symbol)
+            .ok_or(EnvironmentError::UndefinedVariable(symbol))
+    }
+
+    pub fn assign(&mut self, symbol: Symbol, value: Value) -> Result<(), EnvironmentError> {
+        if let Some(entry) = self.values.get_mut(&symbol) {
+            *entry = value;
+            Ok(())
+        } else {
+            Err(EnvironmentError::UndefinedVariable(symbol))
+        }
     }
 }
 

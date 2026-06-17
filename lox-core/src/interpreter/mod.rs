@@ -1,5 +1,5 @@
 use crate::data::{Symbol, Value};
-use crate::environment::Environment;
+use crate::environment::{Environment, EnvironmentError};
 use crate::expr::{
     Assign, Binary, Call, Expr, ExprElement, ExprVisitor, Get, Grouping, Literal, Logical, Set,
     Super, This, Unary, Variable,
@@ -51,6 +51,14 @@ impl Display for RuntimeErrorCode {
                 "operands are of different type but the operator requires all operands to be of the same type"
             ),
             Self::UndefinedVariable(symbol) => write!(f, "undefined variable '{symbol}'"),
+        }
+    }
+}
+
+impl From<EnvironmentError> for RuntimeErrorCode {
+    fn from(error: EnvironmentError) -> Self {
+        match error {
+            EnvironmentError::UndefinedVariable(symbol) => Self::UndefinedVariable(symbol),
         }
     }
 }
@@ -121,8 +129,13 @@ impl Interpreter {
 impl ExprVisitor for Interpreter {
     type Output = Result<Value, RuntimeError>;
 
-    fn visit_assign_expr(&mut self, _expr: &Assign) -> Self::Output {
-        todo!()
+    fn visit_assign_expr(&mut self, expr: &Assign) -> Self::Output {
+        let value = self.evaluate(expr.value())?;
+        let symbol = Symbol::intern(expr.name().lexeme());
+        self.environment
+            .assign(symbol, value.clone())
+            .map_err(|err| RuntimeError::new(err.into(), *expr.name()))?;
+        Ok(value)
     }
 
     fn visit_binary_expr(&mut self, expr: &Binary) -> Self::Output {
@@ -237,9 +250,10 @@ impl ExprVisitor for Interpreter {
 
     fn visit_variable_expr(&mut self, expr: &Variable) -> Self::Output {
         let symbol = Symbol::intern(expr.name().lexeme());
-        self.environment.get(symbol).cloned().ok_or_else(|| {
-            RuntimeError::new(RuntimeErrorCode::UndefinedVariable(symbol), *expr.name())
-        })
+        self.environment
+            .get(symbol)
+            .cloned()
+            .map_err(|err| RuntimeError::new(err.into(), *expr.name()))
     }
 }
 
