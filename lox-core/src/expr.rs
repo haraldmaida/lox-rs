@@ -390,4 +390,8 @@ impl<'a> Variable<'a> {
     pub const fn name(&self) -> &Token<'a> {
         &self.name
     }
+
+    pub const fn take_name(self) -> Token<'a> {
+        self.name
+    }
 }

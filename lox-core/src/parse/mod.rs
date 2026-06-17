@@ -1,4 +1,4 @@
-use crate::expr::{Binary, Expr, Grouping, Literal, Unary, Variable};
+use crate::expr::{Assign, Binary, Expr, Grouping, Literal, Unary, Variable};
 use crate::program::Program;
 use crate::stmt::{Expression, Print, Stmt, Var};
 use crate::token;
@@ -11,6 +11,7 @@ use std::fmt::Display;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SyntaxErrorCode {
     CharacterAfterEndOfFile(char),
+    InvalidAssignmentTarget,
     InvalidExpression(String),
     InvalidNumberLiteral(String),
     IoError(String),
@@ -26,6 +27,9 @@ impl Display for SyntaxErrorCode {
         match &self {
             Self::CharacterAfterEndOfFile(chr) => {
                 write!(f, "character '{chr}' after end of file")
+            },
+            Self::InvalidAssignmentTarget => {
+                write!(f, "invalid assignment target")
             },
             Self::InvalidExpression(lexeme) => {
                 write!(f, "not a valid expression at {lexeme}")
@@ -245,12 +249,13 @@ where
         let name = self.consume(TokenKind::Identifier)?;
         let initializer = match self.advance()? {
             None => None,
-            Some(token) => match token.kind {
-                TokenKind::Equal => Some(self.expression()?),
-                _ => {
+            Some(token) => {
+                if token.kind == TokenKind::Equal {
+                    Some(self.expression()?)
+                } else {
                     self.revert(token);
                     None
-                },
+                }
             },
         };
         self.consume(TokenKind::Semicolon)?;
@@ -284,7 +289,28 @@ where
     }
 
     pub fn expression(&mut self) -> Result<Expr<'a>, SyntaxError> {
-        self.equality()
+        self.assignment()
+    }
+
+    pub fn assignment(&mut self) -> Result<Expr<'a>, SyntaxError> {
+        let expr = self.equality()?;
+        if let Some(token) = self.advance()? {
+            if token.kind == TokenKind::Equal {
+                let value = self.assignment()?;
+                if let Expr::Variable(variable) = expr {
+                    let name = variable.take_name();
+                    Ok(Assign::new(name, value).into())
+                } else {
+                    self.revert(token);
+                    Err(self.error(SyntaxErrorCode::InvalidAssignmentTarget))
+                }
+            } else {
+                self.revert(token);
+                Ok(expr)
+            }
+        } else {
+            Ok(expr)
+        }
     }
 
     pub fn equality(&mut self) -> Result<Expr<'a>, SyntaxError> {

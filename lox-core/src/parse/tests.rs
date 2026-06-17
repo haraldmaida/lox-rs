@@ -1,5 +1,5 @@
 use super::*;
-use crate::expr::{Binary, Literal, Unary};
+use crate::expr::{Assign, Binary, Literal, Unary};
 use crate::stmt::{Print, Var};
 use crate::token::{TokenKind, token};
 use crate::tokenize::Tokenize;
@@ -311,7 +311,7 @@ fn parse_declaration_of_variable() {
         .ok()
         .is_equal_to(Program::from_iter([Stmt::Var(Var::new(
             token(TokenKind::Identifier, "x", (4, 1)),
-            Some(Expr::from(Literal::Number(42.))),
+            Expr::from(Literal::Number(42.)),
         ))]));
 }
 
@@ -326,4 +326,34 @@ fn parse_print_variable() {
         .is_equal_to(Program::from_iter([Stmt::Print(Print::new(Expr::from(
             Variable::new(token(TokenKind::Identifier, "foo", (6, 3))),
         )))]));
+}
+
+#[test]
+fn parse_assignment_to_variable() {
+    let source_code = "var foo = \"before\";\nfoo = \"after\";";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().is_equal_to(Program::from_iter([
+        Stmt::Var(Var::new(
+            token(TokenKind::Identifier, "foo", (4, 3)),
+            Expr::from(Literal::String("before".into())),
+        )),
+        Stmt::from(Expr::Assign(Assign::new(
+            token(TokenKind::Identifier, "foo", (20, 3)),
+            Literal::String("after".into()),
+        ))),
+    ]));
+}
+
+#[test]
+fn parse_assignment_to_invalid_assignment_target() {
+    let source_code = "var foo = \"before\";\na + b = \"after\";";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).err().contains_exactly([SyntaxError {
+        code: SyntaxErrorCode::InvalidAssignmentTarget,
+        location: (35, 1).into(),
+    }]);
 }
