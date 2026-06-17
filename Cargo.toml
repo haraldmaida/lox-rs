@@ -55,3 +55,12 @@ print_stdout = "warn"
 unwrap_used = "deny"
 missing_errors_doc = "allow"  # remove when working on docs
 missing_panics_doc = "allow"  # remove when working on docs
+
+[profile.dev.package.proptest]
+opt-level = 3
+
+[profile.dev.package.trycmd]
+opt-level = 3
+
+[profile.dev.build-override]
+opt-level = 0
