@@ -9,9 +9,14 @@ use crate::token::{
 use crate::tokenize::Tokenize;
 use asserting::prelude::*;
 
-#[ignore = "Not implemented yet"]
 #[test]
-fn parse_empty_source_code() {}
+fn parse_empty_source_code() {
+    let source_code = "";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().is_equal_to(program([]));
+}
 
 #[test]
 fn parse_equality_expression_literal_equal_literal() {
