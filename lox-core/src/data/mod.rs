@@ -3,6 +3,45 @@ use std::fmt;
 use std::fmt::Display;
 use std::sync::LazyLock;
 
+static SYMBOL_TABLE: LazyLock<ThreadedRodeo> = LazyLock::new(ThreadedRodeo::new);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Symbol(Spur);
+
+impl Symbol {
+    pub fn intern(identifier: &str) -> Self {
+        Self(SYMBOL_TABLE.get_or_intern(identifier))
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        SYMBOL_TABLE.resolve(&self.0)
+    }
+}
+
+impl From<&str> for Symbol {
+    fn from(value: &str) -> Self {
+        Self::intern(value)
+    }
+}
+
+impl From<String> for Symbol {
+    fn from(value: String) -> Self {
+        Self::intern(&value)
+    }
+}
+
+impl AsRef<str> for Symbol {
+    fn as_ref(&self) -> &str {
+        SYMBOL_TABLE.resolve(&self.0)
+    }
+}
+
+impl Display for Symbol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Value {
     Nil,
@@ -72,68 +111,14 @@ impl From<&str> for Value {
     }
 }
 
-static SYMBOL_TABLE: LazyLock<ThreadedRodeo> = LazyLock::new(ThreadedRodeo::new);
+#[cfg(any(test, feature = "dsl"))]
+pub use dsl::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Symbol(Spur);
-
-impl Symbol {
-    pub fn intern(identifier: &str) -> Self {
-        Self(SYMBOL_TABLE.get_or_intern(identifier))
-    }
-
-    pub fn as_str(&self) -> &'static str {
-        SYMBOL_TABLE.resolve(&self.0)
-    }
-}
-
-impl From<&str> for Symbol {
-    fn from(value: &str) -> Self {
-        Self::intern(value)
-    }
-}
-
-impl From<String> for Symbol {
-    fn from(value: String) -> Self {
-        Self::intern(&value)
-    }
-}
-
-impl AsRef<str> for Symbol {
-    fn as_ref(&self) -> &str {
-        SYMBOL_TABLE.resolve(&self.0)
-    }
-}
-
-impl Display for Symbol {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
+#[cfg(any(test, feature = "dsl"))]
+mod dsl;
 
 #[cfg(any(test, feature = "proptest_support"))]
-mod proptest_support {
-    use super::*;
-    use proptest::arbitrary::{Arbitrary, any};
-    use proptest::prop_oneof;
-    use proptest::strategy::{BoxedStrategy, Just, Strategy};
-
-    impl Arbitrary for Value {
-        type Parameters = ();
-
-        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            prop_oneof![
-                Just(Self::Nil),
-                any::<bool>().prop_map(Self::Bool),
-                any::<f64>().prop_map(Self::Number),
-                any::<String>().prop_map(Self::String)
-            ]
-            .boxed()
-        }
-
-        type Strategy = BoxedStrategy<Self>;
-    }
-}
+mod proptest_support;
 
 #[cfg(test)]
 mod tests;

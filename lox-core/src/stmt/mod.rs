@@ -73,8 +73,8 @@ impl<'a> From<Expr<'a>> for Stmt<'a> {
 pub struct Expression<'a>(Expr<'a>);
 
 impl<'a> Expression<'a> {
-    pub fn new(expr: impl Into<Expr<'a>>) -> Self {
-        Self(expr.into())
+    pub const fn new(expr: Expr<'a>) -> Self {
+        Self(expr)
     }
 
     pub const fn expression(&self) -> &Expr<'a> {
@@ -102,10 +102,8 @@ pub struct Print<'a> {
 }
 
 impl<'a> Print<'a> {
-    pub fn new(expr: impl Into<Expr<'a>>) -> Self {
-        Self {
-            expression: expr.into(),
-        }
+    pub const fn new(expr: Expr<'a>) -> Self {
+        Self { expression: expr }
     }
 
     pub const fn expression(&self) -> &Expr<'a> {
@@ -120,11 +118,8 @@ pub struct Var<'a> {
 }
 
 impl<'a> Var<'a> {
-    pub fn new(name: Token<'a>, initializer: impl Into<Option<Expr<'a>>>) -> Self {
-        Self {
-            name,
-            initializer: initializer.into(),
-        }
+    pub const fn new(name: Token<'a>, initializer: Option<Expr<'a>>) -> Self {
+        Self { name, initializer }
     }
 
     pub const fn name(&self) -> &Token<'a> {
@@ -135,3 +130,9 @@ impl<'a> Var<'a> {
         self.initializer.as_ref()
     }
 }
+
+#[cfg(any(test, feature = "dsl"))]
+pub use dsl::*;
+
+#[cfg(any(test, feature = "dsl"))]
+mod dsl;

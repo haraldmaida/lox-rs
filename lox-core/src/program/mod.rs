@@ -28,3 +28,9 @@ impl<'a> AsRef<[Stmt<'a>]> for Program<'a> {
         &self.0
     }
 }
+
+#[cfg(any(test, feature = "dsl"))]
+pub use dsl::*;
+
+#[cfg(any(test, feature = "dsl"))]
+mod dsl;

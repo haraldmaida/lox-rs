@@ -170,6 +170,12 @@ impl<'a> From<&'a str> for Literal {
     }
 }
 
+impl From<Symbol> for Literal {
+    fn from(value: Symbol) -> Self {
+        Self::String(value)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Token<'a> {
     pub kind: TokenKind,
@@ -193,44 +199,21 @@ impl<'a> Token<'a> {
         }
     }
 
-    pub fn new_nonliteral(
-        kind: TokenKind,
-        lexeme: &'a str,
-        location: impl Into<SourceSpan>,
-    ) -> Self {
-        Self {
-            kind,
-            literal: None,
-            lexeme,
-            location: location.into(),
-        }
+    /// Escapes a string literal in Lox.
+    ///
+    /// Lox has no escaping, so it just adds `"` around the string.
+    pub fn escape(value: &str) -> String {
+        format!("\"{value}\"")
     }
 
-    pub fn new_literal(
-        literal: impl Into<Literal>,
-        lexeme: &'a str,
-        location: impl Into<SourceSpan>,
-    ) -> Self {
-        let literal = literal.into();
-        let kind = match literal {
-            Literal::Number(_) => TokenKind::NumberLiteral,
-            Literal::String(_) => TokenKind::StringLiteral,
-        };
-        Self {
-            kind,
-            literal: Some(literal),
-            lexeme,
-            location: location.into(),
-        }
-    }
-
-    pub fn new_identifier(lexeme: &'a str, location: impl Into<SourceSpan>) -> Self {
-        Self {
-            kind: TokenKind::Identifier,
-            literal: None,
-            lexeme,
-            location: location.into(),
-        }
+    /// Unescapes the lexeme for a string literal in Lox.
+    ///
+    /// Lox has no escaping, so it just removes the `"` around the string.
+    pub fn unescape(lexeme: &str) -> &str {
+        lexeme
+            .strip_prefix('"')
+            .and_then(|s| s.strip_suffix('"'))
+            .unwrap_or(lexeme)
     }
 
     pub const fn kind(&self) -> TokenKind {
@@ -264,9 +247,11 @@ impl Display for Token<'_> {
     }
 }
 
-pub fn token(kind: TokenKind, lexeme: &str, location: impl Into<SourceSpan>) -> Token<'_> {
-    Token::new(kind, None, lexeme, location.into())
-}
+#[cfg(any(test, feature = "dsl"))]
+pub use dsl::*;
+
+#[cfg(any(test, feature = "dsl"))]
+mod dsl;
 
 #[cfg(test)]
 mod tests;

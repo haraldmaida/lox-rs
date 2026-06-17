@@ -196,9 +196,7 @@ impl<'a> Tokens<'a> {
     fn unescape_string_token(&self) -> Result<Token<'a>, LexingError> {
         let location = self.start_location();
         let lexeme = self.current_lexeme();
-        // Lox has no escaping, so just remove the ".
-        // Since it has no escaping, strings can't contain ", so trim won't trim multiple
-        let value = lexeme.trim_matches('"');
+        let value = Token::unescape(lexeme);
         Ok(Token::new(
             TokenKind::StringLiteral,
             Some(Literal::String(value.into())),

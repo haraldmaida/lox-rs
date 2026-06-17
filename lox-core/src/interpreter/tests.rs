@@ -1,11 +1,15 @@
 use super::*;
-use crate::expr::Expr;
-use crate::token::{TokenKind, token};
+use crate::expr::{Expr, binary, grouping, literal, nil, unary, variable};
+use crate::stmt::{print, var};
+use crate::token::{
+    bang, bang_equal, equal_equal, greater, greater_equal, identifier, less, less_equal, minus,
+    plus, slash, star,
+};
 use asserting::prelude::*;
 
 #[test]
 fn evaluate_literal_nil() {
-    let expr = Expr::from(Literal::Nil);
+    let expr = Expr::from(nil());
 
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
@@ -15,7 +19,7 @@ fn evaluate_literal_nil() {
 
 #[test]
 fn evaluate_literal_bool() {
-    let expr = Expr::from(Literal::Bool(true));
+    let expr = Expr::from(literal(true));
 
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
@@ -25,7 +29,7 @@ fn evaluate_literal_bool() {
 
 #[test]
 fn evaluate_literal_number() {
-    let expr = Expr::from(Literal::Number(123.456));
+    let expr = Expr::from(literal(123.456));
 
     let mut interpreter = Interpreter::default();
     let Ok(Value::Number(value)) = interpreter.evaluate(&expr) else {
@@ -49,7 +53,7 @@ fn evaluate_literal_string() {
 
 #[test]
 fn evaluate_grouping_expression() {
-    let expr = Expr::from(Grouping::new(Literal::Number(123.456)));
+    let expr = Expr::from(grouping(literal(123.456)));
 
     let mut interpreter = Interpreter::default();
     let Ok(Value::Number(value)) = interpreter.evaluate(&expr) else {
@@ -61,10 +65,7 @@ fn evaluate_grouping_expression() {
 
 #[test]
 fn evaluate_unary_expr_bang_for_true() {
-    let expr = Expr::from(Unary::new(
-        token(TokenKind::Bang, "!", (1, 2)),
-        Literal::Bool(true),
-    ));
+    let expr = Expr::from(unary(bang((1, 2)), literal(true)));
 
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
@@ -74,10 +75,7 @@ fn evaluate_unary_expr_bang_for_true() {
 
 #[test]
 fn evaluate_unary_expr_bang_for_false() {
-    let expr = Expr::from(Unary::new(
-        token(TokenKind::Bang, "!", (1, 2)),
-        Literal::Bool(false),
-    ));
+    let expr = Expr::from(unary(bang((1, 2)), literal(false)));
 
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
@@ -87,10 +85,7 @@ fn evaluate_unary_expr_bang_for_false() {
 
 #[test]
 fn evaluate_unary_expr_bang_for_number_0() {
-    let expr = Expr::from(Unary::new(
-        token(TokenKind::Bang, "!", (1, 2)),
-        Literal::Number(0.),
-    ));
+    let expr = Expr::from(unary(bang((1, 2)), literal(0.)));
 
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
@@ -100,10 +95,7 @@ fn evaluate_unary_expr_bang_for_number_0() {
 
 #[test]
 fn evaluate_unary_expr_bang_for_string() {
-    let expr = Expr::from(Unary::new(
-        token(TokenKind::Bang, "!", (1, 2)),
-        Literal::String("0".into()),
-    ));
+    let expr = Expr::from(unary(bang((1, 2)), Literal::String("0".into())));
 
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
@@ -113,10 +105,7 @@ fn evaluate_unary_expr_bang_for_string() {
 
 #[test]
 fn evaluate_unary_expr_minus_with_number() {
-    let expr = Expr::from(Unary::new(
-        token(TokenKind::Minus, "-", (1, 2)),
-        Literal::Number(123.456),
-    ));
+    let expr = Expr::from(unary(minus((1, 2)), literal(123.456)));
 
     let mut interpreter = Interpreter::default();
     let Ok(Value::Number(value)) = interpreter.evaluate(&expr) else {
@@ -128,24 +117,21 @@ fn evaluate_unary_expr_minus_with_number() {
 
 #[test]
 fn evaluate_unary_expr_minus_with_boolean_returns_runtime_error() {
-    let expr = Expr::from(Unary::new(
-        token(TokenKind::Minus, "-", (1, 2)),
-        Literal::Bool(true),
-    ));
+    let expr = Expr::from(unary(minus((1, 2)), literal(true)));
 
     let mut interpreter = Interpreter::default();
     let result = interpreter.evaluate(&expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
-        token(TokenKind::Minus, "-", (1, 2)),
+        minus((1, 2)),
     ));
 }
 
 #[test]
 fn evaluate_unary_expr_minus_with_string_returns_runtime_error() {
-    let expr = Expr::from(Unary::new(
-        token(TokenKind::Minus, "-", (1, 2)),
+    let expr = Expr::from(unary(
+        minus((1, 2)),
         Literal::String("Hello, world!".into()),
     ));
 
@@ -154,49 +140,39 @@ fn evaluate_unary_expr_minus_with_string_returns_runtime_error() {
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
-        token(TokenKind::Minus, "-", (1, 2)),
+        minus((1, 2)),
     ));
 }
 
 #[test]
 fn evaluate_unary_expr_minus_with_nil_returns_runtime_error() {
-    let expr = Expr::from(Unary::new(
-        token(TokenKind::Minus, "-", (1, 2)),
-        Literal::Nil,
-    ));
+    let expr = Expr::from(unary(minus((1, 2)), Literal::Nil));
 
     let mut interpreter = Interpreter::default();
     let result = interpreter.evaluate(&expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
-        token(TokenKind::Minus, "-", (1, 2)),
+        minus((1, 2)),
     ));
 }
 
 #[test]
 fn evaluate_unary_expr_with_illegal_operator() {
-    let expr = Expr::from(Unary::new(
-        token(TokenKind::Plus, "+", (1, 2)),
-        Literal::Number(123.456),
-    ));
+    let expr = Expr::from(unary(plus((1, 2)), literal(123.456)));
 
     let mut interpreter = Interpreter::default();
     let result = interpreter.evaluate(&expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::NotAnUnaryOperator,
-        token(TokenKind::Plus, "+", (1, 2)),
+        plus((1, 2)),
     ));
 }
 
 #[test]
 fn evaluate_binary_expr_minus_with_numbers() {
-    let expr = Expr::from(Binary::new(
-        Literal::Number(123.456),
-        token(TokenKind::Minus, "-", (1, 2)),
-        Literal::Number(789.012),
-    ));
+    let expr = Expr::from(binary(literal(123.456), minus((1, 2)), literal(789.012)));
 
     let mut interpreter = Interpreter::default();
     let Ok(Value::Number(value)) = interpreter.evaluate(&expr) else {
@@ -208,26 +184,22 @@ fn evaluate_binary_expr_minus_with_numbers() {
 
 #[test]
 fn evaluate_binary_expr_minus_with_booleans_returns_runtime_error() {
-    let expr = Expr::from(Binary::new(
-        Literal::Bool(true),
-        token(TokenKind::Minus, "-", (1, 2)),
-        Literal::Bool(false),
-    ));
+    let expr = Expr::from(binary(literal(true), minus((1, 2)), literal(false)));
 
     let mut interpreter = Interpreter::default();
     let result = interpreter.evaluate(&expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
-        token(TokenKind::Minus, "-", (1, 2)),
+        minus((1, 2)),
     ));
 }
 
 #[test]
 fn evaluate_binary_expr_minus_with_strings_returns_runtime_error() {
-    let expr = Expr::from(Binary::new(
-        Literal::Number(123.456),
-        token(TokenKind::Minus, "-", (1, 2)),
+    let expr = Expr::from(binary(
+        literal(123.456),
+        minus((1, 2)),
         Literal::String("Hello, world!".into()),
     ));
 
@@ -236,34 +208,26 @@ fn evaluate_binary_expr_minus_with_strings_returns_runtime_error() {
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
-        token(TokenKind::Minus, "-", (1, 2)),
+        minus((1, 2)),
     ));
 }
 
 #[test]
 fn evaluate_binary_expr_minus_with_nil_returns_runtime_error() {
-    let expr = Expr::from(Binary::new(
-        Literal::Nil,
-        token(TokenKind::Minus, "-", (1, 2)),
-        Literal::Number(123.456),
-    ));
+    let expr = Expr::from(binary(Literal::Nil, minus((1, 2)), literal(123.456)));
 
     let mut interpreter = Interpreter::default();
     let result = interpreter.evaluate(&expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
-        token(TokenKind::Minus, "-", (1, 2)),
+        minus((1, 2)),
     ));
 }
 
 #[test]
 fn evaluate_binary_expr_plus_with_numbers() {
-    let expr = Expr::from(Binary::new(
-        Literal::Number(123.456),
-        token(TokenKind::Plus, "+", (1, 2)),
-        Literal::Number(789.012),
-    ));
+    let expr = Expr::from(binary(literal(123.456), plus((1, 2)), literal(789.012)));
 
     let mut interpreter = Interpreter::default();
     let Ok(Value::Number(value)) = interpreter.evaluate(&expr) else {
@@ -275,9 +239,9 @@ fn evaluate_binary_expr_plus_with_numbers() {
 
 #[test]
 fn evaluate_binary_expr_plus_with_strings() {
-    let expr = Expr::from(Binary::new(
+    let expr = Expr::from(binary(
         Literal::String("Hello, ".into()),
-        token(TokenKind::Plus, "+", (1, 2)),
+        plus((1, 2)),
         Literal::String("world!".into()),
     ));
 
@@ -291,10 +255,10 @@ fn evaluate_binary_expr_plus_with_strings() {
 
 #[test]
 fn evaluate_binary_expr_plus_with_string_and_number_returns_runtime_error() {
-    let expr = Expr::from(Binary::new(
+    let expr = Expr::from(binary(
         Literal::String("Anna".into()),
-        token(TokenKind::Plus, "+", (1, 2)),
-        Literal::Number(123.456),
+        plus((1, 2)),
+        literal(123.456),
     ));
 
     let mut interpreter = Interpreter::default();
@@ -302,15 +266,15 @@ fn evaluate_binary_expr_plus_with_string_and_number_returns_runtime_error() {
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandsOfDifferentType,
-        token(TokenKind::Plus, "+", (1, 2)),
+        plus((1, 2)),
     ));
 }
 
 #[test]
 fn evaluate_binary_expr_plus_with_number_and_string_returns_runtime_error() {
-    let expr = Expr::from(Binary::new(
-        Literal::Number(123.456),
-        token(TokenKind::Plus, "+", (1, 2)),
+    let expr = Expr::from(binary(
+        literal(123.456),
+        plus((1, 2)),
         Literal::String("Anna".into()),
     ));
 
@@ -319,51 +283,39 @@ fn evaluate_binary_expr_plus_with_number_and_string_returns_runtime_error() {
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandsOfDifferentType,
-        token(TokenKind::Plus, "+", (1, 2)),
+        plus((1, 2)),
     ));
 }
 
 #[test]
 fn evaluate_binary_expr_plus_with_booleans_returns_runtime_error() {
-    let expr = Expr::from(Binary::new(
-        Literal::Bool(true),
-        token(TokenKind::Plus, "+", (1, 2)),
-        Literal::Bool(false),
-    ));
+    let expr = Expr::from(binary(literal(true), plus((1, 2)), literal(false)));
 
     let mut interpreter = Interpreter::default();
     let result = interpreter.evaluate(&expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumberOrString,
-        token(TokenKind::Plus, "+", (1, 2)),
+        plus((1, 2)),
     ));
 }
 
 #[test]
 fn evaluate_binary_expr_plus_with_nil_returns_runtime_error() {
-    let expr = Expr::from(Binary::new(
-        Literal::Nil,
-        token(TokenKind::Plus, "+", (1, 2)),
-        Literal::Number(123.456),
-    ));
+    let expr = Expr::from(binary(Literal::Nil, plus((1, 2)), literal(123.456)));
 
     let mut interpreter = Interpreter::default();
     let result = interpreter.evaluate(&expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumberOrString,
-        token(TokenKind::Plus, "+", (1, 2)),
+        plus((1, 2)),
     ));
 }
 
 #[test]
 fn evaluate_binary_expr_star_with_numbers() {
-    let expr = Expr::from(Binary::new(
-        Literal::Number(-123.456),
-        token(TokenKind::Star, "*", (1, 2)),
-        Literal::Number(789.012),
-    ));
+    let expr = Expr::from(binary(literal(-123.456), star((1, 2)), literal(789.012)));
 
     let mut interpreter = Interpreter::default();
     let Ok(Value::Number(value)) = interpreter.evaluate(&expr) else {
@@ -375,27 +327,23 @@ fn evaluate_binary_expr_star_with_numbers() {
 
 #[test]
 fn evaluate_binary_expr_star_with_booleans_returns_runtime_error() {
-    let expr = Expr::from(Binary::new(
-        Literal::Bool(true),
-        token(TokenKind::Star, "*", (1, 2)),
-        Literal::Bool(false),
-    ));
+    let expr = Expr::from(binary(literal(true), star((1, 2)), literal(false)));
 
     let mut interpreter = Interpreter::default();
     let result = interpreter.evaluate(&expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
-        token(TokenKind::Star, "*", (1, 2)),
+        star((1, 2)),
     ));
 }
 
 #[test]
 fn evaluate_binary_expr_star_with_strings_returns_runtime_error() {
-    let expr = Expr::from(Binary::new(
+    let expr = Expr::from(binary(
         Literal::String("Hello, world!".into()),
-        token(TokenKind::Star, "*", (1, 2)),
-        Literal::Number(123.456),
+        star((1, 2)),
+        literal(123.456),
     ));
 
     let mut interpreter = Interpreter::default();
@@ -403,34 +351,26 @@ fn evaluate_binary_expr_star_with_strings_returns_runtime_error() {
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
-        token(TokenKind::Star, "*", (1, 2)),
+        star((1, 2)),
     ));
 }
 
 #[test]
 fn evaluate_binary_expr_star_with_nil_returns_runtime_error() {
-    let expr = Expr::from(Binary::new(
-        Literal::Nil,
-        token(TokenKind::Star, "*", (1, 2)),
-        Literal::Number(123.456),
-    ));
+    let expr = Expr::from(binary(Literal::Nil, star((1, 2)), literal(123.456)));
 
     let mut interpreter = Interpreter::default();
     let result = interpreter.evaluate(&expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
-        token(TokenKind::Star, "*", (1, 2)),
+        star((1, 2)),
     ));
 }
 
 #[test]
 fn evaluate_binary_expr_slash_with_numbers() {
-    let expr = Expr::from(Binary::new(
-        Literal::Number(123.456),
-        token(TokenKind::Slash, "/", (1, 2)),
-        Literal::Number(789.012),
-    ));
+    let expr = Expr::from(binary(literal(123.456), slash((1, 2)), literal(789.012)));
 
     let mut interpreter = Interpreter::default();
     let Ok(Value::Number(value)) = interpreter.evaluate(&expr) else {
@@ -442,27 +382,23 @@ fn evaluate_binary_expr_slash_with_numbers() {
 
 #[test]
 fn evaluate_binary_expr_slash_with_booleans_returns_runtime_error() {
-    let expr = Expr::from(Binary::new(
-        Literal::Bool(true),
-        token(TokenKind::Slash, "/", (1, 2)),
-        Literal::Bool(false),
-    ));
+    let expr = Expr::from(binary(literal(true), slash((1, 2)), literal(false)));
 
     let mut interpreter = Interpreter::default();
     let result = interpreter.evaluate(&expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
-        token(TokenKind::Slash, "/", (1, 2)),
+        slash((1, 2)),
     ));
 }
 
 #[test]
 fn evaluate_binary_expr_slash_with_strings_returns_runtime_error() {
-    let expr = Expr::from(Binary::new(
+    let expr = Expr::from(binary(
         Literal::String("Hello, world!".into()),
-        token(TokenKind::Slash, "/", (1, 2)),
-        Literal::Number(123.456),
+        slash((1, 2)),
+        literal(123.456),
     ));
 
     let mut interpreter = Interpreter::default();
@@ -470,33 +406,29 @@ fn evaluate_binary_expr_slash_with_strings_returns_runtime_error() {
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
-        token(TokenKind::Slash, "/", (1, 2)),
+        slash((1, 2)),
     ));
 }
 
 #[test]
 fn evaluate_binary_expr_slash_with_nil_returns_runtime_error() {
-    let expr = Expr::from(Binary::new(
-        Literal::Nil,
-        token(TokenKind::Slash, "/", (1, 2)),
-        Literal::Number(123.456),
-    ));
+    let expr = Expr::from(binary(Literal::Nil, slash((1, 2)), literal(123.456)));
 
     let mut interpreter = Interpreter::default();
     let result = interpreter.evaluate(&expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
-        token(TokenKind::Slash, "/", (1, 2)),
+        slash((1, 2)),
     ));
 }
 
 #[test]
 fn evaluate_binary_expr_bangequal_with_numbers() {
-    let expr = Expr::from(Binary::new(
-        Literal::Number(123.456),
-        token(TokenKind::BangEqual, "!=", (1, 2)),
-        Literal::Number(789.012),
+    let expr = Expr::from(binary(
+        literal(123.456),
+        bang_equal((1, 2)),
+        literal(789.012),
     ));
 
     let mut interpreter = Interpreter::default();
@@ -507,11 +439,7 @@ fn evaluate_binary_expr_bangequal_with_numbers() {
 
 #[test]
 fn evaluate_binary_expr_bangequal_with_booleans() {
-    let expr = Expr::from(Binary::new(
-        Literal::Bool(true),
-        token(TokenKind::BangEqual, "!=", (1, 2)),
-        Literal::Bool(false),
-    ));
+    let expr = Expr::from(binary(literal(true), bang_equal((1, 2)), literal(false)));
 
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
@@ -521,9 +449,9 @@ fn evaluate_binary_expr_bangequal_with_booleans() {
 
 #[test]
 fn evaluate_binary_expr_bangequal_with_strings() {
-    let expr = Expr::from(Binary::new(
+    let expr = Expr::from(binary(
         Literal::String("Anna".into()),
-        token(TokenKind::BangEqual, "!=", (1, 2)),
+        bang_equal((1, 2)),
         Literal::String("Anna".into()),
     ));
 
@@ -535,11 +463,7 @@ fn evaluate_binary_expr_bangequal_with_strings() {
 
 #[test]
 fn evaluate_binary_expr_bangequal_with_nils() {
-    let expr = Expr::from(Binary::new(
-        Literal::Nil,
-        token(TokenKind::BangEqual, "!=", (1, 2)),
-        Literal::Nil,
-    ));
+    let expr = Expr::from(binary(Literal::Nil, bang_equal((1, 2)), Literal::Nil));
 
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
@@ -549,10 +473,10 @@ fn evaluate_binary_expr_bangequal_with_nils() {
 
 #[test]
 fn evaluate_binary_expr_equalequal_with_numbers() {
-    let expr = Expr::from(Binary::new(
-        Literal::Number(123.456),
-        token(TokenKind::EqualEqual, "==", (1, 2)),
-        Literal::Number(789.012),
+    let expr = Expr::from(binary(
+        literal(123.456),
+        equal_equal((1, 2)),
+        literal(789.012),
     ));
 
     let mut interpreter = Interpreter::default();
@@ -563,11 +487,7 @@ fn evaluate_binary_expr_equalequal_with_numbers() {
 
 #[test]
 fn evaluate_binary_expr_equalequal_with_booleans() {
-    let expr = Expr::from(Binary::new(
-        Literal::Bool(true),
-        token(TokenKind::EqualEqual, "==", (1, 2)),
-        Literal::Bool(false),
-    ));
+    let expr = Expr::from(binary(literal(true), equal_equal((1, 2)), literal(false)));
 
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
@@ -577,9 +497,9 @@ fn evaluate_binary_expr_equalequal_with_booleans() {
 
 #[test]
 fn evaluate_binary_expr_equalequal_with_strings() {
-    let expr = Expr::from(Binary::new(
+    let expr = Expr::from(binary(
         Literal::String("Anna".into()),
-        token(TokenKind::EqualEqual, "==", (1, 2)),
+        equal_equal((1, 2)),
         Literal::String("Anna".into()),
     ));
 
@@ -591,11 +511,7 @@ fn evaluate_binary_expr_equalequal_with_strings() {
 
 #[test]
 fn evaluate_binary_expr_equalequal_with_nils() {
-    let expr = Expr::from(Binary::new(
-        Literal::Nil,
-        token(TokenKind::EqualEqual, "==", (1, 2)),
-        Literal::Nil,
-    ));
+    let expr = Expr::from(binary(Literal::Nil, equal_equal((1, 2)), Literal::Nil));
 
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
@@ -605,11 +521,7 @@ fn evaluate_binary_expr_equalequal_with_nils() {
 
 #[test]
 fn evaluate_binary_expr_greater_with_numbers() {
-    let expr = Expr::from(Binary::new(
-        Literal::Number(123.456),
-        token(TokenKind::Greater, ">", (1, 2)),
-        Literal::Number(789.012),
-    ));
+    let expr = Expr::from(binary(literal(123.456), greater((1, 2)), literal(789.012)));
 
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
@@ -619,11 +531,7 @@ fn evaluate_binary_expr_greater_with_numbers() {
 
 #[test]
 fn evaluate_binary_expr_greater_with_booleans() {
-    let expr = Expr::from(Binary::new(
-        Literal::Bool(true),
-        token(TokenKind::Greater, ">", (1, 2)),
-        Literal::Bool(false),
-    ));
+    let expr = Expr::from(binary(literal(true), greater((1, 2)), literal(false)));
 
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
@@ -633,9 +541,9 @@ fn evaluate_binary_expr_greater_with_booleans() {
 
 #[test]
 fn evaluate_binary_expr_greater_with_strings() {
-    let expr = Expr::from(Binary::new(
+    let expr = Expr::from(binary(
         Literal::String("Billie".into()),
-        token(TokenKind::Greater, ">", (1, 2)),
+        greater((1, 2)),
         Literal::String("Anna".into()),
     ));
 
@@ -647,11 +555,7 @@ fn evaluate_binary_expr_greater_with_strings() {
 
 #[test]
 fn evaluate_binary_expr_greater_with_nils() {
-    let expr = Expr::from(Binary::new(
-        Literal::Nil,
-        token(TokenKind::Greater, ">", (1, 2)),
-        Literal::Nil,
-    ));
+    let expr = Expr::from(binary(Literal::Nil, greater((1, 2)), Literal::Nil));
 
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
@@ -661,10 +565,10 @@ fn evaluate_binary_expr_greater_with_nils() {
 
 #[test]
 fn evaluate_binary_expr_greaterequal_with_numbers() {
-    let expr = Expr::from(Binary::new(
-        Literal::Number(123.456),
-        token(TokenKind::GreaterEqual, ">=", (1, 2)),
-        Literal::Number(789.012),
+    let expr = Expr::from(binary(
+        literal(123.456),
+        greater_equal((1, 2)),
+        literal(789.012),
     ));
 
     let mut interpreter = Interpreter::default();
@@ -675,11 +579,7 @@ fn evaluate_binary_expr_greaterequal_with_numbers() {
 
 #[test]
 fn evaluate_binary_expr_greaterequal_with_booleans() {
-    let expr = Expr::from(Binary::new(
-        Literal::Bool(true),
-        token(TokenKind::GreaterEqual, ">=", (1, 2)),
-        Literal::Bool(true),
-    ));
+    let expr = Expr::from(binary(literal(true), greater_equal((1, 2)), literal(true)));
 
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
@@ -689,9 +589,9 @@ fn evaluate_binary_expr_greaterequal_with_booleans() {
 
 #[test]
 fn evaluate_binary_expr_greaterequal_with_strings() {
-    let expr = Expr::from(Binary::new(
+    let expr = Expr::from(binary(
         Literal::String("Anna".into()),
-        token(TokenKind::GreaterEqual, ">=", (1, 2)),
+        greater_equal((1, 2)),
         Literal::String("Anna".into()),
     ));
 
@@ -703,11 +603,7 @@ fn evaluate_binary_expr_greaterequal_with_strings() {
 
 #[test]
 fn evaluate_binary_expr_greaterequal_with_nils() {
-    let expr = Expr::from(Binary::new(
-        Literal::Nil,
-        token(TokenKind::GreaterEqual, ">=", (1, 2)),
-        Literal::Nil,
-    ));
+    let expr = Expr::from(binary(Literal::Nil, greater_equal((1, 2)), Literal::Nil));
 
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
@@ -717,11 +613,7 @@ fn evaluate_binary_expr_greaterequal_with_nils() {
 
 #[test]
 fn evaluate_binary_expr_less_with_numbers() {
-    let expr = Expr::from(Binary::new(
-        Literal::Number(123.456),
-        token(TokenKind::Less, "<", (1, 2)),
-        Literal::Number(789.012),
-    ));
+    let expr = Expr::from(binary(literal(123.456), less((1, 2)), literal(789.012)));
 
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
@@ -731,11 +623,7 @@ fn evaluate_binary_expr_less_with_numbers() {
 
 #[test]
 fn evaluate_binary_expr_less_with_booleans() {
-    let expr = Expr::from(Binary::new(
-        Literal::Bool(true),
-        token(TokenKind::Less, "<", (1, 2)),
-        Literal::Bool(false),
-    ));
+    let expr = Expr::from(binary(literal(true), less((1, 2)), literal(false)));
 
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
@@ -745,9 +633,9 @@ fn evaluate_binary_expr_less_with_booleans() {
 
 #[test]
 fn evaluate_binary_expr_less_with_strings() {
-    let expr = Expr::from(Binary::new(
+    let expr = Expr::from(binary(
         Literal::String("Anna".into()),
-        token(TokenKind::Less, "<", (1, 2)),
+        less((1, 2)),
         Literal::String("Billie".into()),
     ));
 
@@ -759,11 +647,7 @@ fn evaluate_binary_expr_less_with_strings() {
 
 #[test]
 fn evaluate_binary_expr_less_with_nils() {
-    let expr = Expr::from(Binary::new(
-        Literal::Nil,
-        token(TokenKind::Less, "<", (1, 2)),
-        Literal::Nil,
-    ));
+    let expr = Expr::from(binary(Literal::Nil, less((1, 2)), Literal::Nil));
 
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
@@ -773,10 +657,10 @@ fn evaluate_binary_expr_less_with_nils() {
 
 #[test]
 fn evaluate_binary_expr_lessequal_with_numbers() {
-    let expr = Expr::from(Binary::new(
-        Literal::Number(123.456),
-        token(TokenKind::LessEqual, "<=", (1, 2)),
-        Literal::Number(789.012),
+    let expr = Expr::from(binary(
+        literal(123.456),
+        less_equal((1, 2)),
+        literal(789.012),
     ));
 
     let mut interpreter = Interpreter::default();
@@ -787,11 +671,7 @@ fn evaluate_binary_expr_lessequal_with_numbers() {
 
 #[test]
 fn evaluate_binary_expr_lessequal_with_booleans() {
-    let expr = Expr::from(Binary::new(
-        Literal::Bool(false),
-        token(TokenKind::LessEqual, "<=", (1, 2)),
-        Literal::Bool(true),
-    ));
+    let expr = Expr::from(binary(literal(false), less_equal((1, 2)), literal(true)));
 
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
@@ -801,9 +681,9 @@ fn evaluate_binary_expr_lessequal_with_booleans() {
 
 #[test]
 fn evaluate_binary_expr_lessequal_with_strings() {
-    let expr = Expr::from(Binary::new(
+    let expr = Expr::from(binary(
         Literal::String("Anna".into()),
-        token(TokenKind::LessEqual, "<=", (1, 2)),
+        less_equal((1, 2)),
         Literal::String("Anna".into()),
     ));
 
@@ -815,11 +695,7 @@ fn evaluate_binary_expr_lessequal_with_strings() {
 
 #[test]
 fn evaluate_binary_expr_lessequal_with_nils() {
-    let expr = Expr::from(Binary::new(
-        Literal::Nil,
-        token(TokenKind::LessEqual, "<=", (1, 2)),
-        Literal::Nil,
-    ));
+    let expr = Expr::from(binary(Literal::Nil, less_equal((1, 2)), Literal::Nil));
 
     let mut interpreter = Interpreter::default();
     let value = interpreter.evaluate(&expr);
@@ -829,28 +705,20 @@ fn evaluate_binary_expr_lessequal_with_nils() {
 
 #[test]
 fn evaluate_binary_expr_with_illegal_operator() {
-    let expr = Expr::from(Binary::new(
-        Literal::Number(123.456),
-        token(TokenKind::Bang, "!", (1, 2)),
-        Literal::Number(789.012),
-    ));
+    let expr = Expr::from(binary(literal(123.456), bang((1, 2)), literal(789.012)));
 
     let mut interpreter = Interpreter::default();
     let result = interpreter.evaluate(&expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::NotABinaryOperator,
-        token(TokenKind::Bang, "!", (1, 2)),
+        bang((1, 2)),
     ));
 }
 
 #[test]
 fn execute_print_stmt_with_expression() {
-    let stmt = Stmt::from(Print::new(Binary::new(
-        Literal::Number(84.),
-        token(TokenKind::Plus, "/", (1, 2)),
-        Literal::Number(2.),
-    )));
+    let stmt = Stmt::from(print(binary(literal(84.), plus((1, 2)), literal(2.))));
 
     let mut interpreter = Interpreter::default();
     let result = interpreter.execute(&stmt);
@@ -860,13 +728,9 @@ fn execute_print_stmt_with_expression() {
 
 #[test]
 fn execute_var_stmt_with_initializer() {
-    let stmt = Stmt::from(Var::new(
-        token(TokenKind::Identifier, "my_var", (4, 6)),
-        Expr::from(Binary::new(
-            Literal::Number(40.),
-            token(TokenKind::Plus, "+", (17, 1)),
-            Literal::Number(2.),
-        )),
+    let stmt = Stmt::from(var(
+        identifier("my_var", (4, 6)),
+        Expr::from(binary(literal(40.), plus((17, 1)), literal(2.))),
     ));
 
     let mut interpreter = Interpreter::default();
@@ -878,7 +742,7 @@ fn execute_var_stmt_with_initializer() {
 
 #[test]
 fn execute_var_stmt_without_initializer() {
-    let stmt = Stmt::from(Var::new(token(TokenKind::Identifier, "foo", (4, 3)), None));
+    let stmt = Stmt::from(var(identifier("foo", (4, 3)), None));
 
     let mut interpreter = Interpreter::default();
     let result = interpreter.execute(&stmt);
@@ -889,20 +753,14 @@ fn execute_var_stmt_without_initializer() {
 
 #[test]
 fn execute_var_stmt_with_variable_expression() {
-    let declare_a = Stmt::from(Var::new(
-        token(TokenKind::Identifier, "a", (4, 1)),
-        Expr::from(Literal::Number(3.)),
-    ));
-    let declare_b = Stmt::from(Var::new(
-        token(TokenKind::Identifier, "b", (14, 1)),
-        Expr::from(Literal::Number(2.)),
-    ));
-    let var_stmt = Stmt::from(Var::new(
-        token(TokenKind::Identifier, "foo", (24, 3)),
-        Expr::from(Binary::new(
-            Variable::new(token(TokenKind::Identifier, "a", (30, 1))),
-            token(TokenKind::Plus, "+", (32, 1)),
-            Variable::new(token(TokenKind::Identifier, "b", (34, 1))),
+    let declare_a = Stmt::from(var(identifier("a", (4, 1)), Expr::from(literal(3.))));
+    let declare_b = Stmt::from(var(identifier("b", (14, 1)), Expr::from(literal(2.))));
+    let var_stmt = Stmt::from(var(
+        identifier("foo", (24, 3)),
+        Expr::from(binary(
+            variable(identifier("a", (30, 1))),
+            plus((32, 1)),
+            variable(identifier("b", (34, 1))),
         )),
     ));
 
@@ -920,31 +778,24 @@ fn execute_var_stmt_with_variable_expression() {
 
 #[test]
 fn execute_print_stmt_of_undefined_variable() {
-    let stmt = Stmt::from(Print::new(Variable::new(token(
-        TokenKind::Identifier,
-        "foo",
-        (4, 3),
-    ))));
+    let stmt = Stmt::from(print(variable(identifier("foo", (4, 3)))));
 
     let mut interpreter = Interpreter::default();
     let result = interpreter.execute(&stmt);
 
     assert_that!(result).err().is_equal_to(RuntimeError::new(
         RuntimeErrorCode::UndefinedVariable("foo".into()),
-        token(TokenKind::Identifier, "foo", (4, 3)),
+        identifier("foo", (4, 3)),
     ));
 }
 
 #[test]
 fn evaluate_assign_expr_stmt_to_existing_variable() {
-    let declare_foo = Stmt::from(Var::new(
-        token(TokenKind::Identifier, "foo", (4, 3)),
-        Expr::from(Literal::Number(123.)),
-    ));
+    let declare_foo = Stmt::from(var(identifier("foo", (4, 3)), Expr::from(literal(123.))));
 
     let assign_to_foo = Expr::from(Assign::new(
-        token(TokenKind::Identifier, "foo", (23, 3)),
-        Expr::from(Literal::Number(99.)),
+        identifier("foo", (23, 3)),
+        Expr::from(literal(99.)),
     ));
 
     let mut interpreter = Interpreter::default();
@@ -959,14 +810,11 @@ fn evaluate_assign_expr_stmt_to_existing_variable() {
 
 #[test]
 fn evaluate_assign_expr_stmt_to_not_existing_variable() {
-    let declare_foo = Stmt::from(Var::new(
-        token(TokenKind::Identifier, "a", (4, 1)),
-        Expr::from(Literal::Number(123.)),
-    ));
+    let declare_foo = Stmt::from(var(identifier("a", (4, 1)), Expr::from(literal(123.))));
 
     let assign_to_foo = Expr::from(Assign::new(
-        token(TokenKind::Identifier, "foo", (23, 3)),
-        Expr::from(Literal::Number(99.)),
+        identifier("foo", (23, 3)),
+        Expr::from(literal(99.)),
     ));
 
     let mut interpreter = Interpreter::default();
@@ -979,7 +827,7 @@ fn evaluate_assign_expr_stmt_to_not_existing_variable() {
         .err()
         .is_equal_to(RuntimeError::new(
             RuntimeErrorCode::UndefinedVariable("foo".into()),
-            token(TokenKind::Identifier, "foo", (23, 3)),
+            identifier("foo", (23, 3)),
         ));
     assert_that!(interpreter.environment().get("foo"))
         .is_equal_to(Err(EnvironmentError::UndefinedVariable("foo".into())));

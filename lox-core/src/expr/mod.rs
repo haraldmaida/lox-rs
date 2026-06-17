@@ -103,10 +103,10 @@ pub struct Assign<'a> {
 }
 
 impl<'a> Assign<'a> {
-    pub fn new(name: Token<'a>, value: impl Into<Expr<'a>>) -> Self {
+    pub fn new(name: Token<'a>, value: Expr<'a>) -> Self {
         Self {
             name,
-            value: Box::new(value.into()),
+            value: Box::new(value),
         }
     }
 
@@ -127,11 +127,11 @@ pub struct Binary<'a> {
 }
 
 impl<'a> Binary<'a> {
-    pub fn new(left: impl Into<Expr<'a>>, operator: Token<'a>, right: impl Into<Expr<'a>>) -> Self {
+    pub fn new(left: Expr<'a>, operator: Token<'a>, right: Expr<'a>) -> Self {
         Self {
-            left: Box::new(left.into()),
+            left: Box::new(left),
             operator,
-            right: Box::new(right.into()),
+            right: Box::new(right),
         }
     }
 
@@ -156,9 +156,9 @@ pub struct Call<'a> {
 }
 
 impl<'a> Call<'a> {
-    pub fn new(callee: impl Into<Expr<'a>>, paren: Token<'a>, arguments: Vec<Expr<'a>>) -> Self {
+    pub fn new(callee: Expr<'a>, paren: Token<'a>, arguments: Vec<Expr<'a>>) -> Self {
         Self {
-            callee: Box::new(callee.into()),
+            callee: Box::new(callee),
             paren,
             arguments,
         }
@@ -184,9 +184,9 @@ pub struct Get<'a> {
 }
 
 impl<'a> Get<'a> {
-    pub fn new(object: impl Into<Expr<'a>>, name: Token<'a>) -> Self {
+    pub fn new(object: Expr<'a>, name: Token<'a>) -> Self {
         Self {
-            object: Box::new(object.into()),
+            object: Box::new(object),
             name,
         }
     }
@@ -206,9 +206,9 @@ pub struct Grouping<'a> {
 }
 
 impl<'a> Grouping<'a> {
-    pub fn new(expression: impl Into<Expr<'a>>) -> Self {
+    pub fn new(expression: Expr<'a>) -> Self {
         Self {
-            expression: Box::new(expression.into()),
+            expression: Box::new(expression),
         }
     }
 
@@ -269,11 +269,11 @@ pub struct Logical<'a> {
 }
 
 impl<'a> Logical<'a> {
-    pub fn new(left: impl Into<Expr<'a>>, operator: Token<'a>, right: impl Into<Expr<'a>>) -> Self {
+    pub fn new(left: Expr<'a>, operator: Token<'a>, right: Expr<'a>) -> Self {
         Self {
-            left: Box::new(left.into()),
+            left: Box::new(left),
             operator,
-            right: Box::new(right.into()),
+            right: Box::new(right),
         }
     }
 
@@ -298,11 +298,11 @@ pub struct Set<'a> {
 }
 
 impl<'a> Set<'a> {
-    pub fn new(object: impl Into<Expr<'a>>, name: Token<'a>, value: impl Into<Expr<'a>>) -> Self {
+    pub fn new(object: Expr<'a>, name: Token<'a>, value: Expr<'a>) -> Self {
         Self {
-            object: Box::new(object.into()),
+            object: Box::new(object),
             name,
-            value: Box::new(value.into()),
+            value: Box::new(value),
         }
     }
 
@@ -361,10 +361,10 @@ pub struct Unary<'a> {
 }
 
 impl<'a> Unary<'a> {
-    pub fn new(operator: Token<'a>, right: impl Into<Expr<'a>>) -> Self {
+    pub fn new(operator: Token<'a>, right: Expr<'a>) -> Self {
         Self {
             operator,
-            right: Box::new(right.into()),
+            right: Box::new(right),
         }
     }
 
@@ -395,3 +395,9 @@ impl<'a> Variable<'a> {
         self.name
     }
 }
+
+#[cfg(any(test, feature = "dsl"))]
+pub use dsl::*;
+
+#[cfg(any(test, feature = "dsl"))]
+mod dsl;

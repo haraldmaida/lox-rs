@@ -1,4 +1,5 @@
 use super::*;
+use crate::token::{identifier, literal_token, token};
 use asserting::prelude::*;
 
 mod lexing_error_code {
@@ -45,9 +46,9 @@ fn can_tokenize_str() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::LeftParen, "(", (0, 1))),
-        Ok(Token::new_nonliteral(TokenKind::RightParen, ")", (1, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (2, 0))),
+        Ok(token(TokenKind::LeftParen, "(", (0, 1))),
+        Ok(token(TokenKind::RightParen, ")", (1, 1))),
+        Ok(token(TokenKind::EndOfFile, "", (2, 0))),
     ]);
 }
 
@@ -57,11 +58,7 @@ fn tokenize_empty_source() {
 
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
-    assert_that!(tokens).contains_exactly([Ok(Token::new_nonliteral(
-        TokenKind::EndOfFile,
-        "",
-        (0, 0),
-    ))]);
+    assert_that!(tokens).contains_exactly([Ok(token(TokenKind::EndOfFile, "", (0, 0)))]);
 }
 
 #[test]
@@ -71,14 +68,14 @@ fn tokenize_punctuations() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::LeftParen, "(", (0, 1))),
-        Ok(Token::new_nonliteral(TokenKind::RightParen, ")", (1, 1))),
-        Ok(Token::new_nonliteral(TokenKind::LeftBrace, "{", (2, 1))),
-        Ok(Token::new_nonliteral(TokenKind::RightBrace, "}", (3, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Comma, ",", (4, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Dot, ".", (5, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Semicolon, ";", (6, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (7, 0))),
+        Ok(token(TokenKind::LeftParen, "(", (0, 1))),
+        Ok(token(TokenKind::RightParen, ")", (1, 1))),
+        Ok(token(TokenKind::LeftBrace, "{", (2, 1))),
+        Ok(token(TokenKind::RightBrace, "}", (3, 1))),
+        Ok(token(TokenKind::Comma, ",", (4, 1))),
+        Ok(token(TokenKind::Dot, ".", (5, 1))),
+        Ok(token(TokenKind::Semicolon, ";", (6, 1))),
+        Ok(token(TokenKind::EndOfFile, "", (7, 0))),
     ]);
 }
 
@@ -89,11 +86,11 @@ fn tokenize_ignores_whitespace() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::LeftParen, "(", (1, 1))),
-        Ok(Token::new_nonliteral(TokenKind::RightParen, ")", (8, 1))),
-        Ok(Token::new_nonliteral(TokenKind::LeftBrace, "{", (10, 1))),
-        Ok(Token::new_nonliteral(TokenKind::RightBrace, "}", (17, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (19, 0))),
+        Ok(token(TokenKind::LeftParen, "(", (1, 1))),
+        Ok(token(TokenKind::RightParen, ")", (8, 1))),
+        Ok(token(TokenKind::LeftBrace, "{", (10, 1))),
+        Ok(token(TokenKind::RightBrace, "}", (17, 1))),
+        Ok(token(TokenKind::EndOfFile, "", (19, 0))),
     ]);
 }
 
@@ -104,15 +101,15 @@ fn tokenize_single_character_operators() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::Minus, "-", (0, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Plus, "+", (2, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Star, "*", (4, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Slash, "/", (6, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Bang, "!", (8, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Equal, "=", (10, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Less, "<", (12, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Greater, ">", (14, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (15, 0))),
+        Ok(token(TokenKind::Minus, "-", (0, 1))),
+        Ok(token(TokenKind::Plus, "+", (2, 1))),
+        Ok(token(TokenKind::Star, "*", (4, 1))),
+        Ok(token(TokenKind::Slash, "/", (6, 1))),
+        Ok(token(TokenKind::Bang, "!", (8, 1))),
+        Ok(token(TokenKind::Equal, "=", (10, 1))),
+        Ok(token(TokenKind::Less, "<", (12, 1))),
+        Ok(token(TokenKind::Greater, ">", (14, 1))),
+        Ok(token(TokenKind::EndOfFile, "", (15, 0))),
     ]);
 }
 
@@ -123,11 +120,11 @@ fn tokenize_two_character_operators() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::EqualEqual, "==", (0, 2))),
-        Ok(Token::new_nonliteral(TokenKind::BangEqual, "!=", (3, 2))),
-        Ok(Token::new_nonliteral(TokenKind::LessEqual, "<=", (6, 2))),
-        Ok(Token::new_nonliteral(TokenKind::GreaterEqual, ">=", (9, 2))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (11, 0))),
+        Ok(token(TokenKind::EqualEqual, "==", (0, 2))),
+        Ok(token(TokenKind::BangEqual, "!=", (3, 2))),
+        Ok(token(TokenKind::LessEqual, "<=", (6, 2))),
+        Ok(token(TokenKind::GreaterEqual, ">=", (9, 2))),
+        Ok(token(TokenKind::EndOfFile, "", (11, 0))),
     ]);
 }
 
@@ -138,11 +135,11 @@ fn tokenize_line_comment_not_on_last_line() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::LeftParen, "(", (0, 1))),
-        Ok(Token::new_nonliteral(TokenKind::RightParen, ")", (1, 1))),
-        Ok(Token::new_nonliteral(TokenKind::LeftBrace, "{", (22, 1))),
-        Ok(Token::new_nonliteral(TokenKind::RightBrace, "}", (23, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (24, 0))),
+        Ok(token(TokenKind::LeftParen, "(", (0, 1))),
+        Ok(token(TokenKind::RightParen, ")", (1, 1))),
+        Ok(token(TokenKind::LeftBrace, "{", (22, 1))),
+        Ok(token(TokenKind::RightBrace, "}", (23, 1))),
+        Ok(token(TokenKind::EndOfFile, "", (24, 0))),
     ]);
 }
 
@@ -153,9 +150,9 @@ fn tokenize_line_comment_at_end_of_file() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::LeftParen, "(", (0, 1))),
-        Ok(Token::new_nonliteral(TokenKind::RightParen, ")", (1, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (21, 0))),
+        Ok(token(TokenKind::LeftParen, "(", (0, 1))),
+        Ok(token(TokenKind::RightParen, ")", (1, 1))),
+        Ok(token(TokenKind::EndOfFile, "", (21, 0))),
     ]);
 }
 
@@ -166,11 +163,11 @@ fn tokenize_line_comments_on_two_subsequent_lines() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::LeftParen, "(", (0, 1))),
-        Ok(Token::new_nonliteral(TokenKind::RightParen, ")", (1, 1))),
-        Ok(Token::new_nonliteral(TokenKind::LeftBrace, "{", (61, 1))),
-        Ok(Token::new_nonliteral(TokenKind::RightBrace, "}", (62, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (63, 0))),
+        Ok(token(TokenKind::LeftParen, "(", (0, 1))),
+        Ok(token(TokenKind::RightParen, ")", (1, 1))),
+        Ok(token(TokenKind::LeftBrace, "{", (61, 1))),
+        Ok(token(TokenKind::RightBrace, "}", (62, 1))),
+        Ok(token(TokenKind::EndOfFile, "", (63, 0))),
     ]);
 }
 
@@ -181,18 +178,18 @@ fn tokenize_unexpected_character_at_line_1_char_4() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::LeftParen, "(", (0, 1))),
-        Ok(Token::new_nonliteral(TokenKind::RightParen, ")", (1, 1))),
-        Ok(Token::new_nonliteral(TokenKind::LeftBrace, "{", (2, 1))),
+        Ok(token(TokenKind::LeftParen, "(", (0, 1))),
+        Ok(token(TokenKind::RightParen, ")", (1, 1))),
+        Ok(token(TokenKind::LeftBrace, "{", (2, 1))),
         Err(LexingError {
             code: LexingErrorCode::UnexpectedCharacter('§'),
             location: (3, 2).into(),
         }),
-        Ok(Token::new_nonliteral(TokenKind::RightBrace, "}", (5, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Comma, ",", (6, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Dot, ".", (7, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Semicolon, ";", (8, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (9, 0))),
+        Ok(token(TokenKind::RightBrace, "}", (5, 1))),
+        Ok(token(TokenKind::Comma, ",", (6, 1))),
+        Ok(token(TokenKind::Dot, ".", (7, 1))),
+        Ok(token(TokenKind::Semicolon, ";", (8, 1))),
+        Ok(token(TokenKind::EndOfFile, "", (9, 0))),
     ]);
 }
 
@@ -203,14 +200,14 @@ fn tokenize_unexpected_character_at_line_3_char_1() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::LeftBrace, "{", (0, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Semicolon, ";", (2, 1))),
+        Ok(token(TokenKind::LeftBrace, "{", (0, 1))),
+        Ok(token(TokenKind::Semicolon, ";", (2, 1))),
         Err(LexingError {
             code: LexingErrorCode::UnexpectedCharacter('§'),
             location: (4, 2).into(),
         }),
-        Ok(Token::new_nonliteral(TokenKind::RightBrace, "}", (6, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (8, 0))),
+        Ok(token(TokenKind::RightBrace, "}", (6, 1))),
+        Ok(token(TokenKind::EndOfFile, "", (8, 0))),
     ]);
 }
 
@@ -221,8 +218,8 @@ fn tokenize_string_literal_empty_string() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_literal("", "\"\"", (0, 2))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (2, 0))),
+        Ok(literal_token("", "\"\"", (0, 2))),
+        Ok(token(TokenKind::EndOfFile, "", (2, 0))),
     ]);
 }
 
@@ -233,8 +230,8 @@ fn tokenize_string_literal_with_some_characters() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_literal("some text", "\"some text\"", (0, 11))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (11, 0))),
+        Ok(literal_token("some text", "\"some text\"", (0, 11))),
+        Ok(token(TokenKind::EndOfFile, "", (11, 0))),
     ]);
 }
 
@@ -245,12 +242,12 @@ fn tokenize_string_literal_with_line_breaks() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_literal(
+        Ok(literal_token(
             "first line\nsecond line\r\nthird line",
             "\"first line\nsecond line\r\nthird line\"",
             (0, 36),
         )),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (36, 0))),
+        Ok(token(TokenKind::EndOfFile, "", (36, 0))),
     ]);
 }
 
@@ -265,7 +262,7 @@ fn tokenize_string_literal_which_is_unterminated() {
             code: LexingErrorCode::UnterminatedStringLiteral("\"some text".to_string()),
             location: (0, 10).into(),
         }),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (10, 0))),
+        Ok(token(TokenKind::EndOfFile, "", (10, 0))),
     ]);
 }
 
@@ -276,8 +273,8 @@ fn tokenize_number_literal_integer_0() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_literal(0., "0", (0, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (1, 0))),
+        Ok(literal_token(0., "0", (0, 1))),
+        Ok(token(TokenKind::EndOfFile, "", (1, 0))),
     ]);
 }
 
@@ -288,8 +285,8 @@ fn tokenize_number_literal_integer_256() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_literal(256., "256", (0, 3))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (3, 0))),
+        Ok(literal_token(256., "256", (0, 3))),
+        Ok(token(TokenKind::EndOfFile, "", (3, 0))),
     ]);
 }
 
@@ -300,8 +297,8 @@ fn tokenize_number_literal_float_1_98() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_literal(1.98, "1.98", (0, 4))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (4, 0))),
+        Ok(literal_token(1.98, "1.98", (0, 4))),
+        Ok(token(TokenKind::EndOfFile, "", (4, 0))),
     ]);
 }
 
@@ -312,12 +309,12 @@ fn tokenize_list_of_number_literal_float_1_98() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_literal(811.2344, "811.2344", (0, 8))),
-        Ok(Token::new_nonliteral(TokenKind::Comma, ",", (8, 1))),
-        Ok(Token::new_literal(5.0, "5.0", (10, 3))),
-        Ok(Token::new_nonliteral(TokenKind::Comma, ",", (13, 1))),
-        Ok(Token::new_literal(0.67, "0.67", (15, 4))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (19, 0))),
+        Ok(literal_token(811.2344, "811.2344", (0, 8))),
+        Ok(token(TokenKind::Comma, ",", (8, 1))),
+        Ok(literal_token(5.0, "5.0", (10, 3))),
+        Ok(token(TokenKind::Comma, ",", (13, 1))),
+        Ok(literal_token(0.67, "0.67", (15, 4))),
+        Ok(token(TokenKind::EndOfFile, "", (19, 0))),
     ]);
 }
 
@@ -328,12 +325,12 @@ fn tokenize_number_literal_with_trailing_dot() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_literal(400., "400", (0, 3))),
-        Ok(Token::new_nonliteral(TokenKind::Comma, ",", (3, 1))),
-        Ok(Token::new_literal(4., "4.", (5, 2))),
-        Ok(Token::new_nonliteral(TokenKind::Comma, ",", (7, 1))),
-        Ok(Token::new_literal(655., "655", (9, 3))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (12, 0))),
+        Ok(literal_token(400., "400", (0, 3))),
+        Ok(token(TokenKind::Comma, ",", (3, 1))),
+        Ok(literal_token(4., "4.", (5, 2))),
+        Ok(token(TokenKind::Comma, ",", (7, 1))),
+        Ok(literal_token(655., "655", (9, 3))),
+        Ok(token(TokenKind::EndOfFile, "", (12, 0))),
     ]);
 }
 
@@ -344,10 +341,10 @@ fn tokenize_number_literal_with_leading_dot() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_literal(400., "400", (0, 3))),
-        Ok(Token::new_nonliteral(TokenKind::Dot, ".", (4, 1))),
-        Ok(Token::new_literal(655., "655", (5, 3))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (8, 0))),
+        Ok(literal_token(400., "400", (0, 3))),
+        Ok(token(TokenKind::Dot, ".", (4, 1))),
+        Ok(literal_token(655., "655", (5, 3))),
+        Ok(token(TokenKind::EndOfFile, "", (8, 0))),
     ]);
 }
 
@@ -358,10 +355,10 @@ fn tokenize_number_literal_with_two_dots() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_literal(123.456, "123.456", (0, 7))),
-        Ok(Token::new_nonliteral(TokenKind::Dot, ".", (7, 1))),
-        Ok(Token::new_literal(789., "789", (8, 3))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (11, 0))),
+        Ok(literal_token(123.456, "123.456", (0, 7))),
+        Ok(token(TokenKind::Dot, ".", (7, 1))),
+        Ok(literal_token(789., "789", (8, 3))),
+        Ok(token(TokenKind::EndOfFile, "", (11, 0))),
     ]);
 }
 
@@ -372,8 +369,8 @@ fn tokenize_number_literal_with_trailing_dot_at_end_of_file() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_literal(777., "777.", (1, 4))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (5, 0))),
+        Ok(literal_token(777., "777.", (1, 4))),
+        Ok(token(TokenKind::EndOfFile, "", (5, 0))),
     ]);
 }
 
@@ -384,8 +381,8 @@ fn tokenize_identifier_letters_only() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_identifier("someIdentifier", (0, 14))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (14, 0))),
+        Ok(identifier("someIdentifier", (0, 14))),
+        Ok(token(TokenKind::EndOfFile, "", (14, 0))),
     ]);
 }
 
@@ -396,8 +393,8 @@ fn tokenize_identifier_alphanumeric() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_identifier("club42", (0, 6))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (6, 0))),
+        Ok(identifier("club42", (0, 6))),
+        Ok(token(TokenKind::EndOfFile, "", (6, 0))),
     ]);
 }
 
@@ -408,8 +405,8 @@ fn tokenize_identifier_starting_with_underscore() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_identifier("_identifierWithUnderscore", (0, 25))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (25, 0))),
+        Ok(identifier("_identifierWithUnderscore", (0, 25))),
+        Ok(token(TokenKind::EndOfFile, "", (25, 0))),
     ]);
 }
 
@@ -420,9 +417,9 @@ fn tokenize_identifier_and_semicolon() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_identifier("number2add", (0, 10))),
-        Ok(Token::new_nonliteral(TokenKind::Semicolon, ";", (10, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (11, 0))),
+        Ok(identifier("number2add", (0, 10))),
+        Ok(token(TokenKind::Semicolon, ";", (10, 1))),
+        Ok(token(TokenKind::EndOfFile, "", (11, 0))),
     ]);
 }
 
@@ -433,8 +430,8 @@ fn tokenize_boolean_true() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::True, "true", (1, 4))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (6, 0))),
+        Ok(token(TokenKind::True, "true", (1, 4))),
+        Ok(token(TokenKind::EndOfFile, "", (6, 0))),
     ]);
 }
 
@@ -445,9 +442,9 @@ fn tokenize_boolean_false() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::False, "false", (1, 5))),
-        Ok(Token::new_nonliteral(TokenKind::Semicolon, ";", (6, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (8, 0))),
+        Ok(token(TokenKind::False, "false", (1, 5))),
+        Ok(token(TokenKind::Semicolon, ";", (6, 1))),
+        Ok(token(TokenKind::EndOfFile, "", (8, 0))),
     ]);
 }
 
@@ -458,8 +455,8 @@ fn tokenize_keyword_and() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::And, "and", (1, 3))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (5, 0))),
+        Ok(token(TokenKind::And, "and", (1, 3))),
+        Ok(token(TokenKind::EndOfFile, "", (5, 0))),
     ]);
 }
 
@@ -470,8 +467,8 @@ fn tokenize_keyword_or() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::Or, "or", (1, 2))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (4, 0))),
+        Ok(token(TokenKind::Or, "or", (1, 2))),
+        Ok(token(TokenKind::EndOfFile, "", (4, 0))),
     ]);
 }
 
@@ -482,11 +479,11 @@ fn tokenize_keyword_class() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::Class, "class", (1, 5))),
-        Ok(Token::new_identifier("Foo", (7, 3))),
-        Ok(Token::new_nonliteral(TokenKind::LeftBrace, "{", (11, 1))),
-        Ok(Token::new_nonliteral(TokenKind::RightBrace, "}", (12, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (14, 0))),
+        Ok(token(TokenKind::Class, "class", (1, 5))),
+        Ok(identifier("Foo", (7, 3))),
+        Ok(token(TokenKind::LeftBrace, "{", (11, 1))),
+        Ok(token(TokenKind::RightBrace, "}", (12, 1))),
+        Ok(token(TokenKind::EndOfFile, "", (14, 0))),
     ]);
 }
 
@@ -497,13 +494,13 @@ fn tokenize_keyword_fun() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::Fun, "fun", (1, 3))),
-        Ok(Token::new_identifier("foo", (5, 3))),
-        Ok(Token::new_nonliteral(TokenKind::LeftParen, "(", (8, 1))),
-        Ok(Token::new_nonliteral(TokenKind::RightParen, ")", (9, 1))),
-        Ok(Token::new_nonliteral(TokenKind::LeftBrace, "{", (11, 1))),
-        Ok(Token::new_nonliteral(TokenKind::RightBrace, "}", (12, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (14, 0))),
+        Ok(token(TokenKind::Fun, "fun", (1, 3))),
+        Ok(identifier("foo", (5, 3))),
+        Ok(token(TokenKind::LeftParen, "(", (8, 1))),
+        Ok(token(TokenKind::RightParen, ")", (9, 1))),
+        Ok(token(TokenKind::LeftBrace, "{", (11, 1))),
+        Ok(token(TokenKind::RightBrace, "}", (12, 1))),
+        Ok(token(TokenKind::EndOfFile, "", (14, 0))),
     ]);
 }
 
@@ -514,13 +511,13 @@ fn tokenize_keyword_super() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::Super, "super", (1, 5))),
-        Ok(Token::new_nonliteral(TokenKind::Dot, ".", (6, 1))),
-        Ok(Token::new_identifier("method", (7, 6))),
-        Ok(Token::new_nonliteral(TokenKind::LeftParen, "(", (13, 1))),
-        Ok(Token::new_nonliteral(TokenKind::RightParen, ")", (14, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Semicolon, ";", (15, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (17, 0))),
+        Ok(token(TokenKind::Super, "super", (1, 5))),
+        Ok(token(TokenKind::Dot, ".", (6, 1))),
+        Ok(identifier("method", (7, 6))),
+        Ok(token(TokenKind::LeftParen, "(", (13, 1))),
+        Ok(token(TokenKind::RightParen, ")", (14, 1))),
+        Ok(token(TokenKind::Semicolon, ";", (15, 1))),
+        Ok(token(TokenKind::EndOfFile, "", (17, 0))),
     ]);
 }
 
@@ -531,13 +528,13 @@ fn tokenize_keyword_this() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::This, "this", (1, 4))),
-        Ok(Token::new_nonliteral(TokenKind::Dot, ".", (5, 1))),
-        Ok(Token::new_identifier("name", (6, 4))),
-        Ok(Token::new_nonliteral(TokenKind::Equal, "=", (11, 1))),
-        Ok(Token::new_literal("John", "\"John\"", (13, 6))),
-        Ok(Token::new_nonliteral(TokenKind::Semicolon, ";", (19, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (21, 0))),
+        Ok(token(TokenKind::This, "this", (1, 4))),
+        Ok(token(TokenKind::Dot, ".", (5, 1))),
+        Ok(identifier("name", (6, 4))),
+        Ok(token(TokenKind::Equal, "=", (11, 1))),
+        Ok(literal_token("John", "\"John\"", (13, 6))),
+        Ok(token(TokenKind::Semicolon, ";", (19, 1))),
+        Ok(token(TokenKind::EndOfFile, "", (21, 0))),
     ]);
 }
 
@@ -548,12 +545,12 @@ fn tokenize_keyword_var() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::Var, "var", (1, 3))),
-        Ok(Token::new_identifier("x", (5, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Equal, "=", (7, 1))),
-        Ok(Token::new_literal(10., "10", (9, 2))),
-        Ok(Token::new_nonliteral(TokenKind::Semicolon, ";", (11, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (13, 0))),
+        Ok(token(TokenKind::Var, "var", (1, 3))),
+        Ok(identifier("x", (5, 1))),
+        Ok(token(TokenKind::Equal, "=", (7, 1))),
+        Ok(literal_token(10., "10", (9, 2))),
+        Ok(token(TokenKind::Semicolon, ";", (11, 1))),
+        Ok(token(TokenKind::EndOfFile, "", (13, 0))),
     ]);
 }
 
@@ -564,8 +561,8 @@ fn tokenize_keyword_nil() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::Nil, "nil", (1, 3))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (5, 0))),
+        Ok(token(TokenKind::Nil, "nil", (1, 3))),
+        Ok(token(TokenKind::EndOfFile, "", (5, 0))),
     ]);
 }
 
@@ -576,10 +573,10 @@ fn tokenize_keyword_return() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::Return, "return", (1, 6))),
-        Ok(Token::new_literal(42., "42", (8, 2))),
-        Ok(Token::new_nonliteral(TokenKind::Semicolon, ";", (10, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (12, 0))),
+        Ok(token(TokenKind::Return, "return", (1, 6))),
+        Ok(literal_token(42., "42", (8, 2))),
+        Ok(token(TokenKind::Semicolon, ";", (10, 1))),
+        Ok(token(TokenKind::EndOfFile, "", (12, 0))),
     ]);
 }
 
@@ -590,18 +587,18 @@ fn tokenize_keywords_if_else() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::If, "if", (1, 2))),
-        Ok(Token::new_nonliteral(TokenKind::LeftParen, "(", (4, 1))),
-        Ok(Token::new_identifier("x", (5, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EqualEqual, "==", (7, 2))),
-        Ok(Token::new_literal(99., "99", (10, 2))),
-        Ok(Token::new_nonliteral(TokenKind::RightParen, ")", (12, 1))),
-        Ok(Token::new_nonliteral(TokenKind::LeftBrace, "{", (14, 1))),
-        Ok(Token::new_nonliteral(TokenKind::RightBrace, "}", (16, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Else, "else", (18, 4))),
-        Ok(Token::new_nonliteral(TokenKind::LeftBrace, "{", (23, 1))),
-        Ok(Token::new_nonliteral(TokenKind::RightBrace, "}", (25, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (27, 0))),
+        Ok(token(TokenKind::If, "if", (1, 2))),
+        Ok(token(TokenKind::LeftParen, "(", (4, 1))),
+        Ok(identifier("x", (5, 1))),
+        Ok(token(TokenKind::EqualEqual, "==", (7, 2))),
+        Ok(literal_token(99., "99", (10, 2))),
+        Ok(token(TokenKind::RightParen, ")", (12, 1))),
+        Ok(token(TokenKind::LeftBrace, "{", (14, 1))),
+        Ok(token(TokenKind::RightBrace, "}", (16, 1))),
+        Ok(token(TokenKind::Else, "else", (18, 4))),
+        Ok(token(TokenKind::LeftBrace, "{", (23, 1))),
+        Ok(token(TokenKind::RightBrace, "}", (25, 1))),
+        Ok(token(TokenKind::EndOfFile, "", (27, 0))),
     ]);
 }
 
@@ -612,14 +609,14 @@ fn tokenize_keyword_for() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::For, "for", (1, 3))),
-        Ok(Token::new_nonliteral(TokenKind::LeftParen, "(", (5, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Semicolon, ";", (6, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Semicolon, ";", (7, 1))),
-        Ok(Token::new_nonliteral(TokenKind::RightParen, ")", (8, 1))),
-        Ok(Token::new_nonliteral(TokenKind::LeftBrace, "{", (10, 1))),
-        Ok(Token::new_nonliteral(TokenKind::RightBrace, "}", (12, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (14, 0))),
+        Ok(token(TokenKind::For, "for", (1, 3))),
+        Ok(token(TokenKind::LeftParen, "(", (5, 1))),
+        Ok(token(TokenKind::Semicolon, ";", (6, 1))),
+        Ok(token(TokenKind::Semicolon, ";", (7, 1))),
+        Ok(token(TokenKind::RightParen, ")", (8, 1))),
+        Ok(token(TokenKind::LeftBrace, "{", (10, 1))),
+        Ok(token(TokenKind::RightBrace, "}", (12, 1))),
+        Ok(token(TokenKind::EndOfFile, "", (14, 0))),
     ]);
 }
 
@@ -630,15 +627,15 @@ fn tokenize_keyword_while() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::While, "while", (1, 5))),
-        Ok(Token::new_nonliteral(TokenKind::LeftParen, "(", (7, 1))),
-        Ok(Token::new_identifier("x", (8, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Greater, ">", (10, 1))),
-        Ok(Token::new_literal(0., "0", (12, 1))),
-        Ok(Token::new_nonliteral(TokenKind::RightParen, ")", (13, 1))),
-        Ok(Token::new_nonliteral(TokenKind::LeftBrace, "{", (15, 1))),
-        Ok(Token::new_nonliteral(TokenKind::RightBrace, "}", (17, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (19, 0))),
+        Ok(token(TokenKind::While, "while", (1, 5))),
+        Ok(token(TokenKind::LeftParen, "(", (7, 1))),
+        Ok(identifier("x", (8, 1))),
+        Ok(token(TokenKind::Greater, ">", (10, 1))),
+        Ok(literal_token(0., "0", (12, 1))),
+        Ok(token(TokenKind::RightParen, ")", (13, 1))),
+        Ok(token(TokenKind::LeftBrace, "{", (15, 1))),
+        Ok(token(TokenKind::RightBrace, "}", (17, 1))),
+        Ok(token(TokenKind::EndOfFile, "", (19, 0))),
     ]);
 }
 
@@ -649,16 +646,12 @@ fn tokenize_keyword_print() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::Print, "print", (1, 5))),
-        Ok(Token::new_nonliteral(TokenKind::LeftParen, "(", (6, 1))),
-        Ok(Token::new_literal(
-            "Hello, world!",
-            "\"Hello, world!\"",
-            (7, 15),
-        )),
-        Ok(Token::new_nonliteral(TokenKind::RightParen, ")", (22, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Semicolon, ";", (23, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (25, 0))),
+        Ok(token(TokenKind::Print, "print", (1, 5))),
+        Ok(token(TokenKind::LeftParen, "(", (6, 1))),
+        Ok(literal_token("Hello, world!", "\"Hello, world!\"", (7, 15))),
+        Ok(token(TokenKind::RightParen, ")", (22, 1))),
+        Ok(token(TokenKind::Semicolon, ";", (23, 1))),
+        Ok(token(TokenKind::EndOfFile, "", (25, 0))),
     ]);
 }
 
@@ -669,9 +662,9 @@ fn tokenize_bang_identifier() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_nonliteral(TokenKind::Bang, "!", (0, 1))),
-        Ok(Token::new_identifier("a", (1, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (2, 0))),
+        Ok(token(TokenKind::Bang, "!", (0, 1))),
+        Ok(identifier("a", (1, 1))),
+        Ok(token(TokenKind::EndOfFile, "", (2, 0))),
     ]);
 }
 
@@ -682,11 +675,11 @@ fn tokenize_equal_string_literal() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_identifier("a", (0, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Equal, "=", (1, 1))),
-        Ok(Token::new_literal("Jane", "\"Jane\"", (2, 6))),
-        Ok(Token::new_nonliteral(TokenKind::Semicolon, ";", (8, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (9, 0))),
+        Ok(identifier("a", (0, 1))),
+        Ok(token(TokenKind::Equal, "=", (1, 1))),
+        Ok(literal_token("Jane", "\"Jane\"", (2, 6))),
+        Ok(token(TokenKind::Semicolon, ";", (8, 1))),
+        Ok(token(TokenKind::EndOfFile, "", (9, 0))),
     ]);
 }
 
@@ -697,10 +690,10 @@ fn tokenize_greater_number_literal() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_identifier("a", (0, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Greater, ">", (1, 1))),
-        Ok(Token::new_literal(0.5, "0.5", (2, 3))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (5, 0))),
+        Ok(identifier("a", (0, 1))),
+        Ok(token(TokenKind::Greater, ">", (1, 1))),
+        Ok(literal_token(0.5, "0.5", (2, 3))),
+        Ok(token(TokenKind::EndOfFile, "", (5, 0))),
     ]);
 }
 
@@ -711,10 +704,10 @@ fn tokenize_less_number_literal() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_identifier("a", (0, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Less, "<", (1, 1))),
-        Ok(Token::new_literal(18., "18", (2, 2))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (4, 0))),
+        Ok(identifier("a", (0, 1))),
+        Ok(token(TokenKind::Less, "<", (1, 1))),
+        Ok(literal_token(18., "18", (2, 2))),
+        Ok(token(TokenKind::EndOfFile, "", (4, 0))),
     ]);
 }
 
@@ -725,10 +718,10 @@ fn tokenize_slash_number_literal() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_identifier("a", (0, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Slash, "/", (1, 1))),
-        Ok(Token::new_literal(2.5, "2.5", (2, 3))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (5, 0))),
+        Ok(identifier("a", (0, 1))),
+        Ok(token(TokenKind::Slash, "/", (1, 1))),
+        Ok(literal_token(2.5, "2.5", (2, 3))),
+        Ok(token(TokenKind::EndOfFile, "", (5, 0))),
     ]);
 }
 
@@ -739,11 +732,11 @@ fn tokenize_dot_after_integer_literal() {
     let tokens = source_code.tokenize().collect::<Vec<_>>();
 
     assert_that!(tokens).contains_exactly([
-        Ok(Token::new_literal(1., "1", (0, 1))),
-        Ok(Token::new_nonliteral(TokenKind::Dot, ".", (1, 1))),
-        Ok(Token::new_identifier("neg", (2, 3))),
-        Ok(Token::new_nonliteral(TokenKind::LeftParen, "(", (5, 1))),
-        Ok(Token::new_nonliteral(TokenKind::RightParen, ")", (6, 1))),
-        Ok(Token::new_nonliteral(TokenKind::EndOfFile, "", (7, 0))),
+        Ok(literal_token(1., "1", (0, 1))),
+        Ok(token(TokenKind::Dot, ".", (1, 1))),
+        Ok(identifier("neg", (2, 3))),
+        Ok(token(TokenKind::LeftParen, "(", (5, 1))),
+        Ok(token(TokenKind::RightParen, ")", (6, 1))),
+        Ok(token(TokenKind::EndOfFile, "", (7, 0))),
     ]);
 }

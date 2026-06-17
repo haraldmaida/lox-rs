@@ -1,7 +1,11 @@
 use super::*;
-use crate::expr::{Assign, Binary, Literal, Unary};
-use crate::stmt::{Print, Var};
-use crate::token::{TokenKind, token};
+use crate::expr::{ExprExt, assign, binary, grouping, literal, nil, unary, variable};
+use crate::program::program;
+use crate::stmt::{StmtExt, print, stmt, var};
+use crate::token::{
+    bang, bang_equal, equal_equal, greater, greater_equal, identifier, less, less_equal, minus,
+    plus, slash, star,
+};
 use crate::tokenize::Tokenize;
 use asserting::prelude::*;
 
@@ -17,11 +21,7 @@ fn parse_equality_expression_literal_equal_literal() {
 
     assert_that!(result)
         .ok()
-        .is_equal_to(Expr::from(Binary::new(
-            Literal::Number(1.),
-            token(TokenKind::EqualEqual, "==", (2, 2)),
-            Literal::Number(1.),
-        )));
+        .is_equal_to(binary(literal(1.), equal_equal((2, 2)), literal(1.)).expr());
 }
 
 #[test]
@@ -32,11 +32,7 @@ fn parse_equality_expression_literal_not_equal_literal() {
 
     assert_that!(result)
         .ok()
-        .is_equal_to(Expr::from(Binary::new(
-            Literal::Number(10.),
-            token(TokenKind::BangEqual, "!=", (3, 2)),
-            Literal::Number(1.),
-        )));
+        .is_equal_to(binary(literal(10.), bang_equal((3, 2)), literal(1.)).expr());
 }
 
 #[test]
@@ -47,11 +43,7 @@ fn parse_comparison_expression_literal_greater_literal() {
 
     assert_that!(result)
         .ok()
-        .is_equal_to(Expr::from(Binary::new(
-            Literal::Number(22.),
-            token(TokenKind::Greater, ">", (3, 1)),
-            Literal::Number(1.),
-        )));
+        .is_equal_to(binary(literal(22.), greater((3, 1)), literal(1.)).expr());
 }
 
 #[test]
@@ -62,11 +54,7 @@ fn parse_comparison_expression_literal_greater_equal_literal() {
 
     assert_that!(result)
         .ok()
-        .is_equal_to(Expr::from(Binary::new(
-            Literal::Number(2.),
-            token(TokenKind::GreaterEqual, ">=", (2, 2)),
-            Literal::Number(1.),
-        )));
+        .is_equal_to(binary(literal(2.), greater_equal((2, 2)), literal(1.)).expr());
 }
 
 #[test]
@@ -77,11 +65,7 @@ fn parse_comparison_expression_literal_less_literal() {
 
     assert_that!(result)
         .ok()
-        .is_equal_to(Expr::from(Binary::new(
-            Literal::Number(2.),
-            token(TokenKind::Less, "<", (2, 1)),
-            Literal::Number(11.),
-        )));
+        .is_equal_to(binary(literal(2.), less((2, 1)), literal(11.)).expr());
 }
 
 #[test]
@@ -92,11 +76,7 @@ fn parse_comparison_expression_literal_less_equal_literal() {
 
     assert_that!(result)
         .ok()
-        .is_equal_to(Expr::from(Binary::new(
-            Literal::Number(22.),
-            token(TokenKind::LessEqual, "<=", (3, 2)),
-            Literal::Number(111.),
-        )));
+        .is_equal_to(binary(literal(22.), less_equal((3, 2)), literal(111.)).expr());
 }
 
 #[test]
@@ -107,11 +87,7 @@ fn parse_term_expression_literal_minus_literal() {
 
     assert_that!(result)
         .ok()
-        .is_equal_to(Expr::from(Binary::new(
-            Literal::Number(2.),
-            token(TokenKind::Minus, "-", (2, 1)),
-            Literal::Number(1.),
-        )));
+        .is_equal_to(binary(literal(2.), minus((2, 1)), literal(1.)).expr());
 }
 
 #[test]
@@ -122,11 +98,7 @@ fn parse_term_expression_literal_plus_literal() {
 
     assert_that!(result)
         .ok()
-        .is_equal_to(Expr::from(Binary::new(
-            Literal::Number(22.),
-            token(TokenKind::Plus, "+", (3, 1)),
-            Literal::Number(11.),
-        )));
+        .is_equal_to(binary(literal(22.), plus((3, 1)), literal(11.)).expr());
 }
 
 #[test]
@@ -137,11 +109,7 @@ fn parse_term_expression_literal_multiplied_by_literal() {
 
     assert_that!(result)
         .ok()
-        .is_equal_to(Expr::from(Binary::new(
-            Literal::Number(22.),
-            token(TokenKind::Star, "*", (3, 1)),
-            Literal::Number(11.),
-        )));
+        .is_equal_to(binary(literal(22.), star((3, 1)), literal(11.)).expr());
 }
 
 #[test]
@@ -152,11 +120,7 @@ fn parse_term_expression_literal_divided_by_literal() {
 
     assert_that!(result)
         .ok()
-        .is_equal_to(Expr::from(Binary::new(
-            Literal::Number(6.),
-            token(TokenKind::Slash, "/", (2, 1)),
-            Literal::Number(2.),
-        )));
+        .is_equal_to(binary(literal(6.), slash((2, 1)), literal(2.)).expr());
 }
 
 #[test]
@@ -165,10 +129,9 @@ fn parse_unary_expression_not_literal() {
 
     let result = source_code.tokenize().parse_expr();
 
-    assert_that!(result).ok().is_equal_to(Expr::from(Unary::new(
-        token(TokenKind::Bang, "!", (0, 1)),
-        Literal::Bool(true),
-    )));
+    assert_that!(result)
+        .ok()
+        .is_equal_to(unary(bang((0, 1)), literal(true)).expr());
 }
 
 #[test]
@@ -177,10 +140,9 @@ fn parse_unary_expression_negate_literal() {
 
     let result = source_code.tokenize().parse_expr();
 
-    assert_that!(result).ok().is_equal_to(Expr::from(Unary::new(
-        token(TokenKind::Minus, "-", (0, 1)),
-        Literal::Number(42.),
-    )));
+    assert_that!(result)
+        .ok()
+        .is_equal_to(unary(minus((0, 1)), literal(42.)).expr());
 }
 
 #[test]
@@ -189,9 +151,7 @@ fn parse_primary_literal_nil() {
 
     let result = source_code.tokenize().parse_expr();
 
-    assert_that!(result)
-        .ok()
-        .is_equal_to(Expr::from(Literal::Nil));
+    assert_that!(result).ok().is_equal_to(nil().expr());
 }
 
 #[test]
@@ -200,9 +160,7 @@ fn parse_primary_literal_false() {
 
     let result = source_code.tokenize().parse_expr();
 
-    assert_that!(result)
-        .ok()
-        .is_equal_to(Expr::from(Literal::Bool(false)));
+    assert_that!(result).ok().is_equal_to(literal(false).expr());
 }
 
 #[test]
@@ -244,21 +202,18 @@ fn parse_primary_literal_parens() {
 
     let result = source_code.tokenize().parse_expr();
 
-    assert_that!(result)
-        .ok()
-        .is_equal_to(Expr::from(Binary::new(
-            Grouping::new(Binary::new(
-                Literal::Number(5.),
-                token(TokenKind::Minus, "-", (3, 1)),
-                Grouping::new(Binary::new(
-                    Literal::Number(3.),
-                    token(TokenKind::Minus, "-", (8, 1)),
-                    Literal::Number(1.),
-                )),
+    assert_that!(result).ok().is_equal_to(
+        binary(
+            grouping(binary(
+                literal(5.),
+                minus((3, 1)),
+                grouping(binary(literal(3.), minus((8, 1)), literal(1.))),
             )),
-            token(TokenKind::Plus, "+", (14, 1)),
-            Unary::new(token(TokenKind::Minus, "-", (16, 1)), Literal::Number(1.)),
-        )));
+            plus((14, 1)),
+            unary(minus((16, 1)), literal(1.)),
+        )
+        .expr(),
+    );
 }
 
 #[test]
@@ -279,13 +234,9 @@ fn parse_expression_statement() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result)
-        .ok()
-        .is_equal_to(Program::from_iter([Stmt::from(Expr::from(Binary::new(
-            Literal::Number(84.),
-            token(TokenKind::Slash, "/", (3, 1)),
-            Literal::Number(2.),
-        )))]));
+    assert_that!(result).ok().is_equal_to(program([stmt(
+        binary(literal(84.), slash((3, 1)), literal(2.)).expr(),
+    )]));
 }
 
 #[test]
@@ -296,9 +247,7 @@ fn parse_print_string_literal() {
 
     assert_that!(result)
         .ok()
-        .is_equal_to(Program::from_iter([Stmt::Print(Print::new(Expr::from(
-            Literal::String("Hello, World!".into()),
-        )))]));
+        .is_equal_to(program([print(literal("Hello, World!")).stmt()]));
 }
 
 #[test]
@@ -307,12 +256,11 @@ fn parse_declaration_of_variable() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result)
-        .ok()
-        .is_equal_to(Program::from_iter([Stmt::Var(Var::new(
-            token(TokenKind::Identifier, "x", (4, 1)),
-            Expr::from(Literal::Number(42.)),
-        ))]));
+    assert_that!(result).ok().is_equal_to(program([var(
+        identifier("x", (4, 1)),
+        literal(42.).expr(),
+    )
+    .stmt()]));
 }
 
 #[test]
@@ -323,9 +271,7 @@ fn parse_print_variable() {
 
     assert_that!(result)
         .ok()
-        .is_equal_to(Program::from_iter([Stmt::Print(Print::new(Expr::from(
-            Variable::new(token(TokenKind::Identifier, "foo", (6, 3))),
-        )))]));
+        .is_equal_to(program([print(variable(identifier("foo", (6, 3)))).stmt()]));
 }
 
 #[test]
@@ -334,15 +280,11 @@ fn parse_assignment_to_variable() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(Program::from_iter([
-        Stmt::Var(Var::new(
-            token(TokenKind::Identifier, "foo", (4, 3)),
-            Expr::from(Literal::String("before".into())),
-        )),
-        Stmt::from(Expr::Assign(Assign::new(
-            token(TokenKind::Identifier, "foo", (20, 3)),
-            Literal::String("after".into()),
-        ))),
+    assert_that!(result).ok().is_equal_to(program([
+        var(identifier("foo", (4, 3)), literal("before").expr()).stmt(),
+        assign(identifier("foo", (20, 3)), literal("after"))
+            .expr()
+            .stmt(),
     ]));
 }
 
