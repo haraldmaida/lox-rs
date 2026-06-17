@@ -297,7 +297,7 @@ mod token {
     fn display_format_string_literal() {
         let token = Token {
             kind: TokenKind::StringLiteral,
-            literal: Some(Literal::String("Hello, World!")),
+            literal: Some(Literal::String("Hello, World!".into())),
             lexeme: "\"Hello, World!\"",
             location: (2, 1).into(),
         };

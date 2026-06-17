@@ -78,7 +78,7 @@ where
             Literal::Nil => self.write_str("nil"),
             Literal::Bool(value) => self.write_bool(*value),
             Literal::Number(value) => self.write_f64(*value),
-            Literal::String(value) => self.write_str(value),
+            Literal::String(value) => self.write_str(value.as_str()),
         }
     }
 

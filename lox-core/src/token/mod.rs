@@ -1,3 +1,4 @@
+use crate::data::Symbol;
 use miette::SourceSpan;
 use std::fmt;
 use std::fmt::{Debug, Display};
@@ -137,12 +138,12 @@ impl Display for TokenKind {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Literal<'a> {
+pub enum Literal {
     Number(f64),
-    String(&'a str),
+    String(Symbol),
 }
 
-impl Display for Literal<'_> {
+impl Display for Literal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Number(value) => {
@@ -157,22 +158,22 @@ impl Display for Literal<'_> {
     }
 }
 
-impl From<f64> for Literal<'_> {
+impl From<f64> for Literal {
     fn from(value: f64) -> Self {
         Self::Number(value)
     }
 }
 
-impl<'a> From<&'a str> for Literal<'a> {
+impl<'a> From<&'a str> for Literal {
     fn from(value: &'a str) -> Self {
-        Self::String(value)
+        Self::String(Symbol::intern(value))
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Token<'a> {
     pub kind: TokenKind,
-    pub literal: Option<Literal<'a>>,
+    pub literal: Option<Literal>,
     pub lexeme: &'a str,
     pub location: SourceSpan,
 }
@@ -180,7 +181,7 @@ pub struct Token<'a> {
 impl<'a> Token<'a> {
     pub const fn new(
         kind: TokenKind,
-        literal: Option<Literal<'a>>,
+        literal: Option<Literal>,
         lexeme: &'a str,
         location: SourceSpan,
     ) -> Self {
@@ -206,7 +207,7 @@ impl<'a> Token<'a> {
     }
 
     pub fn new_literal(
-        literal: impl Into<Literal<'a>>,
+        literal: impl Into<Literal>,
         lexeme: &'a str,
         location: impl Into<SourceSpan>,
     ) -> Self {
@@ -236,7 +237,7 @@ impl<'a> Token<'a> {
         self.kind
     }
 
-    pub const fn literal(&self) -> Option<&Literal<'a>> {
+    pub const fn literal(&self) -> Option<&Literal> {
         self.literal.as_ref()
     }
 

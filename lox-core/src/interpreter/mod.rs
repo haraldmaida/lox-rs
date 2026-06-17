@@ -1,3 +1,4 @@
+use crate::data::{Symbol, Value};
 use crate::expr::{
     Assign, Binary, Call, Expr, ExprElement, ExprVisitor, Get, Grouping, Literal, Logical, Set,
     Super, This, Unary, Variable,
@@ -11,45 +12,6 @@ use std::fmt::Display;
 #[cfg(test)]
 mod tests;
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub enum Value {
-    Nil,
-    Bool(bool),
-    Number(f64),
-    String(String),
-}
-
-impl Display for Value {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Nil => write!(f, "nil"),
-            Self::Bool(value) => write!(f, "{value}"),
-            Self::Number(value) => write!(f, "{value}"),
-            Self::String(value) => write!(f, "{value}"),
-        }
-    }
-}
-
-impl Value {
-    /// Returns whether this value is true for all types.
-    ///
-    /// In dynamically typed languages, logical operations can be applied to any
-    /// type of value. Each language defines what values are "truthy" and what
-    /// are not.
-    ///
-    /// For Lox, we follow the simple rules of Lua and Ruby:
-    ///
-    /// * `false` and `nil` are falsy
-    /// * everything else is truthy
-    pub const fn is_truthy(&self) -> bool {
-        match self {
-            Self::Nil => false,
-            Self::Bool(value) => *value,
-            _ => true,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuntimeErrorCode {
     /// This error should never occur. However, if it does occur, it is a bug
@@ -61,17 +23,34 @@ pub enum RuntimeErrorCode {
     OperandNotANumber,
     OperandNotANumberOrString,
     OperandsOfDifferentType,
+    UndefinedVariable(Symbol),
 }
 
 impl Display for RuntimeErrorCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            Self::NotABinaryOperator => "not a binary operator where a binary operator like '=', '+', '-', '*' or '/' is expected",
-            Self::NotAnUnaryOperator => "not an unary operator where an unary operator like '!' or '-'  is expected",
-            Self::OperandNotANumber => "operand is not a number but the operator requires all operands to be numbers",
-            Self::OperandNotANumberOrString => "operand is not a number or a string but the operator requires all operands to be either numbers or strings",
-            Self::OperandsOfDifferentType => "operands are of different type but the operator requires all operands to be of the same type",
-        })
+        match self {
+            Self::NotABinaryOperator => write!(
+                f,
+                "not a binary operator where a binary operator like '=', '+', '-', '*' or '/' is expected"
+            ),
+            Self::NotAnUnaryOperator => write!(
+                f,
+                "not an unary operator where an unary operator like '!' or '-'  is expected"
+            ),
+            Self::OperandNotANumber => write!(
+                f,
+                "operand is not a number but the operator requires all operands to be numbers"
+            ),
+            Self::OperandNotANumberOrString => write!(
+                f,
+                "operand is not a number or a string but the operator requires all operands to be either numbers or strings"
+            ),
+            Self::OperandsOfDifferentType => write!(
+                f,
+                "operands are of different type but the operator requires all operands to be of the same type"
+            ),
+            Self::UndefinedVariable(symbol) => write!(f, "undefined variable '{symbol}'"),
+        }
     }
 }
 
@@ -80,8 +59,6 @@ impl Display for RuntimeErrorCode {
 pub struct RuntimeError {
     code: RuntimeErrorCode,
     operation: TokenKind,
-    #[help]
-    help: Option<String>,
     #[label]
     location: SourceSpan,
 }
@@ -91,7 +68,6 @@ impl RuntimeError {
         Self {
             code,
             operation: token.kind,
-            help: None,
             location: token.location,
         }
     }
@@ -102,10 +78,6 @@ impl RuntimeError {
 
     pub const fn operation(&self) -> TokenKind {
         self.operation
-    }
-
-    pub fn help(&self) -> Option<&str> {
-        self.help.as_deref()
     }
 
     pub const fn location(&self) -> SourceSpan {
@@ -215,7 +187,7 @@ impl ExprVisitor for Interpreter {
             Literal::Nil => Ok(Value::Nil),
             Literal::Bool(value) => Ok(Value::Bool(*value)),
             Literal::Number(value) => Ok(Value::Number(*value)),
-            Literal::String(value) => Ok(Value::String(value.clone())),
+            Literal::String(value) => Ok(Value::String(value.to_string())),
         }
     }
 

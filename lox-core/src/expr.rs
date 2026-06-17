@@ -1,3 +1,4 @@
+use crate::data::Symbol;
 use crate::token::Token;
 
 pub trait ExprVisitor {
@@ -216,12 +217,12 @@ impl<'a> Grouping<'a> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Literal {
     Nil,
     Bool(bool),
     Number(f64),
-    String(String),
+    String(Symbol),
 }
 
 impl From<bool> for Literal {
@@ -250,7 +251,7 @@ impl From<i32> for Literal {
 
 impl From<String> for Literal {
     fn from(value: String) -> Self {
-        Self::String(value)
+        Self::String(value.into())
     }
 }
 

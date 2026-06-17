@@ -17,6 +17,8 @@ lox-core = { path = "lox-core" }
 
 # external dependencies
 clap = { version = "4", features = ["derive"] }
+hashbrown = "0.17"
+lasso = { version = "0.7", features = ["multi-threaded"] }
 miette = { version = "7", features = ["fancy"] }
 thiserror = "2"
 

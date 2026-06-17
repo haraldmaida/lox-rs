@@ -201,7 +201,7 @@ impl<'a> Tokens<'a> {
         let value = lexeme.trim_matches('"');
         Ok(Token::new(
             TokenKind::StringLiteral,
-            Some(Literal::String(value)),
+            Some(Literal::String(value.into())),
             lexeme,
             location,
         ))

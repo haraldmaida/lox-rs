@@ -5,8 +5,14 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 
+[features]
+proptest_support = ["dep:proptest"]
+
 [dependencies]
+hashbrown = { workspace = true }
+lasso = { workspace = true }
 miette = { workspace = true }
+proptest = { workspace = true, optional = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]

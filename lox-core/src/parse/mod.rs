@@ -394,7 +394,7 @@ where
                 },
                 TokenKind::StringLiteral => {
                     if let Some(token::Literal::String(value)) = token.literal {
-                        Ok(Literal::String(value.to_string()).into())
+                        Ok(Literal::String(value).into())
                     } else {
                         unreachable!("invalid string token {token:?}! please file a bug report.")
                     }
