@@ -873,8 +873,7 @@ fn execute_var_stmt_with_initializer() {
     let result = interpreter.execute(&stmt);
 
     assert_that!(result).is_ok();
-    assert_that!(interpreter.environment().get("my_var".into()))
-        .is_equal_to(Ok(&Value::Number(42.)));
+    assert_that!(interpreter.environment().get("my_var")).is_equal_to(Ok(&Value::Number(42.)));
 }
 
 #[test]
@@ -885,7 +884,7 @@ fn execute_var_stmt_without_initializer() {
     let result = interpreter.execute(&stmt);
 
     assert_that!(result).is_ok();
-    assert_that!(interpreter.environment().get("foo".into())).is_equal_to(Ok(&Value::Nil));
+    assert_that!(interpreter.environment().get("foo")).is_equal_to(Ok(&Value::Nil));
 }
 
 #[test]
@@ -916,7 +915,7 @@ fn execute_var_stmt_with_variable_expression() {
     let result = interpreter.execute(&var_stmt);
 
     assert_that!(result).is_ok();
-    assert_that!(interpreter.environment().get("foo".into())).is_equal_to(Ok(&Value::Number(5.)));
+    assert_that!(interpreter.environment().get("foo")).is_equal_to(Ok(&Value::Number(5.)));
 }
 
 #[test]
@@ -955,7 +954,7 @@ fn evaluate_assign_expr_stmt_to_existing_variable() {
     let assign_result = interpreter.evaluate(&assign_to_foo);
 
     assert_that!(assign_result).is_equal_to(Ok(Value::Number(99.)));
-    assert_that!(interpreter.environment().get("foo".into())).is_equal_to(Ok(&Value::Number(99.)));
+    assert_that!(interpreter.environment().get("foo")).is_equal_to(Ok(&Value::Number(99.)));
 }
 
 #[test]
@@ -982,7 +981,7 @@ fn evaluate_assign_expr_stmt_to_not_existing_variable() {
             RuntimeErrorCode::UndefinedVariable("foo".into()),
             token(TokenKind::Identifier, "foo", (23, 3)),
         ));
-    assert_that!(interpreter.environment().get("foo".into()))
+    assert_that!(interpreter.environment().get("foo"))
         .is_equal_to(Err(EnvironmentError::UndefinedVariable("foo".into())));
-    assert_that!(interpreter.environment().get("a".into())).is_equal_to(Ok(&Value::Number(123.)));
+    assert_that!(interpreter.environment().get("a")).is_equal_to(Ok(&Value::Number(123.)));
 }
