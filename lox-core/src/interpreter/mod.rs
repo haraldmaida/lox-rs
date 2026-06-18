@@ -5,7 +5,7 @@ use crate::expr::{
     Super, This, Unary, Variable,
 };
 use crate::runtime::RuntimeContext;
-use crate::stmt::{Block, Expression, Print, Stmt, StmtElement, StmtVisitor, Var};
+use crate::stmt::{Block, Expression, If, Print, Stmt, StmtElement, StmtVisitor, Var};
 use crate::token::{Token, TokenKind};
 use miette::{Diagnostic, SourceSpan};
 use std::fmt;
@@ -285,6 +285,10 @@ impl StmtVisitor for Interpreter {
     ) -> Self::Output {
         self.evaluate(stmt.expression())?;
         Ok(())
+    }
+
+    fn visit_if_stmt(&mut self, _rtc: &mut RuntimeContext<'_>, _stmt: &If) -> Self::Output {
+        todo!()
     }
 
     fn visit_print_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Print) -> Self::Output {

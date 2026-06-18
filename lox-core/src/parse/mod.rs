@@ -1,6 +1,6 @@
 use crate::expr::{Assign, Binary, Expr, Grouping, Literal, Unary, Variable};
 use crate::program::Program;
-use crate::stmt::{Block, Expression, Print, Stmt, Var};
+use crate::stmt::{Block, Expression, If, Print, Stmt, Var};
 use crate::token;
 use crate::token::{Token, TokenKind};
 use crate::tokenize::{LexingError, LexingErrorCode};
@@ -238,7 +238,7 @@ where
                 TokenKind::Var => Some(self.var_declaration()),
                 _ => {
                     self.revert(token);
-                    self.statement()
+                    Some(self.statement())
                 },
             },
             Err(err) => Some(Err(err)),
@@ -274,25 +274,26 @@ where
                 TokenKind::Var => Some(self.var_declaration()),
                 _ => {
                     self.revert(token);
-                    self.statement()
+                    Some(self.statement())
                 },
             },
             Err(err) => Some(Err(err)),
         }
     }
 
-    fn statement(&mut self) -> Option<Result<Stmt<'a>, SyntaxError>> {
+    fn statement(&mut self) -> Result<Stmt<'a>, SyntaxError> {
         match self.advance() {
-            Ok(None) => None,
+            Ok(None) => Err(self.error(SyntaxErrorCode::UnexpectedEndOfInput)),
             Ok(Some(token)) => match token.kind {
-                TokenKind::LeftBrace => Some(self.block()),
-                TokenKind::Print => Some(self.print_statement()),
+                TokenKind::LeftBrace => self.block(),
+                TokenKind::If => self.if_statement(),
+                TokenKind::Print => self.print_statement(),
                 _ => {
                     self.revert(token);
-                    Some(self.expression_statement())
+                    self.expression_statement()
                 },
             },
-            Err(err) => Some(Err(err)),
+            Err(err) => Err(err),
         }
     }
 
@@ -303,6 +304,26 @@ where
         }
         self.consume(TokenKind::RightBrace)?;
         Ok(Block::new(statements).into())
+    }
+
+    fn if_statement(&mut self) -> Result<Stmt<'a>, SyntaxError> {
+        self.consume(TokenKind::LeftParen)?;
+        let condition = self.expression()?;
+        self.consume(TokenKind::RightParen)?;
+
+        let then_branch = self.statement()?;
+        let else_branch = if let Some(token) = self.advance()? {
+            if token.kind == TokenKind::Else {
+                Some(self.statement()?)
+            } else {
+                self.revert(token);
+                None
+            }
+        } else {
+            None
+        };
+
+        Ok(If::new(condition, then_branch, else_branch).into())
     }
 
     fn print_statement(&mut self) -> Result<Stmt<'a>, SyntaxError> {

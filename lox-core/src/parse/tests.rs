@@ -1,7 +1,7 @@
 use super::*;
 use crate::expr::{ExprExt, assign, binary, grouping, literal, nil, unary, variable};
 use crate::program::program;
-use crate::stmt::{StmtExt, block, print, stmt, var};
+use crate::stmt::{IfExt, StmtExt, block, if_, print, stmt, var};
 use crate::token::{
     bang, bang_equal, equal_equal, greater, greater_equal, identifier, less, less_equal, minus,
     plus, slash, star,
@@ -349,5 +349,110 @@ fn parse_block_containing_multiple_statements() {
         .stmt(),
         print(variable(identifier("x", (30, 1)))).stmt(),
     ])
+    .stmt()]));
+}
+
+#[test]
+fn parse_if_stmt_single_then_stmt_no_else_branch() {
+    let source_code = "if (true) print \"Hello, World!\";";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().is_equal_to(program([if_(
+        literal(true),
+        print(literal("Hello, World!")).stmt(),
+    )
+    .stmt()]));
+}
+
+#[test]
+fn parse_if_stmt_single_then_stmt_and_single_else_stmt() {
+    let source_code = "if (42 > 41) print \"Hello, World!\"; else print \"Goodbye, World!\";";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().is_equal_to(program([if_(
+        binary(literal(42.), greater((7, 1)), literal(41.)),
+        print(literal("Hello, World!")).stmt(),
+    )
+    .else_(print(literal("Goodbye, World!")).stmt())
+    .stmt()]));
+}
+
+#[test]
+fn parse_if_stmt_multiple_then_stmts_no_else_branch() {
+    let source_code = "if (true) { x = 4 + 3;\nprint x; }";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().is_equal_to(program([if_(
+        literal(true),
+        block([
+            assign(
+                identifier("x", (12, 1)),
+                binary(literal(4.), plus((18, 1)), literal(3.)).expr(),
+            )
+            .expr()
+            .stmt(),
+            print(variable(identifier("x", (29, 1)))).stmt(),
+        ]),
+    )
+    .stmt()]));
+}
+
+#[test]
+fn parse_if_stmt_multiple_then_stmts_and_multiple_else_stmts() {
+    let source_code = "if (x < 0) { x = x - 3;\nprint x; } else { x = x + 3;\nprint x; }";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().is_equal_to(program([if_(
+        binary(variable(identifier("x", (4, 1))), less((6, 1)), literal(0.)),
+        block([
+            assign(
+                identifier("x", (13, 1)),
+                binary(
+                    variable(identifier("x", (17, 1))),
+                    minus((19, 1)),
+                    literal(3.),
+                )
+                .expr(),
+            )
+            .expr()
+            .stmt(),
+            print(variable(identifier("x", (30, 1)))).stmt(),
+        ]),
+    )
+    .else_(block([
+        assign(
+            identifier("x", (42, 1)),
+            binary(
+                variable(identifier("x", (46, 1))),
+                plus((48, 1)),
+                literal(3.),
+            )
+            .expr(),
+        )
+        .expr()
+        .stmt(),
+        print(variable(identifier("x", (59, 1)))).stmt(),
+    ]))
+    .stmt()]));
+}
+
+#[test]
+fn parse_if_without_else_branch_and_nested_if_with_else_branch() {
+    let source_code = "if (x) if (y) print \"x and y\"; else print \"x only\";";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().is_equal_to(program([if_(
+        variable(identifier("x", (4, 1))),
+        if_(
+            variable(identifier("y", (11, 1))),
+            print(literal("x and y")),
+        )
+        .else_(print(literal("x only"))),
+    )
     .stmt()]));
 }
