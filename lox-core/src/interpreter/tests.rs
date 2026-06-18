@@ -3,7 +3,7 @@ use crate::data::value;
 use crate::expr::{
     Expr, ExprExt, assign, binary, grouping, literal, logical, nil, unary, variable,
 };
-use crate::stmt::{IfExt, StmtExt, block, if_, print, var};
+use crate::stmt::{IfExt, StmtExt, block, if_, print, var, while_};
 use crate::token::{
     and, bang, bang_equal, equal_equal, greater, greater_equal, identifier, less, less_equal,
     minus, or, plus, slash, star,
@@ -1188,4 +1188,78 @@ fn evaluate_logical_or_where_second_condition_is_true() {
     // expecting that both assignments are executed
     assert_that!(interpreter.environment().get("x")).is_equal_to(Ok(&Value::Number(50.)));
     assert_that!(interpreter.environment().get("y")).is_equal_to(Ok(&Value::Number(0.)));
+}
+
+#[test]
+fn execute_while_loop_with_single_statement() {
+    let declare_x = Stmt::from(var(identifier("x", (4, 1)), literal(0.).expr()));
+    let while_loop = Stmt::from(while_(
+        binary(
+            variable(identifier("x", (7, 1))),
+            less((9, 1)),
+            literal(10.),
+        ),
+        assign(
+            identifier("x", (15, 1)),
+            binary(
+                variable(identifier("x", (19, 1))),
+                plus((21, 1)),
+                literal(1.),
+            ),
+        )
+        .expr(),
+    ));
+
+    let mut out = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut out, io::sink());
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.execute(&mut rtc, &declare_x);
+    assert_that!(result).is_ok();
+
+    let result = interpreter.execute(&mut rtc, &while_loop);
+
+    drop(rtc);
+    assert_that!(result).is_ok();
+    assert_that!(interpreter.environment().get("x")).is_equal_to(Ok(&Value::Number(10.)));
+    assert_that!(String::from_utf8(out)).ok().is_equal_to("");
+}
+
+#[test]
+fn execute_while_loop_with_multiple_statements() {
+    let declare_x = Stmt::from(var(identifier("x", (4, 1)), literal(0.).expr()));
+    let while_loop = Stmt::from(while_(
+        binary(
+            variable(identifier("x", (7, 1))),
+            less((9, 1)),
+            literal(10.),
+        ),
+        block([
+            assign(
+                identifier("x", (17, 1)),
+                binary(
+                    variable(identifier("x", (21, 1))),
+                    plus((23, 1)),
+                    literal(1.),
+                ),
+            )
+            .expr()
+            .stmt(),
+            print(variable(identifier("x", (34, 1)))).stmt(),
+        ]),
+    ));
+
+    let mut out = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut out, io::sink());
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.execute(&mut rtc, &declare_x);
+    assert_that!(result).is_ok();
+
+    let result = interpreter.execute(&mut rtc, &while_loop);
+
+    drop(rtc);
+    assert_that!(result).is_ok();
+    assert_that!(interpreter.environment().get("x")).is_equal_to(Ok(&Value::Number(10.)));
+    assert_that!(String::from_utf8(out))
+        .ok()
+        .is_equal_to("1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n");
 }

@@ -1,6 +1,6 @@
 use crate::expr::{Assign, Binary, Expr, Grouping, Literal, Logical, Unary, Variable};
 use crate::program::Program;
-use crate::stmt::{Block, Expression, If, Print, Stmt, Var};
+use crate::stmt::{Block, Expression, If, Print, Stmt, Var, While};
 use crate::token;
 use crate::token::{Token, TokenKind};
 use crate::tokenize::{LexingError, LexingErrorCode};
@@ -288,6 +288,7 @@ where
                 TokenKind::LeftBrace => self.block(),
                 TokenKind::If => self.if_statement(),
                 TokenKind::Print => self.print_statement(),
+                TokenKind::While => self.while_statement(),
                 _ => {
                     self.revert(token);
                     self.expression_statement()
@@ -330,6 +331,14 @@ where
         let expr = self.expression()?;
         self.consume(TokenKind::Semicolon)?;
         Ok(Print::new(expr).into())
+    }
+
+    fn while_statement(&mut self) -> Result<Stmt<'a>, SyntaxError> {
+        self.consume(TokenKind::LeftParen)?;
+        let condition = self.expression()?;
+        self.consume(TokenKind::RightParen)?;
+        let body = self.statement()?;
+        Ok(While::new(condition, body).into())
     }
 
     fn expression_statement(&mut self) -> Result<Stmt<'a>, SyntaxError> {

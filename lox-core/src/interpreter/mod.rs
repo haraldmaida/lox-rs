@@ -311,8 +311,7 @@ impl StmtVisitor for Interpreter {
     }
 
     fn visit_if_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &If) -> Self::Output {
-        let value = self.evaluate(stmt.condition())?;
-        if value.is_truthy() {
+        if self.evaluate(stmt.condition())?.is_truthy() {
             self.execute(rtc, stmt.then_branch())
         } else if let Some(else_branch) = stmt.else_branch() {
             self.execute(rtc, else_branch)
@@ -342,7 +341,10 @@ impl StmtVisitor for Interpreter {
         Ok(())
     }
 
-    fn visit_while_stmt(&mut self, _rtc: &mut RuntimeContext<'_>, _stmt: &While) -> Self::Output {
-        todo!()
+    fn visit_while_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &While) -> Self::Output {
+        while self.evaluate(stmt.condition())?.is_truthy() {
+            self.execute(rtc, stmt.body())?;
+        }
+        Ok(())
     }
 }

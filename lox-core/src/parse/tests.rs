@@ -1,7 +1,7 @@
 use super::*;
 use crate::expr::{ExprExt, assign, binary, grouping, literal, logical, nil, unary, variable};
 use crate::program::program;
-use crate::stmt::{IfExt, StmtExt, block, if_, print, stmt, var};
+use crate::stmt::{IfExt, StmtExt, block, if_, print, stmt, var, while_};
 use crate::token::{
     and, bang, bang_equal, equal_equal, greater, greater_equal, identifier, less, less_equal,
     minus, or, plus, slash, star,
@@ -499,4 +499,58 @@ fn parse_logical_or() {
         )
         .expr(),
     );
+}
+
+#[test]
+fn parse_while_loop_with_single_statement() {
+    let source_code = "while (x < 10) x = x + 1;";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().is_equal_to(program([while_(
+        binary(
+            variable(identifier("x", (7, 1))),
+            less((9, 1)),
+            literal(10.),
+        ),
+        assign(
+            identifier("x", (15, 1)),
+            binary(
+                variable(identifier("x", (19, 1))),
+                plus((21, 1)),
+                literal(1.),
+            ),
+        )
+        .expr(),
+    )
+    .stmt()]));
+}
+
+#[test]
+fn parse_while_loop_with_multiple_statements() {
+    let source_code = "while (x < 10) { x = x + 1; print x; }";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().is_equal_to(program([while_(
+        binary(
+            variable(identifier("x", (7, 1))),
+            less((9, 1)),
+            literal(10.),
+        ),
+        block([
+            assign(
+                identifier("x", (17, 1)),
+                binary(
+                    variable(identifier("x", (21, 1))),
+                    plus((23, 1)),
+                    literal(1.),
+                ),
+            )
+            .expr()
+            .stmt(),
+            print(variable(identifier("x", (34, 1)))).stmt(),
+        ]),
+    )
+    .stmt()]));
 }
