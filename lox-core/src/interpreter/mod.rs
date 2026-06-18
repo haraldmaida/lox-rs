@@ -216,8 +216,16 @@ impl ExprVisitor for Interpreter {
         }
     }
 
-    fn visit_logical_expr(&mut self, _expr: &Logical) -> Self::Output {
-        todo!()
+    fn visit_logical_expr(&mut self, expr: &Logical) -> Self::Output {
+        let left = self.evaluate(expr.left())?;
+        if expr.operator().kind() == TokenKind::Or {
+            if left.is_truthy() {
+                return Ok(left);
+            }
+        } else if !left.is_truthy() {
+            return Ok(left);
+        }
+        self.evaluate(expr.right())
     }
 
     fn visit_set_expr(&mut self, _expr: &Set) -> Self::Output {

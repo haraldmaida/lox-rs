@@ -1,9 +1,12 @@
 use super::*;
-use crate::expr::{Expr, ExprExt, assign, binary, grouping, literal, nil, unary, variable};
+use crate::data::value;
+use crate::expr::{
+    Expr, ExprExt, assign, binary, grouping, literal, logical, nil, unary, variable,
+};
 use crate::stmt::{IfExt, StmtExt, block, if_, print, var};
 use crate::token::{
-    bang, bang_equal, equal_equal, greater, greater_equal, identifier, less, less_equal, minus,
-    plus, slash, star,
+    and, bang, bang_equal, equal_equal, greater, greater_equal, identifier, less, less_equal,
+    minus, or, plus, slash, star,
 };
 use asserting::prelude::*;
 use std::io;
@@ -1053,4 +1056,136 @@ fn execute_if_without_else_branch_and_nested_if_with_else_branch() {
     assert_that!(String::from_utf8(out))
         .ok()
         .is_equal_to("x only\n");
+}
+
+#[test]
+fn evaluate_logical_and_where_both_conditions_are_true() {
+    let declare_x = Stmt::from(var(identifier("x", (4, 1)), literal(25.).expr()));
+    let declare_y = Stmt::from(var(identifier("y", (4, 1)), literal(10.).expr()));
+    let expr = Expr::from(logical(
+        binary(
+            assign(identifier("x", (4, 1)), literal(50.)),
+            equal_equal((19, 2)),
+            literal(50.),
+        ),
+        and((6, 3)),
+        binary(
+            assign(identifier("y", (4, 1)), literal(0.)),
+            equal_equal((19, 2)),
+            literal(0.),
+        ),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let x_result = interpreter.execute(&mut sink_rtc(), &declare_x);
+    assert_that!(x_result).is_ok();
+    let y_result = interpreter.execute(&mut sink_rtc(), &declare_y);
+    assert_that!(y_result).is_ok();
+
+    let result = interpreter.evaluate(&expr);
+
+    assert_that!(result).ok().is_equal_to(value(true));
+    // expecting that both assignments are executed
+    assert_that!(interpreter.environment().get("x")).is_equal_to(Ok(&Value::Number(50.)));
+    assert_that!(interpreter.environment().get("y")).is_equal_to(Ok(&Value::Number(0.)));
+}
+
+#[test]
+fn evaluate_logical_and_where_first_condition_is_false() {
+    let declare_x = Stmt::from(var(identifier("x", (4, 1)), literal(25.).expr()));
+    let declare_y = Stmt::from(var(identifier("y", (4, 1)), literal(10.).expr()));
+    let expr = Expr::from(logical(
+        binary(
+            assign(identifier("x", (4, 1)), literal(50.)),
+            equal_equal((19, 2)),
+            literal(25.),
+        ),
+        and((6, 3)),
+        binary(
+            assign(identifier("y", (4, 1)), literal(0.)),
+            equal_equal((19, 2)),
+            literal(0.),
+        ),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let x_result = interpreter.execute(&mut sink_rtc(), &declare_x);
+    assert_that!(x_result).is_ok();
+    let y_result = interpreter.execute(&mut sink_rtc(), &declare_y);
+    assert_that!(y_result).is_ok();
+
+    let result = interpreter.evaluate(&expr);
+
+    assert_that!(result).ok().is_equal_to(value(false));
+    // expecting the left assignment is executed
+    assert_that!(interpreter.environment().get("x")).is_equal_to(Ok(&Value::Number(50.)));
+    // expecting the `and` stops evaluating after the left condition because it is `false`
+    // second assignment right from the `and` is not executed
+    assert_that!(interpreter.environment().get("y")).is_equal_to(Ok(&Value::Number(10.)));
+}
+
+#[test]
+fn evaluate_logical_or_where_first_condition_is_true() {
+    let declare_x = Stmt::from(var(identifier("x", (4, 1)), literal(25.).expr()));
+    let declare_y = Stmt::from(var(identifier("y", (4, 1)), literal(10.).expr()));
+    let expr = Expr::from(logical(
+        binary(
+            assign(identifier("x", (4, 1)), literal(50.)),
+            equal_equal((19, 2)),
+            literal(50.),
+        ),
+        or((6, 3)),
+        binary(
+            assign(identifier("y", (4, 1)), literal(0.)),
+            equal_equal((19, 2)),
+            literal(0.),
+        ),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let x_result = interpreter.execute(&mut sink_rtc(), &declare_x);
+    assert_that!(x_result).is_ok();
+    let y_result = interpreter.execute(&mut sink_rtc(), &declare_y);
+    assert_that!(y_result).is_ok();
+
+    let result = interpreter.evaluate(&expr);
+
+    assert_that!(result).ok().is_equal_to(value(true));
+    // expecting the left assignment is executed
+    assert_that!(interpreter.environment().get("x")).is_equal_to(Ok(&Value::Number(50.)));
+    // expecting the `or` stops after the first condition because its `true`
+    // second assignment right from the `or` is not executed
+    assert_that!(interpreter.environment().get("y")).is_equal_to(Ok(&Value::Number(10.)));
+}
+
+#[test]
+fn evaluate_logical_or_where_second_condition_is_true() {
+    let declare_x = Stmt::from(var(identifier("x", (4, 1)), literal(25.).expr()));
+    let declare_y = Stmt::from(var(identifier("y", (4, 1)), literal(10.).expr()));
+    let expr = Expr::from(logical(
+        binary(
+            assign(identifier("x", (4, 1)), literal(50.)),
+            equal_equal((19, 2)),
+            literal(25.),
+        ),
+        or((6, 3)),
+        binary(
+            assign(identifier("y", (4, 1)), literal(0.)),
+            equal_equal((19, 2)),
+            literal(0.),
+        ),
+    ));
+
+    let mut interpreter = Interpreter::default();
+    let x_result = interpreter.execute(&mut sink_rtc(), &declare_x);
+    assert_that!(x_result).is_ok();
+    let y_result = interpreter.execute(&mut sink_rtc(), &declare_y);
+    assert_that!(y_result).is_ok();
+
+    let result = interpreter.evaluate(&expr);
+
+    assert_that!(result).ok().is_equal_to(value(true));
+    // expecting that both assignments are executed
+    assert_that!(interpreter.environment().get("x")).is_equal_to(Ok(&Value::Number(50.)));
+    assert_that!(interpreter.environment().get("y")).is_equal_to(Ok(&Value::Number(0.)));
 }
