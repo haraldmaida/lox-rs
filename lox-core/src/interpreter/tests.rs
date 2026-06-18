@@ -1,6 +1,6 @@
 use super::*;
-use crate::expr::{Expr, binary, grouping, literal, nil, unary, variable};
-use crate::stmt::{print, var};
+use crate::expr::{Expr, ExprExt, assign, binary, grouping, literal, nil, unary, variable};
+use crate::stmt::{StmtExt, block, print, var};
 use crate::token::{
     bang, bang_equal, equal_equal, greater, greater_equal, identifier, less, less_equal, minus,
     plus, slash, star,
@@ -730,7 +730,7 @@ fn execute_print_stmt_with_expression() {
 fn execute_var_stmt_with_initializer() {
     let stmt = Stmt::from(var(
         identifier("my_var", (4, 6)),
-        Expr::from(binary(literal(40.), plus((17, 1)), literal(2.))),
+        binary(literal(40.), plus((17, 1)), literal(2.)).expr(),
     ));
 
     let mut interpreter = Interpreter::default();
@@ -753,15 +753,16 @@ fn execute_var_stmt_without_initializer() {
 
 #[test]
 fn execute_var_stmt_with_variable_expression() {
-    let declare_a = Stmt::from(var(identifier("a", (4, 1)), Expr::from(literal(3.))));
-    let declare_b = Stmt::from(var(identifier("b", (14, 1)), Expr::from(literal(2.))));
+    let declare_a = Stmt::from(var(identifier("a", (4, 1)), literal(3.).expr()));
+    let declare_b = Stmt::from(var(identifier("b", (14, 1)), literal(2.).expr()));
     let var_stmt = Stmt::from(var(
         identifier("foo", (24, 3)),
-        Expr::from(binary(
+        binary(
             variable(identifier("a", (30, 1))),
             plus((32, 1)),
             variable(identifier("b", (34, 1))),
-        )),
+        )
+        .expr(),
     ));
 
     let mut interpreter = Interpreter::default();
@@ -791,12 +792,9 @@ fn execute_print_stmt_of_undefined_variable() {
 
 #[test]
 fn evaluate_assign_expr_stmt_to_existing_variable() {
-    let declare_foo = Stmt::from(var(identifier("foo", (4, 3)), Expr::from(literal(123.))));
+    let declare_foo = Stmt::from(var(identifier("foo", (4, 3)), literal(123.).expr()));
 
-    let assign_to_foo = Expr::from(Assign::new(
-        identifier("foo", (23, 3)),
-        Expr::from(literal(99.)),
-    ));
+    let assign_to_foo = Expr::from(assign(identifier("foo", (23, 3)), literal(99.)));
 
     let mut interpreter = Interpreter::default();
     let declare_result = interpreter.execute(&declare_foo);
@@ -810,12 +808,9 @@ fn evaluate_assign_expr_stmt_to_existing_variable() {
 
 #[test]
 fn evaluate_assign_expr_stmt_to_not_existing_variable() {
-    let declare_foo = Stmt::from(var(identifier("a", (4, 1)), Expr::from(literal(123.))));
+    let declare_foo = Stmt::from(var(identifier("a", (4, 1)), literal(123.).expr()));
 
-    let assign_to_foo = Expr::from(Assign::new(
-        identifier("foo", (23, 3)),
-        Expr::from(literal(99.)),
-    ));
+    let assign_to_foo = Expr::from(assign(identifier("foo", (23, 3)), literal(99.)));
 
     let mut interpreter = Interpreter::default();
     let declare_result = interpreter.execute(&declare_foo);
@@ -832,4 +827,59 @@ fn evaluate_assign_expr_stmt_to_not_existing_variable() {
     assert_that!(interpreter.environment().get("foo"))
         .is_equal_to(Err(EnvironmentError::UndefinedVariable("foo".into())));
     assert_that!(interpreter.environment().get("a")).is_equal_to(Ok(&Value::Number(123.)));
+}
+
+#[test]
+fn execute_block_that_is_empty() {
+    let stmt = Stmt::from(block(vec![]));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.execute(&stmt);
+
+    assert_that!(result).is_ok();
+}
+
+#[test]
+fn execute_block_with_var_declarations_and_assignments() {
+    let declare_a = Stmt::from(var(identifier("a", (4, 1)), literal(3.).expr()));
+    let declare_b = Stmt::from(var(identifier("b", (14, 1)), literal(2.).expr()));
+    let assign_b = Expr::from(assign(identifier("b", (24, 1)), literal(7.).expr()));
+    let assign_a = Expr::from(assign(identifier("a", (34, 1)), literal(5.).expr()));
+    let block = Stmt::from(block(vec![declare_b, assign_b.stmt(), assign_a.stmt()]));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.execute(&declare_a);
+    assert_that!(result).is_ok();
+
+    let result = interpreter.execute(&block);
+
+    assert_that!(result).is_ok();
+    assert_that!(interpreter.environment().get("a")).is_equal_to(Ok(&Value::Number(5.)));
+    assert_that!(interpreter.environment().get("b"))
+        .err()
+        .is_equal_to(EnvironmentError::UndefinedVariable("b".into()));
+}
+
+#[test]
+fn execute_block_with_var_declarations_and_assignments_and_runtime_error() {
+    let declare_a = Stmt::from(var(identifier("a", (4, 1)), literal(3.).expr()));
+    let declare_b = Stmt::from(var(identifier("b", (14, 1)), literal(2.).expr()));
+    let assign_c = Expr::from(assign(identifier("c", (24, 1)), literal(7.).expr()));
+    let assign_a = Expr::from(assign(identifier("a", (34, 1)), literal(5.).expr()));
+    let block = Stmt::from(block(vec![declare_b, assign_c.stmt(), assign_a.stmt()]));
+
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.execute(&declare_a);
+    assert_that!(result).is_ok();
+
+    let result = interpreter.execute(&block);
+
+    assert_that!(result).err().is_equal_to(RuntimeError::new(
+        RuntimeErrorCode::UndefinedVariable("c".into()),
+        identifier("c", (24, 1)),
+    ));
+    assert_that!(interpreter.environment().get("a")).is_equal_to(Ok(&Value::Number(3.)));
+    assert_that!(interpreter.environment().get("b"))
+        .err()
+        .is_equal_to(EnvironmentError::UndefinedVariable("b".into()));
 }

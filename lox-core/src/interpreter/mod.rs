@@ -260,8 +260,17 @@ impl ExprVisitor for Interpreter {
 impl StmtVisitor for Interpreter {
     type Output = Result<(), RuntimeError>;
 
-    fn visit_block_stmt(&mut self, _stmt: &Block) -> Self::Output {
-        todo!()
+    fn visit_block_stmt(&mut self, stmt: &Block) -> Self::Output {
+        self.environment.create_new_scope();
+        for a_stmt in stmt.statements() {
+            let result = self.execute(a_stmt);
+            if let Err(error) = result {
+                self.environment.destroy_current_scope();
+                return Err(error);
+            }
+        }
+        self.environment.destroy_current_scope();
+        Ok(())
     }
 
     fn visit_expression_stmt(&mut self, stmt: &Expression) -> Self::Output {
