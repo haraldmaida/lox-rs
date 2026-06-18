@@ -1,6 +1,6 @@
 use super::*;
 use crate::expr::{Expr, ExprExt, assign, binary, grouping, literal, nil, unary, variable};
-use crate::stmt::{StmtExt, block, print, var};
+use crate::stmt::{IfExt, StmtExt, block, if_, print, var};
 use crate::token::{
     bang, bang_equal, equal_equal, greater, greater_equal, identifier, less, less_equal, minus,
     plus, slash, star,
@@ -902,4 +902,155 @@ fn execute_block_with_var_declarations_and_assignments_and_runtime_error() {
     assert_that!(interpreter.environment().get("b"))
         .err()
         .is_equal_to(EnvironmentError::UndefinedVariable("b".into()));
+}
+
+#[test]
+fn execute_if_stmt_single_then_stmt_no_else_branch() {
+    let stmt = Stmt::from(if_(literal(true), print(literal("Hello, World!")).stmt()));
+
+    let mut out = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut out, io::sink());
+    let mut interpreter = Interpreter::default();
+
+    let result = interpreter.execute(&mut rtc, &stmt);
+
+    drop(rtc);
+    assert_that!(result).is_ok();
+    assert_that!(String::from_utf8(out))
+        .ok()
+        .is_equal_to("Hello, World!\n");
+}
+
+#[test]
+fn execute_if_stmt_single_then_stmt_and_single_else_stmt() {
+    let stmt = Stmt::from(
+        if_(
+            binary(literal(42.), greater((7, 1)), literal(43.)),
+            print(literal("Hello, World!")).stmt(),
+        )
+        .else_(print(literal("Goodbye, World!")).stmt()),
+    );
+
+    let mut out = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut out, io::sink());
+    let mut interpreter = Interpreter::default();
+
+    let result = interpreter.execute(&mut rtc, &stmt);
+
+    drop(rtc);
+    assert_that!(result).is_ok();
+    assert_that!(String::from_utf8(out))
+        .ok()
+        .is_equal_to("Goodbye, World!\n");
+}
+
+#[test]
+fn execute_if_stmt_multiple_then_stmts_no_else_branch() {
+    let declare_x = Stmt::from(var(identifier("x", (4, 1)), None));
+    let stmt = Stmt::from(if_(
+        literal(true),
+        block([
+            assign(
+                identifier("x", (12, 1)),
+                binary(literal(4.), plus((18, 1)), literal(3.)).expr(),
+            )
+            .expr()
+            .stmt(),
+            print(variable(identifier("x", (29, 1)))).stmt(),
+        ]),
+    ));
+
+    let mut out = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut out, io::sink());
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.execute(&mut rtc, &declare_x);
+    assert_that!(result).is_ok();
+
+    let result = interpreter.execute(&mut rtc, &stmt);
+
+    drop(rtc);
+    assert_that!(result).is_ok();
+    assert_that!(String::from_utf8(out)).ok().is_equal_to("7\n");
+}
+
+#[test]
+fn execute_if_stmt_multiple_then_stmts_and_multiple_else_stmts() {
+    let declare_x = Stmt::from(var(identifier("x", (4, 1)), literal(99.).expr()));
+    let stmt = Stmt::from(
+        if_(
+            binary(variable(identifier("x", (4, 1))), less((6, 1)), literal(0.)),
+            block([
+                assign(
+                    identifier("x", (13, 1)),
+                    binary(
+                        variable(identifier("x", (17, 1))),
+                        minus((19, 1)),
+                        literal(3.),
+                    )
+                    .expr(),
+                )
+                .expr()
+                .stmt(),
+                print(variable(identifier("x", (30, 1)))).stmt(),
+            ]),
+        )
+        .else_(block([
+            assign(
+                identifier("x", (42, 1)),
+                binary(
+                    variable(identifier("x", (46, 1))),
+                    plus((48, 1)),
+                    literal(3.),
+                )
+                .expr(),
+            )
+            .expr()
+            .stmt(),
+            print(variable(identifier("x", (59, 1)))).stmt(),
+        ])),
+    );
+
+    let mut out = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut out, io::sink());
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.execute(&mut rtc, &declare_x);
+    assert_that!(result).is_ok();
+
+    let result = interpreter.execute(&mut rtc, &stmt);
+
+    drop(rtc);
+    assert_that!(result).is_ok();
+    assert_that!(String::from_utf8(out))
+        .ok()
+        .is_equal_to("102\n");
+}
+
+#[test]
+fn execute_if_without_else_branch_and_nested_if_with_else_branch() {
+    let declare_x = Stmt::from(var(identifier("x", (4, 1)), literal(0.).expr()));
+    let declare_y = Stmt::from(var(identifier("y", (4, 1)), None));
+    let stmt = Stmt::from(if_(
+        variable(identifier("x", (4, 1))),
+        if_(
+            variable(identifier("y", (11, 1))),
+            print(literal("x and y")),
+        )
+        .else_(print(literal("x only"))),
+    ));
+
+    let mut out = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut out, io::sink());
+    let mut interpreter = Interpreter::default();
+    let result = interpreter.execute(&mut rtc, &declare_x);
+    assert_that!(result).is_ok();
+    let result = interpreter.execute(&mut rtc, &declare_y);
+    assert_that!(result).is_ok();
+
+    let result = interpreter.execute(&mut rtc, &stmt);
+
+    drop(rtc);
+    assert_that!(result).is_ok();
+    assert_that!(String::from_utf8(out))
+        .ok()
+        .is_equal_to("x only\n");
 }
