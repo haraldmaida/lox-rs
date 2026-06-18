@@ -1,7 +1,7 @@
 use super::*;
 use crate::expr::{ExprExt, assign, binary, grouping, literal, nil, unary, variable};
 use crate::program::program;
-use crate::stmt::{StmtExt, print, stmt, var};
+use crate::stmt::{StmtExt, block, print, stmt, var};
 use crate::token::{
     bang, bang_equal, equal_equal, greater, greater_equal, identifier, less, less_equal, minus,
     plus, slash, star,
@@ -303,4 +303,51 @@ fn parse_assignment_to_invalid_assignment_target() {
         code: SyntaxErrorCode::InvalidAssignmentTarget,
         location: (35, 1).into(),
     }]);
+}
+
+#[test]
+fn parse_block_that_is_empty() {
+    let source_code = "{}";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result)
+        .ok()
+        .is_equal_to(program([block([]).stmt()]));
+}
+
+#[test]
+fn parse_block_containing_one_statement() {
+    let source_code = "{ print \"Hello, World!\"; }";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result)
+        .ok()
+        .is_equal_to(program([
+            block([print(literal("Hello, World!")).stmt()]).stmt()
+        ]));
+}
+
+#[test]
+fn parse_block_containing_multiple_statements() {
+    let source_code = "{ var x = 1;\nx = x * 2;\nprint x; }";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().is_equal_to(program([block([
+        var(identifier("x", (6, 1)), literal(1.).expr()).stmt(),
+        assign(
+            identifier("x", (13, 1)),
+            binary(
+                variable(identifier("x", (17, 1))),
+                star((19, 1)),
+                literal(2.).expr(),
+            ),
+        )
+        .expr()
+        .stmt(),
+        print(variable(identifier("x", (30, 1)))).stmt(),
+    ])
+    .stmt()]));
 }

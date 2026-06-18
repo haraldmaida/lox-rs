@@ -6,6 +6,7 @@ use std::ops::Deref;
 pub trait StmtVisitor {
     type Output;
 
+    fn visit_block_stmt(&mut self, stmt: &Block) -> Self::Output;
     fn visit_expression_stmt(&mut self, stmt: &Expression) -> Self::Output;
     fn visit_print_stmt(&mut self, stmt: &Print) -> Self::Output;
     fn visit_var_stmt(&mut self, stmt: &Var) -> Self::Output;
@@ -19,6 +20,7 @@ pub trait StmtElement {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt<'a> {
+    Block(Block<'a>),
     Expression(Expression<'a>),
     Print(Print<'a>),
     Var(Var<'a>),
@@ -45,6 +47,7 @@ macro_rules! impl_stmt {
     };
 }
 
+impl_stmt!(Block<'a>, Block, visit_block_stmt);
 impl_stmt!(Expression<'a>, Expression, visit_expression_stmt);
 impl_stmt!(Print<'a>, Print, visit_print_stmt);
 impl_stmt!(Var<'a>, Var, visit_var_stmt);
@@ -55,6 +58,7 @@ impl StmtElement for Stmt<'_> {
         V: StmtVisitor,
     {
         match self {
+            Self::Block(stmt) => visitor.visit_block_stmt(stmt),
             Self::Expression(stmt) => visitor.visit_expression_stmt(stmt),
             Self::Print(stmt) => visitor.visit_print_stmt(stmt),
             Self::Var(stmt) => visitor.visit_var_stmt(stmt),
@@ -65,6 +69,21 @@ impl StmtElement for Stmt<'_> {
 impl<'a> From<Expr<'a>> for Stmt<'a> {
     fn from(expr: Expr<'a>) -> Self {
         Self::Expression(Expression::new(expr))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Block<'a> {
+    statements: Vec<Stmt<'a>>,
+}
+
+impl<'a> Block<'a> {
+    pub const fn new(statements: Vec<Stmt<'a>>) -> Self {
+        Self { statements }
+    }
+
+    pub fn statements(&self) -> &[Stmt<'a>] {
+        &self.statements
     }
 }
 

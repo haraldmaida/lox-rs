@@ -4,7 +4,7 @@ use crate::expr::{
     Assign, Binary, Call, Expr, ExprElement, ExprVisitor, Get, Grouping, Literal, Logical, Set,
     Super, This, Unary, Variable,
 };
-use crate::stmt::{Expression, Print, Stmt, StmtElement, StmtVisitor, Var};
+use crate::stmt::{Block, Expression, Print, Stmt, StmtElement, StmtVisitor, Var};
 use crate::token::{Token, TokenKind};
 use miette::{Diagnostic, SourceSpan};
 use std::fmt;
@@ -259,6 +259,10 @@ impl ExprVisitor for Interpreter {
 
 impl StmtVisitor for Interpreter {
     type Output = Result<(), RuntimeError>;
+
+    fn visit_block_stmt(&mut self, _stmt: &Block) -> Self::Output {
+        todo!()
+    }
 
     fn visit_expression_stmt(&mut self, stmt: &Expression) -> Self::Output {
         self.evaluate(stmt.expression())?;

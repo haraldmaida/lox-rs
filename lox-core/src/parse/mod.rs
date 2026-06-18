@@ -1,6 +1,6 @@
 use crate::expr::{Assign, Binary, Expr, Grouping, Literal, Unary, Variable};
 use crate::program::Program;
-use crate::stmt::{Expression, Print, Stmt, Var};
+use crate::stmt::{Block, Expression, Print, Stmt, Var};
 use crate::token;
 use crate::token::{Token, TokenKind};
 use crate::tokenize::{LexingError, LexingErrorCode};
@@ -207,7 +207,7 @@ where
         Ok(())
     }
 
-    pub fn program(&mut self) -> Result<Program<'a>, Vec<SyntaxError>> {
+    fn program(&mut self) -> Result<Program<'a>, Vec<SyntaxError>> {
         let mut errors = Vec::new();
         let mut statements = Vec::new();
         loop {
@@ -230,7 +230,7 @@ where
         }
     }
 
-    pub fn declaration(&mut self) -> Option<Result<Stmt<'a>, SyntaxError>> {
+    fn declaration(&mut self) -> Option<Result<Stmt<'a>, SyntaxError>> {
         match self.advance() {
             Ok(None) => None,
             Ok(Some(token)) => match token.kind {
@@ -245,7 +245,7 @@ where
         }
     }
 
-    pub fn var_declaration(&mut self) -> Result<Stmt<'a>, SyntaxError> {
+    fn var_declaration(&mut self) -> Result<Stmt<'a>, SyntaxError> {
         let name = self.consume(TokenKind::Identifier)?;
         let initializer = match self.advance()? {
             None => None,
@@ -262,10 +262,30 @@ where
         Ok(Var::new(name, initializer).into())
     }
 
-    pub fn statement(&mut self) -> Option<Result<Stmt<'a>, SyntaxError>> {
+    fn declaration_inside_block(&mut self) -> Option<Result<Stmt<'a>, SyntaxError>> {
         match self.advance() {
             Ok(None) => None,
             Ok(Some(token)) => match token.kind {
+                TokenKind::RightBrace => {
+                    self.revert(token);
+                    None
+                },
+                TokenKind::EndOfFile => None,
+                TokenKind::Var => Some(self.var_declaration()),
+                _ => {
+                    self.revert(token);
+                    self.statement()
+                },
+            },
+            Err(err) => Some(Err(err)),
+        }
+    }
+
+    fn statement(&mut self) -> Option<Result<Stmt<'a>, SyntaxError>> {
+        match self.advance() {
+            Ok(None) => None,
+            Ok(Some(token)) => match token.kind {
+                TokenKind::LeftBrace => Some(self.block()),
                 TokenKind::Print => Some(self.print_statement()),
                 _ => {
                     self.revert(token);
@@ -276,23 +296,32 @@ where
         }
     }
 
-    pub fn print_statement(&mut self) -> Result<Stmt<'a>, SyntaxError> {
+    fn block(&mut self) -> Result<Stmt<'a>, SyntaxError> {
+        let mut statements = Vec::new();
+        while let Some(stmt) = self.declaration_inside_block() {
+            statements.push(stmt?);
+        }
+        self.consume(TokenKind::RightBrace)?;
+        Ok(Block::new(statements).into())
+    }
+
+    fn print_statement(&mut self) -> Result<Stmt<'a>, SyntaxError> {
         let expr = self.expression()?;
         self.consume(TokenKind::Semicolon)?;
         Ok(Print::new(expr).into())
     }
 
-    pub fn expression_statement(&mut self) -> Result<Stmt<'a>, SyntaxError> {
+    fn expression_statement(&mut self) -> Result<Stmt<'a>, SyntaxError> {
         let expr = self.expression()?;
         self.consume(TokenKind::Semicolon)?;
         Ok(Expression::new(expr).into())
     }
 
-    pub fn expression(&mut self) -> Result<Expr<'a>, SyntaxError> {
+    fn expression(&mut self) -> Result<Expr<'a>, SyntaxError> {
         self.assignment()
     }
 
-    pub fn assignment(&mut self) -> Result<Expr<'a>, SyntaxError> {
+    fn assignment(&mut self) -> Result<Expr<'a>, SyntaxError> {
         let expr = self.equality()?;
         if let Some(token) = self.advance()? {
             if token.kind == TokenKind::Equal {
@@ -313,7 +342,7 @@ where
         }
     }
 
-    pub fn equality(&mut self) -> Result<Expr<'a>, SyntaxError> {
+    fn equality(&mut self) -> Result<Expr<'a>, SyntaxError> {
         let mut expr = self.comparison()?;
         while let Some(token) = self.advance()? {
             match token.kind {
@@ -331,7 +360,7 @@ where
         Ok(expr)
     }
 
-    pub fn comparison(&mut self) -> Result<Expr<'a>, SyntaxError> {
+    fn comparison(&mut self) -> Result<Expr<'a>, SyntaxError> {
         let mut expr = self.term()?;
         while let Some(token) = self.advance()? {
             match token.kind {
@@ -352,7 +381,7 @@ where
         Ok(expr)
     }
 
-    pub fn term(&mut self) -> Result<Expr<'a>, SyntaxError> {
+    fn term(&mut self) -> Result<Expr<'a>, SyntaxError> {
         let mut expr = self.factor()?;
         while let Some(token) = self.advance()? {
             match token.kind {
@@ -370,7 +399,7 @@ where
         Ok(expr)
     }
 
-    pub fn factor(&mut self) -> Result<Expr<'a>, SyntaxError> {
+    fn factor(&mut self) -> Result<Expr<'a>, SyntaxError> {
         let mut expr = self.unary()?;
         while let Some(token) = self.advance()? {
             match token.kind {
@@ -388,7 +417,7 @@ where
         Ok(expr)
     }
 
-    pub fn unary(&mut self) -> Result<Expr<'a>, SyntaxError> {
+    fn unary(&mut self) -> Result<Expr<'a>, SyntaxError> {
         match self.advance()? {
             Some(token) => match token.kind {
                 TokenKind::Bang | TokenKind::Minus => {
@@ -405,7 +434,7 @@ where
         }
     }
 
-    pub fn primary(&mut self) -> Result<Expr<'a>, SyntaxError> {
+    fn primary(&mut self) -> Result<Expr<'a>, SyntaxError> {
         match self.advance()? {
             Some(token) => match token.kind {
                 TokenKind::Nil => Ok(Literal::Nil.into()),

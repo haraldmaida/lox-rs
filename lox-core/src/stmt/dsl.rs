@@ -1,4 +1,4 @@
-use super::{Expression, Print, Stmt, Var};
+use super::{Block, Expression, Print, Stmt, Var};
 use crate::expr::Expr;
 use crate::token::Token;
 
@@ -17,6 +17,10 @@ where
 
 pub fn stmt<'a>(stmt: impl Into<Stmt<'a>>) -> Stmt<'a> {
     stmt.into()
+}
+
+pub fn block<'a>(statements: impl IntoIterator<Item = Stmt<'a>>) -> Block<'a> {
+    Block::new(statements.into_iter().collect())
 }
 
 pub fn expression<'a>(expr: impl Into<Expression<'a>>) -> Expression<'a> {
