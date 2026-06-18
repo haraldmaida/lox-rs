@@ -6,14 +6,22 @@ use std::ops::Deref;
 pub trait StmtVisitor {
     type Output;
 
-    fn visit_block_stmt(&mut self, stmt: &Block) -> Self::Output;
-    fn visit_expression_stmt(&mut self, stmt: &Expression) -> Self::Output;
-    fn visit_print_stmt(&mut self, stmt: &Print) -> Self::Output;
-    fn visit_var_stmt(&mut self, stmt: &Var) -> Self::Output;
+    fn visit_block_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Block) -> Self::Output;
+    fn visit_expression_stmt(
+        &mut self,
+        rtc: &mut RuntimeContext<'_>,
+        stmt: &Expression,
+    ) -> Self::Output;
+    fn visit_print_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Print) -> Self::Output;
+    fn visit_var_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Var) -> Self::Output;
 }
 
 pub trait StmtElement {
-    fn accept<V>(&self, visitor: &mut V) -> <V as StmtVisitor>::Output
+    fn accept<V>(
+        &self,
+        visitor: &mut V,
+        rtc: &mut RuntimeContext<'_>,
+    ) -> <V as StmtVisitor>::Output
     where
         V: StmtVisitor;
 }
@@ -37,11 +45,15 @@ macro_rules! impl_stmt {
 
         #[allow(single_use_lifetimes, unused_lifetimes)]
         impl<'a> StmtElement for $stmt_type {
-            fn accept<V>(&self, visitor: &mut V) -> <V as StmtVisitor>::Output
+            fn accept<V>(
+                &self,
+                visitor: &mut V,
+                rtc: &mut RuntimeContext<'_>,
+            ) -> <V as StmtVisitor>::Output
             where
                 V: StmtVisitor,
             {
-                visitor.$visitor_method(self)
+                visitor.$visitor_method(rtc, self)
             }
         }
     };
@@ -53,15 +65,15 @@ impl_stmt!(Print<'a>, Print, visit_print_stmt);
 impl_stmt!(Var<'a>, Var, visit_var_stmt);
 
 impl StmtElement for Stmt<'_> {
-    fn accept<V>(&self, visitor: &mut V) -> <V as StmtVisitor>::Output
+    fn accept<V>(&self, visitor: &mut V, rtc: &mut RuntimeContext<'_>) -> <V as StmtVisitor>::Output
     where
         V: StmtVisitor,
     {
         match self {
-            Self::Block(stmt) => visitor.visit_block_stmt(stmt),
-            Self::Expression(stmt) => visitor.visit_expression_stmt(stmt),
-            Self::Print(stmt) => visitor.visit_print_stmt(stmt),
-            Self::Var(stmt) => visitor.visit_var_stmt(stmt),
+            Self::Block(stmt) => visitor.visit_block_stmt(rtc, stmt),
+            Self::Expression(stmt) => visitor.visit_expression_stmt(rtc, stmt),
+            Self::Print(stmt) => visitor.visit_print_stmt(rtc, stmt),
+            Self::Var(stmt) => visitor.visit_var_stmt(rtc, stmt),
         }
     }
 }
@@ -150,6 +162,7 @@ impl<'a> Var<'a> {
     }
 }
 
+use crate::runtime::RuntimeContext;
 #[cfg(any(test, feature = "dsl"))]
 pub use dsl::*;
 

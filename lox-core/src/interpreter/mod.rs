@@ -4,6 +4,7 @@ use crate::expr::{
     Assign, Binary, Call, Expr, ExprElement, ExprVisitor, Get, Grouping, Literal, Logical, Set,
     Super, This, Unary, Variable,
 };
+use crate::runtime::RuntimeContext;
 use crate::stmt::{Block, Expression, Print, Stmt, StmtElement, StmtVisitor, Var};
 use crate::token::{Token, TokenKind};
 use miette::{Diagnostic, SourceSpan};
@@ -105,20 +106,24 @@ impl Interpreter {
         &self.environment
     }
 
-    pub fn interpret<'a, P>(&mut self, program: P)
+    pub fn interpret<'a, P>(&mut self, rtc: &mut RuntimeContext<'_>, program: P)
     where
         P: AsRef<[Stmt<'a>]>,
     {
         let statements = program.as_ref();
         for stmt in statements {
-            if let Err(error) = self.execute(stmt) {
-                eprintln!("{error}");
+            if let Err(error) = self.execute(rtc, stmt) {
+                writeln!(rtc.stderr(), "{error}").expect("failed to write to stderr");
             }
         }
     }
 
-    pub fn execute(&mut self, statement: &Stmt<'_>) -> Result<(), RuntimeError> {
-        statement.accept(self)
+    pub fn execute(
+        &mut self,
+        rtc: &mut RuntimeContext<'_>,
+        statement: &Stmt<'_>,
+    ) -> Result<(), RuntimeError> {
+        statement.accept(self, rtc)
     }
 
     pub fn evaluate(&mut self, expression: &Expr<'_>) -> Result<Value, RuntimeError> {
@@ -260,10 +265,10 @@ impl ExprVisitor for Interpreter {
 impl StmtVisitor for Interpreter {
     type Output = Result<(), RuntimeError>;
 
-    fn visit_block_stmt(&mut self, stmt: &Block) -> Self::Output {
+    fn visit_block_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Block) -> Self::Output {
         self.environment.create_new_scope();
         for a_stmt in stmt.statements() {
-            let result = self.execute(a_stmt);
+            let result = self.execute(rtc, a_stmt);
             if let Err(error) = result {
                 self.environment.destroy_current_scope();
                 return Err(error);
@@ -273,18 +278,22 @@ impl StmtVisitor for Interpreter {
         Ok(())
     }
 
-    fn visit_expression_stmt(&mut self, stmt: &Expression) -> Self::Output {
+    fn visit_expression_stmt(
+        &mut self,
+        _rtc: &mut RuntimeContext<'_>,
+        stmt: &Expression,
+    ) -> Self::Output {
         self.evaluate(stmt.expression())?;
         Ok(())
     }
 
-    fn visit_print_stmt(&mut self, stmt: &Print) -> Self::Output {
+    fn visit_print_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Print) -> Self::Output {
         let value = self.evaluate(stmt.expression())?;
-        println!("{value}");
+        writeln!(rtc.stdout(), "{value}").expect("failed to write to stdout");
         Ok(())
     }
 
-    fn visit_var_stmt(&mut self, stmt: &Var) -> Self::Output {
+    fn visit_var_stmt(&mut self, _rtc: &mut RuntimeContext<'_>, stmt: &Var) -> Self::Output {
         let value = if let Some(initializer) = stmt.initializer() {
             self.evaluate(initializer)?
         } else {

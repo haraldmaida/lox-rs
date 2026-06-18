@@ -5,6 +5,7 @@ pub mod expr;
 pub mod interpreter;
 pub mod parse;
 pub mod program;
+pub mod runtime;
 pub mod stmt;
 pub mod token;
 pub mod tokenize;

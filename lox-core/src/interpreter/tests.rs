@@ -6,6 +6,11 @@ use crate::token::{
     plus, slash, star,
 };
 use asserting::prelude::*;
+use std::io;
+
+fn sink_rtc<'a>() -> RuntimeContext<'a> {
+    RuntimeContext::new(io::sink(), io::sink())
+}
 
 #[test]
 fn evaluate_literal_nil() {
@@ -720,10 +725,16 @@ fn evaluate_binary_expr_with_illegal_operator() {
 fn execute_print_stmt_with_expression() {
     let stmt = Stmt::from(print(binary(literal(84.), plus((1, 2)), literal(2.))));
 
+    let mut stdout = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, io::sink());
     let mut interpreter = Interpreter::default();
-    let result = interpreter.execute(&stmt);
+    let result = interpreter.execute(&mut rtc, &stmt);
+    drop(rtc);
 
     assert_that!(result).is_ok();
+    assert_that!(String::from_utf8(stdout))
+        .ok()
+        .is_equal_to("86\n");
 }
 
 #[test]
@@ -733,8 +744,9 @@ fn execute_var_stmt_with_initializer() {
         binary(literal(40.), plus((17, 1)), literal(2.)).expr(),
     ));
 
+    let mut rtc = sink_rtc();
     let mut interpreter = Interpreter::default();
-    let result = interpreter.execute(&stmt);
+    let result = interpreter.execute(&mut rtc, &stmt);
 
     assert_that!(result).is_ok();
     assert_that!(interpreter.environment().get("my_var")).is_equal_to(Ok(&Value::Number(42.)));
@@ -744,8 +756,9 @@ fn execute_var_stmt_with_initializer() {
 fn execute_var_stmt_without_initializer() {
     let stmt = Stmt::from(var(identifier("foo", (4, 3)), None));
 
+    let mut rtc = sink_rtc();
     let mut interpreter = Interpreter::default();
-    let result = interpreter.execute(&stmt);
+    let result = interpreter.execute(&mut rtc, &stmt);
 
     assert_that!(result).is_ok();
     assert_that!(interpreter.environment().get("foo")).is_equal_to(Ok(&Value::Nil));
@@ -765,13 +778,14 @@ fn execute_var_stmt_with_variable_expression() {
         .expr(),
     ));
 
+    let mut rtc = sink_rtc();
     let mut interpreter = Interpreter::default();
-    let result = interpreter.execute(&declare_a);
+    let result = interpreter.execute(&mut rtc, &declare_a);
     assert_that!(result).is_ok();
-    let result = interpreter.execute(&declare_b);
+    let result = interpreter.execute(&mut rtc, &declare_b);
     assert_that!(result).is_ok();
 
-    let result = interpreter.execute(&var_stmt);
+    let result = interpreter.execute(&mut rtc, &var_stmt);
 
     assert_that!(result).is_ok();
     assert_that!(interpreter.environment().get("foo")).is_equal_to(Ok(&Value::Number(5.)));
@@ -781,8 +795,9 @@ fn execute_var_stmt_with_variable_expression() {
 fn execute_print_stmt_of_undefined_variable() {
     let stmt = Stmt::from(print(variable(identifier("foo", (4, 3)))));
 
+    let mut rtc = sink_rtc();
     let mut interpreter = Interpreter::default();
-    let result = interpreter.execute(&stmt);
+    let result = interpreter.execute(&mut rtc, &stmt);
 
     assert_that!(result).err().is_equal_to(RuntimeError::new(
         RuntimeErrorCode::UndefinedVariable("foo".into()),
@@ -796,8 +811,9 @@ fn evaluate_assign_expr_stmt_to_existing_variable() {
 
     let assign_to_foo = Expr::from(assign(identifier("foo", (23, 3)), literal(99.)));
 
+    let mut rtc = sink_rtc();
     let mut interpreter = Interpreter::default();
-    let declare_result = interpreter.execute(&declare_foo);
+    let declare_result = interpreter.execute(&mut rtc, &declare_foo);
     assert_that!(declare_result).is_ok();
 
     let assign_result = interpreter.evaluate(&assign_to_foo);
@@ -812,8 +828,9 @@ fn evaluate_assign_expr_stmt_to_not_existing_variable() {
 
     let assign_to_foo = Expr::from(assign(identifier("foo", (23, 3)), literal(99.)));
 
+    let mut rtc = sink_rtc();
     let mut interpreter = Interpreter::default();
-    let declare_result = interpreter.execute(&declare_foo);
+    let declare_result = interpreter.execute(&mut rtc, &declare_foo);
     assert_that!(declare_result).is_ok();
 
     let assign_result = interpreter.evaluate(&assign_to_foo);
@@ -833,8 +850,9 @@ fn evaluate_assign_expr_stmt_to_not_existing_variable() {
 fn execute_block_that_is_empty() {
     let stmt = Stmt::from(block(vec![]));
 
+    let mut rtc = sink_rtc();
     let mut interpreter = Interpreter::default();
-    let result = interpreter.execute(&stmt);
+    let result = interpreter.execute(&mut rtc, &stmt);
 
     assert_that!(result).is_ok();
 }
@@ -847,11 +865,12 @@ fn execute_block_with_var_declarations_and_assignments() {
     let assign_a = Expr::from(assign(identifier("a", (34, 1)), literal(5.).expr()));
     let block = Stmt::from(block(vec![declare_b, assign_b.stmt(), assign_a.stmt()]));
 
+    let mut rtc = sink_rtc();
     let mut interpreter = Interpreter::default();
-    let result = interpreter.execute(&declare_a);
+    let result = interpreter.execute(&mut rtc, &declare_a);
     assert_that!(result).is_ok();
 
-    let result = interpreter.execute(&block);
+    let result = interpreter.execute(&mut rtc, &block);
 
     assert_that!(result).is_ok();
     assert_that!(interpreter.environment().get("a")).is_equal_to(Ok(&Value::Number(5.)));
@@ -868,11 +887,12 @@ fn execute_block_with_var_declarations_and_assignments_and_runtime_error() {
     let assign_a = Expr::from(assign(identifier("a", (34, 1)), literal(5.).expr()));
     let block = Stmt::from(block(vec![declare_b, assign_c.stmt(), assign_a.stmt()]));
 
+    let mut rtc = sink_rtc();
     let mut interpreter = Interpreter::default();
-    let result = interpreter.execute(&declare_a);
+    let result = interpreter.execute(&mut rtc, &declare_a);
     assert_that!(result).is_ok();
 
-    let result = interpreter.execute(&block);
+    let result = interpreter.execute(&mut rtc, &block);
 
     assert_that!(result).err().is_equal_to(RuntimeError::new(
         RuntimeErrorCode::UndefinedVariable("c".into()),

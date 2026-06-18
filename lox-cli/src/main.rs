@@ -14,6 +14,7 @@ use clap::Parser;
 use lox_core::ast_printer::AstPrinter;
 use lox_core::interpreter::Interpreter;
 use lox_core::parse::Parse;
+use lox_core::runtime::RuntimeContext;
 use lox_core::tokenize::Tokenize;
 use miette::{IntoDiagnostic, NamedSource, Report, WrapErr};
 use std::fs;
@@ -21,6 +22,8 @@ use std::path::Path;
 
 fn main() -> miette::Result<()> {
     let cli = Cli::parse();
+
+    let mut rtc = RuntimeContext::new(std::io::stdout(), std::io::stderr());
 
     match &cli.command {
         Command::Tokenize { source } => {
@@ -54,7 +57,7 @@ fn main() -> miette::Result<()> {
             match source_code.tokenize().parse() {
                 Ok(program) => {
                     let mut interpreter = Interpreter::default();
-                    interpreter.interpret(&program);
+                    interpreter.interpret(&mut rtc, &program);
                 },
                 Err(syntax_errors) => {
                     for error in syntax_errors {
