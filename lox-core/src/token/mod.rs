@@ -51,48 +51,6 @@ impl Display for TokenKind {
         let formatted = if f.alternate() {
             match self {
                 Self::EndOfFile => "EOF",
-                Self::LeftParen => "'('",
-                Self::RightParen => "')'",
-                Self::LeftBrace => "'{'",
-                Self::RightBrace => "'}'",
-                Self::Comma => "','",
-                Self::Dot => "'.'",
-                Self::Semicolon => "';'",
-                Self::Minus => "'-'",
-                Self::Plus => "'+'",
-                Self::Star => "'*'",
-                Self::Slash => "'/'",
-                Self::Bang => "'!'",
-                Self::Equal => "'='",
-                Self::Greater => "'>'",
-                Self::Less => "'<'",
-                Self::BangEqual => "'!=",
-                Self::EqualEqual => "'=='",
-                Self::GreaterEqual => "'>='",
-                Self::LessEqual => "'<='",
-                Self::StringLiteral => "string literal",
-                Self::NumberLiteral => "number literal",
-                Self::Identifier => "identifier",
-                Self::And => "and",
-                Self::Class => "class",
-                Self::Else => "else",
-                Self::False => "false",
-                Self::Fun => "fun",
-                Self::For => "for",
-                Self::If => "if",
-                Self::Nil => "nil",
-                Self::Or => "or",
-                Self::Print => "print",
-                Self::Return => "return",
-                Self::Super => "super",
-                Self::This => "this",
-                Self::True => "true",
-                Self::Var => "var",
-                Self::While => "while",
-            }
-        } else {
-            match self {
-                Self::EndOfFile => "EOF",
                 Self::LeftParen => "LEFT_PAREN",
                 Self::RightParen => "RIGHT_PAREN",
                 Self::LeftBrace => "LEFT_BRACE",
@@ -131,6 +89,48 @@ impl Display for TokenKind {
                 Self::True => "TRUE",
                 Self::Var => "VAR",
                 Self::While => "WHILE",
+            }
+        } else {
+            match self {
+                Self::EndOfFile => "EOF",
+                Self::LeftParen => "(",
+                Self::RightParen => ")",
+                Self::LeftBrace => "{",
+                Self::RightBrace => "}",
+                Self::Comma => ",",
+                Self::Dot => ".",
+                Self::Semicolon => ";",
+                Self::Minus => "-",
+                Self::Plus => "+",
+                Self::Star => "*",
+                Self::Slash => "/",
+                Self::Bang => "!",
+                Self::Equal => "=",
+                Self::Greater => ">",
+                Self::Less => "<",
+                Self::BangEqual => "!=",
+                Self::EqualEqual => "==",
+                Self::GreaterEqual => ">=",
+                Self::LessEqual => "<=",
+                Self::StringLiteral => "string literal",
+                Self::NumberLiteral => "number literal",
+                Self::Identifier => "identifier",
+                Self::And => "and",
+                Self::Class => "class",
+                Self::Else => "else",
+                Self::False => "false",
+                Self::Fun => "fun",
+                Self::For => "for",
+                Self::If => "if",
+                Self::Nil => "nil",
+                Self::Or => "or",
+                Self::Print => "print",
+                Self::Return => "return",
+                Self::Super => "super",
+                Self::This => "this",
+                Self::True => "true",
+                Self::Var => "var",
+                Self::While => "while",
             }
         };
         f.write_str(formatted)
@@ -236,13 +236,13 @@ impl<'a> Token<'a> {
 impl Display for Token<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if f.alternate() {
-            f.write_str(self.lexeme)
-        } else {
             let literal = self
                 .literal
                 .as_ref()
                 .map_or_else(|| "null".to_string(), ToString::to_string);
-            write!(f, "{} {} {literal}", self.kind, self.lexeme)
+            write!(f, "{:#} {} {literal}", self.kind, self.lexeme)
+        } else {
+            f.write_str(self.lexeme)
         }
     }
 }

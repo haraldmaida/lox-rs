@@ -26,7 +26,7 @@ fn main() -> miette::Result<()> {
         Command::Tokenize { source } => {
             let source_code = read_source_file(source)?;
             source_code.tokenize().for_each(|item| match item {
-                Ok(token) => println!("{token}"),
+                Ok(token) => println!("{token:#}"),
                 Err(error) => {
                     let error = Report::from(error)
                         .with_source_code(NamedSource::new(source, source_code.clone()));
