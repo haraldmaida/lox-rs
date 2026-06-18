@@ -1,10 +1,10 @@
 use super::*;
-use crate::expr::{ExprExt, assign, binary, grouping, literal, nil, unary, variable};
+use crate::expr::{ExprExt, assign, binary, grouping, literal, logical, nil, unary, variable};
 use crate::program::program;
 use crate::stmt::{IfExt, StmtExt, block, if_, print, stmt, var};
 use crate::token::{
-    bang, bang_equal, equal_equal, greater, greater_equal, identifier, less, less_equal, minus,
-    plus, slash, star,
+    and, bang, bang_equal, equal_equal, greater, greater_equal, identifier, less, less_equal,
+    minus, or, plus, slash, star,
 };
 use crate::tokenize::Tokenize;
 use asserting::prelude::*;
@@ -455,4 +455,48 @@ fn parse_if_without_else_branch_and_nested_if_with_else_branch() {
         .else_(print(literal("x only"))),
     )
     .stmt()]));
+}
+
+#[test]
+fn parse_logical_and() {
+    let source_code = "x >= 1 and x < 10";
+
+    let result = source_code.tokenize().parse_expr();
+
+    assert_that!(result).ok().is_equal_to(
+        logical(
+            binary(
+                variable(identifier("x", (0, 1))),
+                greater_equal((2, 2)),
+                literal(1.),
+            ),
+            and((7, 3)),
+            binary(
+                variable(identifier("x", (11, 1))),
+                less((13, 1)),
+                literal(10.),
+            ),
+        )
+        .expr(),
+    );
+}
+
+#[test]
+fn parse_logical_or() {
+    let source_code = "x < 1 or x >= 10";
+
+    let result = source_code.tokenize().parse_expr();
+
+    assert_that!(result).ok().is_equal_to(
+        logical(
+            binary(variable(identifier("x", (0, 1))), less((2, 1)), literal(1.)),
+            or((6, 2)),
+            binary(
+                variable(identifier("x", (9, 1))),
+                greater_equal((11, 2)),
+                literal(10.),
+            ),
+        )
+        .expr(),
+    );
 }

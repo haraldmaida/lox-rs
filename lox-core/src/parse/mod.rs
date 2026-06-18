@@ -1,4 +1,4 @@
-use crate::expr::{Assign, Binary, Expr, Grouping, Literal, Unary, Variable};
+use crate::expr::{Assign, Binary, Expr, Grouping, Literal, Logical, Unary, Variable};
 use crate::program::Program;
 use crate::stmt::{Block, Expression, If, Print, Stmt, Var};
 use crate::token;
@@ -343,7 +343,7 @@ where
     }
 
     fn assignment(&mut self) -> Result<Expr<'a>, SyntaxError> {
-        let expr = self.equality()?;
+        let expr = self.logical_or()?;
         if let Some(token) = self.advance()? {
             if token.kind == TokenKind::Equal {
                 let value = self.assignment()?;
@@ -361,6 +361,36 @@ where
         } else {
             Ok(expr)
         }
+    }
+
+    fn logical_or(&mut self) -> Result<Expr<'a>, SyntaxError> {
+        let mut expr = self.logical_and()?;
+        while let Some(token) = self.advance()? {
+            if token.kind == TokenKind::Or {
+                let operator = token;
+                let right = self.logical_and()?;
+                expr = Logical::new(expr, operator, right).into();
+            } else {
+                self.revert(token);
+                break;
+            }
+        }
+        Ok(expr)
+    }
+
+    fn logical_and(&mut self) -> Result<Expr<'a>, SyntaxError> {
+        let mut expr = self.equality()?;
+        while let Some(token) = self.advance()? {
+            if token.kind == TokenKind::And {
+                let operator = token;
+                let right = self.equality()?;
+                expr = Logical::new(expr, operator, right).into();
+            } else {
+                self.revert(token);
+                break;
+            }
+        }
+        Ok(expr)
     }
 
     fn equality(&mut self) -> Result<Expr<'a>, SyntaxError> {
