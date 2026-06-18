@@ -5,7 +5,10 @@ use crate::expr::{
     Super, This, Unary, Variable,
 };
 use crate::runtime::RuntimeContext;
-use crate::stmt::{Block, Expression, If, Print, Stmt, StmtElement, StmtVisitor, Var};
+use crate::stmt::{
+    Block, Class, Expression, Function, If, Print, Return, Stmt, StmtElement, StmtVisitor, Var,
+    While,
+};
 use crate::token::{Token, TokenKind};
 use miette::{Diagnostic, SourceSpan};
 use std::fmt;
@@ -286,6 +289,10 @@ impl StmtVisitor for Interpreter {
         Ok(())
     }
 
+    fn visit_class_stmt(&mut self, _rtc: &mut RuntimeContext<'_>, _stmt: &Class) -> Self::Output {
+        todo!()
+    }
+
     fn visit_expression_stmt(
         &mut self,
         _rtc: &mut RuntimeContext<'_>,
@@ -293,6 +300,14 @@ impl StmtVisitor for Interpreter {
     ) -> Self::Output {
         self.evaluate(stmt.expression())?;
         Ok(())
+    }
+
+    fn visit_function_stmt(
+        &mut self,
+        _rtc: &mut RuntimeContext<'_>,
+        _stmt: &Function,
+    ) -> Self::Output {
+        todo!()
     }
 
     fn visit_if_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &If) -> Self::Output {
@@ -312,6 +327,10 @@ impl StmtVisitor for Interpreter {
         Ok(())
     }
 
+    fn visit_return_stmt(&mut self, _rtc: &mut RuntimeContext<'_>, _stmt: &Return) -> Self::Output {
+        todo!()
+    }
+
     fn visit_var_stmt(&mut self, _rtc: &mut RuntimeContext<'_>, stmt: &Var) -> Self::Output {
         let value = if let Some(initializer) = stmt.initializer() {
             self.evaluate(initializer)?
@@ -321,5 +340,9 @@ impl StmtVisitor for Interpreter {
         let symbol = Symbol::intern(stmt.name().lexeme());
         self.environment.define(symbol, value);
         Ok(())
+    }
+
+    fn visit_while_stmt(&mut self, _rtc: &mut RuntimeContext<'_>, _stmt: &While) -> Self::Output {
+        todo!()
     }
 }

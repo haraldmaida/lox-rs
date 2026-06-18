@@ -1,4 +1,5 @@
-use crate::expr::Expr;
+use crate::expr::{Expr, Variable};
+use crate::runtime::RuntimeContext;
 use crate::token::Token;
 use std::borrow::Borrow;
 use std::ops::Deref;
@@ -7,14 +8,22 @@ pub trait StmtVisitor {
     type Output;
 
     fn visit_block_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Block) -> Self::Output;
+    fn visit_class_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Class) -> Self::Output;
     fn visit_expression_stmt(
         &mut self,
         rtc: &mut RuntimeContext<'_>,
         stmt: &Expression,
     ) -> Self::Output;
+    fn visit_function_stmt(
+        &mut self,
+        rtc: &mut RuntimeContext<'_>,
+        stmt: &Function,
+    ) -> Self::Output;
     fn visit_if_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &If) -> Self::Output;
     fn visit_print_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Print) -> Self::Output;
+    fn visit_return_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Return) -> Self::Output;
     fn visit_var_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Var) -> Self::Output;
+    fn visit_while_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &While) -> Self::Output;
 }
 
 pub trait StmtElement {
@@ -30,10 +39,14 @@ pub trait StmtElement {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt<'a> {
     Block(Block<'a>),
+    Class(Class<'a>),
     Expression(Expression<'a>),
+    Function(Function<'a>),
     If(If<'a>),
     Print(Print<'a>),
+    Return(Return<'a>),
     Var(Var<'a>),
+    While(While<'a>),
 }
 
 macro_rules! impl_stmt {
@@ -62,10 +75,14 @@ macro_rules! impl_stmt {
 }
 
 impl_stmt!(Block<'a>, Block, visit_block_stmt);
+impl_stmt!(Class<'a>, Class, visit_class_stmt);
 impl_stmt!(Expression<'a>, Expression, visit_expression_stmt);
+impl_stmt!(Function<'a>, Function, visit_function_stmt);
 impl_stmt!(If<'a>, If, visit_if_stmt);
 impl_stmt!(Print<'a>, Print, visit_print_stmt);
+impl_stmt!(Return<'a>, Return, visit_return_stmt);
 impl_stmt!(Var<'a>, Var, visit_var_stmt);
+impl_stmt!(While<'a>, While, visit_while_stmt);
 
 impl StmtElement for Stmt<'_> {
     fn accept<V>(&self, visitor: &mut V, rtc: &mut RuntimeContext<'_>) -> <V as StmtVisitor>::Output
@@ -74,10 +91,14 @@ impl StmtElement for Stmt<'_> {
     {
         match self {
             Self::Block(stmt) => visitor.visit_block_stmt(rtc, stmt),
+            Self::Class(stmt) => visitor.visit_class_stmt(rtc, stmt),
             Self::Expression(stmt) => visitor.visit_expression_stmt(rtc, stmt),
+            Self::Function(stmt) => visitor.visit_function_stmt(rtc, stmt),
             Self::If(stmt) => visitor.visit_if_stmt(rtc, stmt),
             Self::Print(stmt) => visitor.visit_print_stmt(rtc, stmt),
+            Self::Return(stmt) => visitor.visit_return_stmt(rtc, stmt),
             Self::Var(stmt) => visitor.visit_var_stmt(rtc, stmt),
+            Self::While(stmt) => visitor.visit_while_stmt(rtc, stmt),
         }
     }
 }
@@ -109,6 +130,39 @@ impl<'a> FromIterator<Stmt<'a>> for Block<'a> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Class<'a> {
+    name: Option<Token<'a>>,
+    superclass: Option<Variable<'a>>,
+    methods: Vec<Function<'a>>,
+}
+
+impl<'a> Class<'a> {
+    pub const fn new(
+        name: Option<Token<'a>>,
+        superclass: Option<Variable<'a>>,
+        methods: Vec<Function<'a>>,
+    ) -> Self {
+        Self {
+            name,
+            superclass,
+            methods,
+        }
+    }
+
+    pub const fn name(&self) -> Option<&Token<'a>> {
+        self.name.as_ref()
+    }
+
+    pub const fn superclass(&self) -> Option<&Variable<'a>> {
+        self.superclass.as_ref()
+    }
+
+    pub fn methods(&self) -> &[Function<'a>] {
+        &self.methods
+    }
+}
+
 /// An expression statement.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Expression<'a>(Expr<'a>);
@@ -134,6 +188,39 @@ impl<'a> Deref for Expression<'a> {
 impl<'a> Borrow<Expr<'a>> for Expression<'a> {
     fn borrow(&self) -> &Expr<'a> {
         &self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Function<'a> {
+    name: Option<Token<'a>>,
+    parameters: Vec<Token<'a>>,
+    body: Vec<Stmt<'a>>,
+}
+
+impl<'a> Function<'a> {
+    pub const fn new(
+        name: Option<Token<'a>>,
+        parameters: Vec<Token<'a>>,
+        body: Vec<Stmt<'a>>,
+    ) -> Self {
+        Self {
+            name,
+            parameters,
+            body,
+        }
+    }
+
+    pub const fn name(&self) -> Option<&Token<'a>> {
+        self.name.as_ref()
+    }
+
+    pub fn parameters(&self) -> &[Token<'a>] {
+        &self.parameters
+    }
+
+    pub fn body(&self) -> &[Stmt<'a>] {
+        &self.body
     }
 }
 
@@ -182,6 +269,26 @@ impl<'a> Print<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct Return<'a> {
+    keyword: Token<'a>,
+    value: Option<Expr<'a>>,
+}
+
+impl<'a> Return<'a> {
+    pub const fn new(keyword: Token<'a>, value: Option<Expr<'a>>) -> Self {
+        Self { keyword, value }
+    }
+
+    pub const fn keyword(&self) -> &Token<'a> {
+        &self.keyword
+    }
+
+    pub const fn value(&self) -> Option<&Expr<'a>> {
+        self.value.as_ref()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Var<'a> {
     name: Token<'a>,
     initializer: Option<Expr<'a>>,
@@ -201,7 +308,29 @@ impl<'a> Var<'a> {
     }
 }
 
-use crate::runtime::RuntimeContext;
+#[derive(Debug, Clone, PartialEq)]
+pub struct While<'a> {
+    condition: Expr<'a>,
+    body: Box<Stmt<'a>>,
+}
+
+impl<'a> While<'a> {
+    pub fn new(condition: Expr<'a>, body: Stmt<'a>) -> Self {
+        Self {
+            condition,
+            body: Box::new(body),
+        }
+    }
+
+    pub const fn condition(&self) -> &Expr<'a> {
+        &self.condition
+    }
+
+    pub fn body(&self) -> &Stmt<'a> {
+        &self.body
+    }
+}
+
 #[cfg(any(test, feature = "dsl"))]
 pub use dsl::*;
 
