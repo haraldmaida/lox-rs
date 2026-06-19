@@ -1,3 +1,6 @@
+#[cfg(any(test, feature = "dsl"))]
+pub use dsl::*;
+
 use lasso::{Spur, ThreadedRodeo};
 use std::fmt;
 use std::fmt::Display;
@@ -110,9 +113,6 @@ impl From<&str> for Value {
         Self::String(value.to_owned())
     }
 }
-
-#[cfg(any(test, feature = "dsl"))]
-pub use dsl::*;
 
 #[cfg(any(test, feature = "dsl"))]
 mod dsl;

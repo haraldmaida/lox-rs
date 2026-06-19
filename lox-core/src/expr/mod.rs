@@ -1,3 +1,6 @@
+#[cfg(any(test, feature = "dsl"))]
+pub use dsl::*;
+
 use crate::data::Symbol;
 use crate::token::Token;
 
@@ -395,9 +398,6 @@ impl<'a> Variable<'a> {
         self.name
     }
 }
-
-#[cfg(any(test, feature = "dsl"))]
-pub use dsl::*;
 
 #[cfg(any(test, feature = "dsl"))]
 mod dsl;

@@ -1,3 +1,6 @@
+#[cfg(any(test, feature = "dsl"))]
+pub use dsl::*;
+
 use crate::data::Symbol;
 use miette::SourceSpan;
 use std::fmt;
@@ -246,9 +249,6 @@ impl Display for Token<'_> {
         }
     }
 }
-
-#[cfg(any(test, feature = "dsl"))]
-pub use dsl::*;
 
 #[cfg(any(test, feature = "dsl"))]
 mod dsl;

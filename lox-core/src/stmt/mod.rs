@@ -1,3 +1,6 @@
+#[cfg(any(test, feature = "dsl"))]
+pub use dsl::*;
+
 use crate::expr::{Expr, Variable};
 use crate::runtime::RuntimeContext;
 use crate::token::Token;
@@ -330,9 +333,6 @@ impl<'a> While<'a> {
         &self.body
     }
 }
-
-#[cfg(any(test, feature = "dsl"))]
-pub use dsl::*;
 
 #[cfg(any(test, feature = "dsl"))]
 mod dsl;
