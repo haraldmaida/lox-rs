@@ -1,10 +1,12 @@
 use super::*;
-use crate::expr::{ExprExt, assign, binary, grouping, literal, logical, nil, unary, variable};
+use crate::expr::{
+    ExprExt, assign, binary, call, grouping, literal, logical, nil, unary, variable,
+};
 use crate::program::program;
 use crate::stmt::{IfExt, StmtExt, block, if_, print, stmt, var, while_};
 use crate::token::{
     and, bang, bang_equal, equal_equal, greater, greater_equal, identifier, less, less_equal,
-    minus, or, plus, slash, star,
+    minus, or, plus, right_paren, slash, star,
 };
 use crate::tokenize::Tokenize;
 use asserting::prelude::*;
@@ -727,5 +729,110 @@ fn parse_for_loop_without_increment() {
         )
         .stmt(),
     ])
+    .stmt()]));
+}
+
+#[test]
+fn parse_function_call_with_no_arguments() {
+    let source_code = "foo();";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().is_equal_to(program([call(
+        variable(identifier("foo", (0, 3))),
+        right_paren((4, 1)),
+        [],
+    )
+    .expr()
+    .stmt()]));
+}
+
+#[test]
+fn parse_function_call_with_one_arguments() {
+    let source_code = "foo(42);";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().is_equal_to(program([call(
+        variable(identifier("foo", (0, 3))),
+        right_paren((6, 1)),
+        [literal(42.).expr()],
+    )
+    .expr()
+    .stmt()]));
+}
+
+#[test]
+fn parse_function_call_with_two_arguments() {
+    let source_code = "foo(42, \"Hello, World!\");";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().is_equal_to(program([call(
+        variable(identifier("foo", (0, 3))),
+        right_paren((23, 1)),
+        [literal(42.).expr(), literal("Hello, World!").expr()],
+    )
+    .expr()
+    .stmt()]));
+}
+
+#[test]
+fn parse_function_call_with_three_arguments() {
+    let source_code = "foo(x, 42, \"Hello, World!\");";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().is_equal_to(program([call(
+        variable(identifier("foo", (0, 3))),
+        right_paren((26, 1)),
+        [
+            variable(identifier("x", (4, 1))).expr(),
+            literal(42.).expr(),
+            literal("Hello, World!").expr(),
+        ],
+    )
+    .expr()
+    .stmt()]));
+}
+
+#[test]
+fn parse_function_call_with_grouping_in_an_argument() {
+    let source_code = "foo(x, (42 - 3));";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().is_equal_to(program([call(
+        variable(identifier("foo", (0, 3))),
+        right_paren((15, 1)),
+        [
+            variable(identifier("x", (4, 1))).expr(),
+            grouping(binary(literal(42.), minus((11, 1)), literal(3.))).expr(),
+        ],
+    )
+    .expr()
+    .stmt()]));
+}
+
+#[test]
+fn parse_function_call_on_return_value_of_a_function_call() {
+    let source_code = "foo(a)()(b);";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().is_equal_to(program([call(
+        call(
+            call(
+                variable(identifier("foo", (0, 3))),
+                right_paren((5, 1)),
+                [variable(identifier("a", (4, 1))).expr()],
+            ),
+            right_paren((7, 1)),
+            [],
+        ),
+        right_paren((10, 1)),
+        [variable(identifier("b", (9, 1))).expr()],
+    )
+    .expr()
     .stmt()]));
 }

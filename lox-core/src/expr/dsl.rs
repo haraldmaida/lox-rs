@@ -35,9 +35,9 @@ pub fn binary<'a>(
 pub fn call<'a>(
     callee: impl Into<Expr<'a>>,
     paren: Token<'a>,
-    arguments: Vec<Expr<'a>>,
+    arguments: impl IntoIterator<Item = Expr<'a>>,
 ) -> Call<'a> {
-    Call::new(callee.into(), paren, arguments)
+    Call::new(callee.into(), paren, arguments.into_iter().collect())
 }
 
 pub fn get<'a>(object: impl Into<Expr<'a>>, name: Token<'a>) -> Get<'a> {

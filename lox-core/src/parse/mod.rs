@@ -1,4 +1,4 @@
-use crate::expr::{Assign, Binary, Expr, Grouping, Literal, Logical, Unary, Variable};
+use crate::expr::{Assign, Binary, Call, Expr, Grouping, Literal, Logical, Unary, Variable};
 use crate::program::Program;
 use crate::stmt::{Block, Expression, If, Print, Stmt, Var, While};
 use crate::token;
@@ -553,11 +553,48 @@ where
                 },
                 _ => {
                     self.revert(token);
-                    self.primary()
+                    self.call()
                 },
             },
             None => Err(self.error(SyntaxErrorCode::UnexpectedEndOfInput)),
         }
+    }
+
+    fn call(&mut self) -> Result<Expr<'a>, SyntaxError> {
+        let mut expr = self.primary()?;
+        while let Some(token) = self.advance()? {
+            if token.kind == TokenKind::LeftParen {
+                expr = self.finish_call(expr)?;
+            } else {
+                self.revert(token);
+                break;
+            }
+        }
+        Ok(expr)
+    }
+
+    fn finish_call(&mut self, callee: Expr<'a>) -> Result<Expr<'a>, SyntaxError> {
+        let mut arguments = Vec::new();
+        let paren = if let Some(token) = self.advance()? {
+            if token.kind == TokenKind::RightParen {
+                token
+            } else {
+                self.revert(token);
+                loop {
+                    arguments.push(self.expression()?);
+                    if let Some(token) = self.advance()?
+                        && token.kind != TokenKind::Comma
+                    {
+                        self.revert(token);
+                        break;
+                    }
+                }
+                self.consume(TokenKind::RightParen)?
+            }
+        } else {
+            return Err(self.error(SyntaxErrorCode::MissingToken(TokenKind::RightParen)));
+        };
+        Ok(Call::new(callee, paren, arguments).into())
     }
 
     fn primary(&mut self) -> Result<Expr<'a>, SyntaxError> {
