@@ -15,6 +15,9 @@ pub enum SyntaxErrorCode {
     InvalidExpression(String),
     InvalidNumberLiteral(String),
     IoError(String),
+    MissingForCondition,
+    MissingForIncrement,
+    MissingForInitializer,
     MissingToken(TokenKind),
     UnexpectedEndOfInput,
     UnexpectedCharacter(char),
@@ -39,6 +42,15 @@ impl Display for SyntaxErrorCode {
             },
             Self::IoError(message) => {
                 write!(f, "{message}")
+            },
+            Self::MissingForCondition => {
+                write!(f, "missing for condition or semicolon")
+            },
+            Self::MissingForIncrement => {
+                write!(f, "missing for increment or right paren")
+            },
+            Self::MissingForInitializer => {
+                write!(f, "missing for initializer or semicolon")
             },
             Self::MissingToken(kind) => {
                 write!(f, "missing {kind:#}")
@@ -286,6 +298,7 @@ where
             Ok(None) => Err(self.error(SyntaxErrorCode::UnexpectedEndOfInput)),
             Ok(Some(token)) => match token.kind {
                 TokenKind::LeftBrace => self.block(),
+                TokenKind::For => self.for_statement(),
                 TokenKind::If => self.if_statement(),
                 TokenKind::Print => self.print_statement(),
                 TokenKind::While => self.while_statement(),
@@ -305,6 +318,59 @@ where
         }
         self.consume(TokenKind::RightBrace)?;
         Ok(Block::new(statements).into())
+    }
+
+    fn for_statement(&mut self) -> Result<Stmt<'a>, SyntaxError> {
+        self.consume(TokenKind::LeftParen)?;
+        let initializer = if let Some(token) = self.advance()? {
+            match token.kind {
+                TokenKind::Semicolon => None,
+                TokenKind::Var => Some(self.var_declaration()?),
+                _ => {
+                    self.revert(token);
+                    Some(self.expression_statement()?)
+                },
+            }
+        } else {
+            return Err(self.error(SyntaxErrorCode::MissingForInitializer));
+        };
+        let condition = if let Some(token) = self.advance()? {
+            self.revert(token);
+            if token.kind == TokenKind::Semicolon {
+                Literal::Bool(true).into()
+            } else {
+                self.expression()?
+            }
+        } else {
+            return Err(self.error(SyntaxErrorCode::MissingForCondition));
+        };
+        self.consume(TokenKind::Semicolon)?;
+        let increment = if let Some(token) = self.advance()? {
+            self.revert(token);
+            if token.kind == TokenKind::RightParen {
+                None
+            } else {
+                Some(Stmt::from(self.expression()?))
+            }
+        } else {
+            return Err(self.error(SyntaxErrorCode::MissingForIncrement));
+        };
+        self.consume(TokenKind::RightParen)?;
+        let body = self.statement()?;
+        let while_stmt = match (initializer, increment) {
+            (None, None) => Stmt::from(While::new(condition, body)),
+            (None, Some(incr)) => {
+                Stmt::from(While::new(condition, Block::new(vec![body, incr]).into()))
+            },
+            (Some(init), None) => {
+                Stmt::from(Block::new(vec![init, While::new(condition, body).into()]))
+            },
+            (Some(init), Some(incr)) => Stmt::from(Block::new(vec![
+                init,
+                While::new(condition, Block::new(vec![body, incr]).into()).into(),
+            ])),
+        };
+        Ok(while_stmt)
     }
 
     fn if_statement(&mut self) -> Result<Stmt<'a>, SyntaxError> {

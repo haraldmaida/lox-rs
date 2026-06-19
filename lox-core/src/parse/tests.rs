@@ -554,3 +554,178 @@ fn parse_while_loop_with_multiple_statements() {
     )
     .stmt()]));
 }
+
+#[test]
+fn parse_for_loop_with_one_statement() {
+    let source_code = "for (var i = 0; i < 10; i = i + 1) print i;";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().is_equal_to(program([block([
+        var(identifier("i", (9, 1)), literal(0.).expr()).stmt(),
+        while_(
+            binary(
+                variable(identifier("i", (16, 1))),
+                less((18, 1)),
+                literal(10.),
+            ),
+            block([
+                print(variable(identifier("i", (41, 1)))).stmt(),
+                assign(
+                    identifier("i", (24, 1)),
+                    binary(
+                        variable(identifier("i", (28, 1))),
+                        plus((30, 1)),
+                        literal(1.),
+                    ),
+                )
+                .expr()
+                .stmt(),
+            ]),
+        )
+        .stmt(),
+    ])
+    .stmt()]));
+}
+
+#[test]
+fn parse_for_loop_with_multiple_statements() {
+    let source_code = "for (var i = 0; i < 10; i = i + 1) { var x = i * 2; print x; }";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().is_equal_to(program([block([
+        var(identifier("i", (9, 1)), literal(0.).expr()).stmt(),
+        while_(
+            binary(
+                variable(identifier("i", (16, 1))),
+                less((18, 1)),
+                literal(10.),
+            ),
+            block([
+                block([
+                    var(
+                        identifier("x", (41, 1)),
+                        binary(
+                            variable(identifier("i", (45, 1))),
+                            star((47, 1)),
+                            literal(2.),
+                        )
+                        .expr(),
+                    )
+                    .stmt(),
+                    print(variable(identifier("x", (58, 1)))).stmt(),
+                ])
+                .stmt(),
+                assign(
+                    identifier("i", (24, 1)),
+                    binary(
+                        variable(identifier("i", (28, 1))),
+                        plus((30, 1)),
+                        literal(1.),
+                    ),
+                )
+                .expr()
+                .stmt(),
+            ]),
+        )
+        .stmt(),
+    ])
+    .stmt()]));
+}
+
+#[test]
+fn parse_for_loop_with_no_parts() {
+    let source_code = "for (;;) print \"Hello, World!\";";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().is_equal_to(program([while_(
+        literal(true),
+        print(literal("Hello, World!")).stmt(),
+    )
+    .stmt()]));
+}
+
+#[test]
+fn parse_for_loop_without_initializer() {
+    let source_code = "var i = 5; for (; i < 10; i = i + 1) print i;";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().is_equal_to(program([
+        var(identifier("i", (4, 1)), literal(5.).expr()).stmt(),
+        while_(
+            binary(
+                variable(identifier("i", (18, 1))),
+                less((20, 1)),
+                literal(10.),
+            ),
+            block([
+                print(variable(identifier("i", (43, 1)))).stmt(),
+                assign(
+                    identifier("i", (26, 1)),
+                    binary(
+                        variable(identifier("i", (30, 1))),
+                        plus((32, 1)),
+                        literal(1.),
+                    ),
+                )
+                .expr()
+                .stmt(),
+            ])
+            .stmt(),
+        )
+        .stmt(),
+    ]));
+}
+
+#[test]
+fn parse_for_loop_without_condition() {
+    let source_code = "for (var i = 0; ; i = i + 1) print i;";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().is_equal_to(program([block([
+        var(identifier("i", (9, 1)), literal(0.).expr()).stmt(),
+        while_(
+            literal(true),
+            block([
+                print(variable(identifier("i", (35, 1)))).stmt(),
+                assign(
+                    identifier("i", (18, 1)),
+                    binary(
+                        variable(identifier("i", (22, 1))),
+                        plus((24, 1)),
+                        literal(1.),
+                    ),
+                )
+                .expr()
+                .stmt(),
+            ]),
+        )
+        .stmt(),
+    ])
+    .stmt()]));
+}
+
+#[test]
+fn parse_for_loop_without_increment() {
+    let source_code = "for (var i = 0; i < 10;) print i;";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().is_equal_to(program([block([
+        var(identifier("i", (9, 1)), literal(0.).expr()).stmt(),
+        while_(
+            binary(
+                variable(identifier("i", (16, 1))),
+                less((18, 1)),
+                literal(10.),
+            ),
+            print(variable(identifier("i", (31, 1)))).stmt(),
+        )
+        .stmt(),
+    ])
+    .stmt()]));
+}
