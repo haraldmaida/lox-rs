@@ -8,6 +8,8 @@ use miette::{Diagnostic, SourceSpan};
 use std::fmt;
 use std::fmt::Display;
 
+const MAX_CALL_ARGUMENTS: usize = 255;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SyntaxErrorCode {
     CharacterAfterEndOfFile(char),
@@ -19,6 +21,7 @@ pub enum SyntaxErrorCode {
     MissingForIncrement,
     MissingForInitializer,
     MissingToken(TokenKind),
+    TooManyCallArguments(usize, usize),
     UnexpectedEndOfInput,
     UnexpectedCharacter(char),
     UnexpectedToken(TokenKind),
@@ -54,6 +57,12 @@ impl Display for SyntaxErrorCode {
             },
             Self::MissingToken(kind) => {
                 write!(f, "missing {kind:#}")
+            },
+            Self::TooManyCallArguments(count, max_count) => {
+                write!(
+                    f,
+                    "too many arguments ({count}) in function call. the maximum number of arguments is limited to {max_count}."
+                )
             },
             Self::UnexpectedEndOfInput => {
                 write!(f, "unexpected end of input")
@@ -594,6 +603,12 @@ where
         } else {
             return Err(self.error(SyntaxErrorCode::MissingToken(TokenKind::RightParen)));
         };
+        if arguments.len() > MAX_CALL_ARGUMENTS {
+            return Err(self.error(SyntaxErrorCode::TooManyCallArguments(
+                arguments.len(),
+                MAX_CALL_ARGUMENTS,
+            )));
+        }
         Ok(Call::new(callee, paren, arguments).into())
     }
 
