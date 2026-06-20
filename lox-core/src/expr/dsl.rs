@@ -3,48 +3,44 @@ use super::{
 };
 use crate::token::Token;
 
-pub trait ExprExt<'a> {
-    fn expr(self) -> Expr<'a>;
+pub trait ExprExt {
+    fn expr(self) -> Expr;
 }
 
-impl<'a, T> ExprExt<'a> for T
+impl<T> ExprExt for T
 where
-    T: Into<Expr<'a>>,
+    T: Into<Expr>,
 {
-    fn expr(self) -> Expr<'a> {
+    fn expr(self) -> Expr {
         self.into()
     }
 }
 
-pub fn expr<'a>(expr: impl Into<Expr<'a>>) -> Expr<'a> {
+pub fn expr(expr: impl Into<Expr>) -> Expr {
     expr.into()
 }
 
-pub fn assign<'a>(name: Token<'a>, value: impl Into<Expr<'a>>) -> Assign<'a> {
+pub fn assign(name: Token, value: impl Into<Expr>) -> Assign {
     Assign::new(name, value.into())
 }
 
-pub fn binary<'a>(
-    left: impl Into<Expr<'a>>,
-    operator: Token<'a>,
-    right: impl Into<Expr<'a>>,
-) -> Binary<'a> {
+pub fn binary(left: impl Into<Expr>, operator: Token, right: impl Into<Expr>) -> Binary {
     Binary::new(left.into(), operator, right.into())
 }
 
-pub fn call<'a>(
-    callee: impl Into<Expr<'a>>,
-    paren: Token<'a>,
-    arguments: impl IntoIterator<Item = Expr<'a>>,
-) -> Call<'a> {
+pub fn call(
+    callee: impl Into<Expr>,
+    paren: Token,
+    arguments: impl IntoIterator<Item = Expr>,
+) -> Call {
     Call::new(callee.into(), paren, arguments.into_iter().collect())
 }
 
-pub fn get<'a>(object: impl Into<Expr<'a>>, name: Token<'a>) -> Get<'a> {
+pub fn get(object: impl Into<Expr>, name: Token) -> Get {
     Get::new(object.into(), name)
 }
 
-pub fn grouping<'a>(expression: impl Into<Expr<'a>>) -> Grouping<'a> {
+pub fn grouping(expression: impl Into<Expr>) -> Grouping {
     Grouping::new(expression.into())
 }
 
@@ -56,34 +52,26 @@ pub const fn nil() -> Literal {
     Literal::Nil
 }
 
-pub fn logical<'a>(
-    left: impl Into<Expr<'a>>,
-    operator: Token<'a>,
-    right: impl Into<Expr<'a>>,
-) -> Logical<'a> {
+pub fn logical(left: impl Into<Expr>, operator: Token, right: impl Into<Expr>) -> Logical {
     Logical::new(left.into(), operator, right.into())
 }
 
-pub fn set<'a>(
-    object: impl Into<Expr<'a>>,
-    name: Token<'a>,
-    value: impl Into<Expr<'a>>,
-) -> Set<'a> {
+pub fn set(object: impl Into<Expr>, name: Token, value: impl Into<Expr>) -> Set {
     Set::new(object.into(), name, value.into())
 }
 
-pub const fn super_<'a>(keyword: Token<'a>, method: Token<'a>) -> Super<'a> {
+pub const fn super_(keyword: Token, method: Token) -> Super {
     Super::new(keyword, method)
 }
 
-pub const fn this_(keyword: Token<'_>) -> This<'_> {
+pub const fn this_(keyword: Token) -> This {
     This::new(keyword)
 }
 
-pub fn unary<'a>(operator: Token<'a>, right: impl Into<Expr<'a>>) -> Unary<'a> {
+pub fn unary(operator: Token, right: impl Into<Expr>) -> Unary {
     Unary::new(operator, right.into())
 }
 
-pub const fn variable(name: Token<'_>) -> Variable<'_> {
+pub const fn variable(name: Token) -> Variable {
     Variable::new(name)
 }

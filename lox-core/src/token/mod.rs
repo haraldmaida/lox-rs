@@ -180,18 +180,18 @@ impl From<Symbol> for Literal {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Token<'a> {
+pub struct Token {
     pub kind: TokenKind,
     pub literal: Option<Literal>,
-    pub lexeme: &'a str,
+    pub lexeme: Symbol,
     pub location: SourceSpan,
 }
 
-impl<'a> Token<'a> {
+impl Token {
     pub const fn new(
         kind: TokenKind,
         literal: Option<Literal>,
-        lexeme: &'a str,
+        lexeme: Symbol,
         location: SourceSpan,
     ) -> Self {
         Self {
@@ -227,7 +227,7 @@ impl<'a> Token<'a> {
         self.literal.as_ref()
     }
 
-    pub const fn lexeme(&self) -> &str {
+    pub const fn lexeme(&self) -> Symbol {
         self.lexeme
     }
 
@@ -236,7 +236,7 @@ impl<'a> Token<'a> {
     }
 }
 
-impl Display for Token<'_> {
+impl Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if f.alternate() {
             let literal = self
@@ -245,7 +245,7 @@ impl Display for Token<'_> {
                 .map_or_else(|| "null".to_string(), ToString::to_string);
             write!(f, "{:#} {} {literal}", self.kind, self.lexeme)
         } else {
-            f.write_str(self.lexeme)
+            f.write_str(self.lexeme.as_str())
         }
     }
 }

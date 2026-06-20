@@ -8,7 +8,7 @@ proptest! {
         name in any::<String>(),
         value in any::<Value>(),
     ) {
-        let environment = Environment::new_global();
+        let environment = Environment::new_root();
 
         let symbol = Symbol::from(name);
         environment.define(symbol, value.clone());
@@ -21,7 +21,7 @@ proptest! {
     fn looking_up_a_non_existing_variable_returns_an_error(
         name in any::<String>(),
     ) {
-        let environment = Environment::new_global();
+        let environment = Environment::new_root();
         let symbol = Symbol::from(name);
 
         let maybe_value = environment.lookup(symbol);
@@ -35,7 +35,7 @@ proptest! {
         value_before in any::<Value>(),
         value_after in any::<Value>(),
     ) {
-        let environment = Environment::new_global();
+        let environment = Environment::new_root();
         let symbol = Symbol::from(name);
         environment.define(symbol, value_before);
 
@@ -51,7 +51,7 @@ proptest! {
         name in any::<String>(),
         value in any::<Value>(),
     ) {
-        let environment = Environment::new_global();
+        let environment = Environment::new_root();
         let symbol = Symbol::from(name);
 
         let result = environment.assign(symbol, value);
@@ -62,7 +62,7 @@ proptest! {
 
 #[test]
 fn can_create_new_local_environment_that_is_enclosed_by_the_current_one() {
-    let global_env = Environment::new_global();
+    let global_env = Environment::new_root();
     global_env.define("foo", "some value");
 
     let local_env = global_env.new_local();
@@ -74,7 +74,7 @@ fn can_create_new_local_environment_that_is_enclosed_by_the_current_one() {
 
 #[test]
 fn a_new_local_environment_shadows_a_variable_with_same_name_from_the_enclosing_environment() {
-    let global_env = Environment::new_global();
+    let global_env = Environment::new_root();
     global_env.define("foo", "some value");
     global_env.define("bar", "another value");
 
@@ -89,7 +89,7 @@ fn a_new_local_environment_shadows_a_variable_with_same_name_from_the_enclosing_
 
 #[test]
 fn can_assign_to_a_variable_defined_in_the_enclosing_environment() {
-    let global_env = Environment::new_global();
+    let global_env = Environment::new_root();
     global_env.define("foo", "some value");
 
     let local_env = global_env.new_local();
@@ -104,7 +104,7 @@ fn can_assign_to_a_variable_defined_in_the_enclosing_environment() {
 
 #[test]
 fn dropping_a_local_environment_does_not_affect_the_enclosing_environment() {
-    let global_env = Environment::new_global();
+    let global_env = Environment::new_root();
     global_env.define("foo", "some value");
     global_env.define("bar", "another value");
 
@@ -125,7 +125,7 @@ fn dropping_a_local_environment_does_not_affect_the_enclosing_environment() {
 
 #[test]
 fn creating_a_new_local_environment_after_dropping_the_last_one() {
-    let global_env = Environment::new_global();
+    let global_env = Environment::new_root();
     global_env.define("foo", "some value");
     global_env.define("bar", "another value");
 

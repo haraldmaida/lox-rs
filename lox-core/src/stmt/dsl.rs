@@ -2,32 +2,32 @@ use super::{Block, Class, Expression, Function, If, Print, Return, Stmt, Var, Wh
 use crate::expr::{Expr, Variable};
 use crate::token::Token;
 
-pub trait StmtExt<'a> {
-    fn stmt(self) -> Stmt<'a>;
+pub trait StmtExt {
+    fn stmt(self) -> Stmt;
 }
 
-impl<'a, T> StmtExt<'a> for T
+impl<T> StmtExt for T
 where
-    T: Into<Stmt<'a>>,
+    T: Into<Stmt>,
 {
-    fn stmt(self) -> Stmt<'a> {
+    fn stmt(self) -> Stmt {
         self.into()
     }
 }
 
-pub fn stmt<'a>(stmt: impl Into<Stmt<'a>>) -> Stmt<'a> {
+pub fn stmt(stmt: impl Into<Stmt>) -> Stmt {
     stmt.into()
 }
 
-pub fn block<'a>(statements: impl IntoIterator<Item = Stmt<'a>>) -> Block<'a> {
+pub fn block(statements: impl IntoIterator<Item = Stmt>) -> Block {
     Block::new(statements.into_iter().collect())
 }
 
-pub fn class<'a>(
-    name: impl Into<Option<Token<'a>>>,
-    superclass: impl Into<Option<Variable<'a>>>,
-    methods: impl IntoIterator<Item = Function<'a>>,
-) -> Class<'a> {
+pub fn class(
+    name: impl Into<Option<Token>>,
+    superclass: impl Into<Option<Variable>>,
+    methods: impl IntoIterator<Item = Function>,
+) -> Class {
     Class::new(
         name.into(),
         superclass.into(),
@@ -35,50 +35,50 @@ pub fn class<'a>(
     )
 }
 
-pub fn expression<'a>(expr: impl Into<Expression<'a>>) -> Expression<'a> {
+pub fn expression(expr: impl Into<Expression>) -> Expression {
     expr.into()
 }
 
-pub fn function<'a>(
-    name: impl Into<Option<Token<'a>>>,
-    params: impl IntoIterator<Item = Token<'a>>,
-    body: impl IntoIterator<Item = Stmt<'a>>,
-) -> Function<'a> {
+pub fn function(
+    name: Token,
+    params: impl IntoIterator<Item = Token>,
+    body: impl IntoIterator<Item = Stmt>,
+) -> Function {
     Function::new(
-        name.into(),
+        name,
         params.into_iter().collect(),
         body.into_iter().collect(),
     )
 }
 
-pub fn if_<'a>(condition: impl Into<Expr<'a>>, then_branch: impl Into<Stmt<'a>>) -> If<'a> {
+pub fn if_(condition: impl Into<Expr>, then_branch: impl Into<Stmt>) -> If {
     If::new(condition.into(), then_branch.into(), None)
 }
 
-pub trait IfExt<'a> {
+pub trait IfExt {
     #[must_use = "The `else_` method returns a new `If` with the `else_branch` set"]
-    fn else_(self, else_branch: impl Into<Stmt<'a>>) -> Self;
+    fn else_(self, else_branch: impl Into<Stmt>) -> Self;
 }
 
-impl<'a> IfExt<'a> for If<'a> {
-    fn else_(mut self, else_branch: impl Into<Stmt<'a>>) -> Self {
+impl IfExt for If {
+    fn else_(mut self, else_branch: impl Into<Stmt>) -> Self {
         self.else_branch = Some(Box::new(else_branch.into()));
         self
     }
 }
 
-pub fn print<'a>(expr: impl Into<Expr<'a>>) -> Print<'a> {
+pub fn print(expr: impl Into<Expr>) -> Print {
     Print::new(expr.into())
 }
 
-pub fn return_<'a>(keyword: Token<'a>, value: impl Into<Option<Expr<'a>>>) -> Return<'a> {
+pub fn return_(keyword: Token, value: impl Into<Option<Expr>>) -> Return {
     Return::new(keyword, value.into())
 }
 
-pub fn var<'a>(name: Token<'a>, initializer: impl Into<Option<Expr<'a>>>) -> Var<'a> {
+pub fn var(name: Token, initializer: impl Into<Option<Expr>>) -> Var {
     Var::new(name, initializer.into())
 }
 
-pub fn while_<'a>(condition: impl Into<Expr<'a>>, body: impl Into<Stmt<'a>>) -> While<'a> {
+pub fn while_(condition: impl Into<Expr>, body: impl Into<Stmt>) -> While {
     While::new(condition.into(), body.into())
 }

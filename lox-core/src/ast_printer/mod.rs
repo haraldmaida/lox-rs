@@ -1,3 +1,4 @@
+use crate::data::Symbol;
 use crate::expr::{
     Assign, Binary, Call, Expr, ExprElement, ExprVisitor, Get, Grouping, Literal, Logical, Set,
     Super, This, Unary, Variable,
@@ -36,7 +37,12 @@ where
         write!(self.out, "{value}").map_err(From::from)
     }
 
-    fn write_grouped(&mut self, name: &str, expressions: &[&Expr]) -> Result<(), Error> {
+    fn write_grouped(
+        &mut self,
+        name: impl Into<Symbol>,
+        expressions: &[&Expr],
+    ) -> Result<(), Error> {
+        let name = name.into();
         write!(self.out, "({name}")?;
         for expr in expressions {
             write!(self.out, " ")?;

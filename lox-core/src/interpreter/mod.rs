@@ -1,4 +1,5 @@
-use crate::data::{Symbol, Value};
+use crate::data;
+use crate::data::{Callable, LoxFunction, NativeFunction, Symbol, Value};
 use crate::environment::{Environment, EnvironmentError};
 use crate::expr::{
     Assign, Binary, Call, Expr, ExprElement, ExprVisitor, Get, Grouping, Literal, Logical, Set,
@@ -11,8 +12,8 @@ use crate::stmt::{
 };
 use crate::token::{Token, TokenKind};
 use miette::{Diagnostic, SourceSpan};
-use std::fmt;
 use std::fmt::Display;
+use std::{fmt, mem};
 
 #[cfg(test)]
 mod tests;
@@ -77,7 +78,7 @@ pub struct RuntimeError {
 }
 
 impl RuntimeError {
-    pub const fn new(code: RuntimeErrorCode, token: Token<'_>) -> Self {
+    pub const fn new(code: RuntimeErrorCode, token: Token) -> Self {
         Self {
             code,
             operation: token.kind,
@@ -101,12 +102,14 @@ impl RuntimeError {
 /// A tree-walk interpreter for Lox.
 pub struct Interpreter {
     environment: Environment,
+    globals: Environment,
 }
 
 impl Default for Interpreter {
     fn default() -> Self {
         Self {
-            environment: Environment::new_global(),
+            environment: Environment::new_root(),
+            globals: Environment::new_root(),
         }
     }
 }
@@ -116,9 +119,13 @@ impl Interpreter {
         &self.environment
     }
 
-    pub fn interpret<'a, P>(&mut self, rtc: &mut RuntimeContext<'_>, program: P)
+    pub const fn globals(&self) -> &Environment {
+        &self.globals
+    }
+
+    pub fn interpret<P>(&mut self, rtc: &mut RuntimeContext<'_>, program: P)
     where
-        P: AsRef<[Stmt<'a>]>,
+        P: AsRef<[Stmt]>,
     {
         let statements = program.as_ref();
         for stmt in statements {
@@ -128,16 +135,34 @@ impl Interpreter {
         }
     }
 
+    pub fn evaluate(&mut self, expression: &Expr) -> Result<Value, RuntimeError> {
+        expression.accept(self)
+    }
+
     pub fn execute(
         &mut self,
         rtc: &mut RuntimeContext<'_>,
-        statement: &Stmt<'_>,
+        statement: &Stmt,
     ) -> Result<(), RuntimeError> {
         statement.accept(self, rtc)
     }
 
-    pub fn evaluate(&mut self, expression: &Expr<'_>) -> Result<Value, RuntimeError> {
-        expression.accept(self)
+    pub fn execute_block(
+        &mut self,
+        rtc: &mut RuntimeContext<'_>,
+        environment: Environment,
+        statements: &[Stmt],
+    ) -> Result<(), RuntimeError> {
+        let previous_environment = mem::replace(&mut self.environment, environment);
+        for a_stmt in statements {
+            let result = self.execute(rtc, a_stmt);
+            if let Err(error) = result {
+                self.environment = previous_environment;
+                return Err(error);
+            }
+        }
+        self.environment = previous_environment;
+        Ok(())
     }
 }
 
@@ -146,7 +171,7 @@ impl ExprVisitor for Interpreter {
 
     fn visit_assign_expr(&mut self, expr: &Assign) -> Self::Output {
         let value = self.evaluate(expr.value())?;
-        let symbol = Symbol::intern(expr.name().lexeme());
+        let symbol = expr.name().lexeme();
         self.environment
             .assign(symbol, value.clone())
             .map_err(|err| RuntimeError::new(err.into(), *expr.name()))?;
@@ -272,7 +297,7 @@ impl ExprVisitor for Interpreter {
     }
 
     fn visit_variable_expr(&mut self, expr: &Variable) -> Self::Output {
-        let symbol = Symbol::intern(expr.name().lexeme());
+        let symbol = expr.name().lexeme();
         self.environment
             .lookup(symbol)
             .map_err(|err| RuntimeError::new(err.into(), *expr.name()))
@@ -283,16 +308,7 @@ impl StmtVisitor for Interpreter {
     type Output = Result<(), RuntimeError>;
 
     fn visit_block_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Block) -> Self::Output {
-        self.environment = self.environment.new_local();
-        for a_stmt in stmt.statements() {
-            let result = self.execute(rtc, a_stmt);
-            if let Err(error) = result {
-                self.environment = self.environment.enclosing();
-                return Err(error);
-            }
-        }
-        self.environment = self.environment.enclosing();
-        Ok(())
+        self.execute_block(rtc, self.environment.new_local(), stmt.statements())
     }
 
     fn visit_class_stmt(&mut self, _rtc: &mut RuntimeContext<'_>, _stmt: &Class) -> Self::Output {
@@ -311,9 +327,11 @@ impl StmtVisitor for Interpreter {
     fn visit_function_stmt(
         &mut self,
         _rtc: &mut RuntimeContext<'_>,
-        _stmt: &Function,
+        stmt: &Function,
     ) -> Self::Output {
-        todo!()
+        let function = LoxFunction::new(stmt.clone());
+        self.environment.define(stmt.name().lexeme(), function);
+        Ok(())
     }
 
     fn visit_if_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &If) -> Self::Output {
@@ -342,7 +360,7 @@ impl StmtVisitor for Interpreter {
         } else {
             Value::Nil
         };
-        let symbol = Symbol::intern(stmt.name().lexeme());
+        let symbol = stmt.name().lexeme();
         self.environment.define(symbol, value);
         Ok(())
     }
@@ -352,5 +370,70 @@ impl StmtVisitor for Interpreter {
             self.execute(rtc, stmt.body())?;
         }
         Ok(())
+    }
+}
+
+impl data::Call for Callable {
+    type Interpreter = Interpreter;
+
+    fn arity(&self) -> usize {
+        match self {
+            Self::LoxFunction(fun) => fun.arity(),
+            Self::NativeFunction(fun) => fun.arity(),
+        }
+    }
+
+    fn call(
+        &self,
+        interpreter: &mut Self::Interpreter,
+        rtc: &mut RuntimeContext<'_>,
+        arguments: &[Value],
+    ) -> Result<Value, RuntimeError> {
+        match self {
+            Self::LoxFunction(fun) => fun.call(interpreter, rtc, arguments),
+            Self::NativeFunction(fun) => fun.call(&mut (), rtc, arguments),
+        }
+    }
+}
+
+impl data::Call for LoxFunction {
+    type Interpreter = Interpreter;
+
+    fn arity(&self) -> usize {
+        self.declaration().parameters().len()
+    }
+
+    fn call(
+        &self,
+        interpreter: &mut Self::Interpreter,
+        rtc: &mut RuntimeContext<'_>,
+        arguments: &[Value],
+    ) -> Result<Value, RuntimeError> {
+        let environment = interpreter.globals().new_local();
+        self.declaration()
+            .parameters()
+            .iter()
+            .zip(arguments.iter())
+            .for_each(|(param, arg)| environment.define(param.lexeme(), arg.clone()));
+
+        let _return = interpreter.execute_block(rtc, environment, self.declaration().body());
+        todo!("how to handle return values from function calls?")
+    }
+}
+
+impl data::Call for NativeFunction {
+    type Interpreter = ();
+
+    fn arity(&self) -> usize {
+        self.parameters().len()
+    }
+
+    fn call(
+        &self,
+        _interpreter: &mut Self::Interpreter,
+        _rtc: &mut RuntimeContext<'_>,
+        arguments: &[Value],
+    ) -> Result<Value, RuntimeError> {
+        self.fun_ptr()(arguments)
     }
 }

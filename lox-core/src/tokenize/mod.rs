@@ -66,17 +66,17 @@ impl LexingError {
     }
 }
 
-pub struct LexingResult<'a> {
-    tokens: Vec<Token<'a>>,
+pub struct LexingResult {
+    tokens: Vec<Token>,
     errors: Vec<LexingError>,
 }
 
-impl<'a> LexingResult<'a> {
-    pub const fn new(tokens: Vec<Token<'a>>, errors: Vec<LexingError>) -> Self {
+impl LexingResult {
+    pub const fn new(tokens: Vec<Token>, errors: Vec<LexingError>) -> Self {
         Self { tokens, errors }
     }
 
-    pub fn tokens(&self) -> &[Token<'a>] {
+    pub fn tokens(&self) -> &[Token] {
         &self.tokens
     }
 
@@ -84,7 +84,7 @@ impl<'a> LexingResult<'a> {
         &self.errors
     }
 
-    pub fn into_result(self) -> Result<Vec<Token<'a>>, Vec<LexingError>> {
+    pub fn into_result(self) -> Result<Vec<Token>, Vec<LexingError>> {
         if self.errors.is_empty() {
             Ok(self.tokens)
         } else {
@@ -93,8 +93,8 @@ impl<'a> LexingResult<'a> {
     }
 }
 
-impl<'a> FromIterator<Result<Token<'a>, LexingError>> for LexingResult<'a> {
-    fn from_iter<I: IntoIterator<Item = Result<Token<'a>, LexingError>>>(iter: I) -> Self {
+impl FromIterator<Result<Token, LexingError>> for LexingResult {
+    fn from_iter<I: IntoIterator<Item = Result<Token, LexingError>>>(iter: I) -> Self {
         let iterator = iter.into_iter();
         let (lower_bound, _) = iterator.size_hint();
 
@@ -186,33 +186,33 @@ impl<'a> Tokens<'a> {
         &self.source[self.start_offset..self.current_offset]
     }
 
-    fn nonliteral_token(&self, kind: TokenKind) -> Token<'a> {
+    fn nonliteral_token(&self, kind: TokenKind) -> Token {
         let location = self.start_location();
         let lexeme = self.current_lexeme();
-        Token::new(kind, None, lexeme, location)
+        Token::new(kind, None, lexeme.into(), location)
     }
 
     #[allow(clippy::unnecessary_wraps)]
-    fn unescape_string_token(&self) -> Result<Token<'a>, LexingError> {
+    fn unescape_string_token(&self) -> Result<Token, LexingError> {
         let location = self.start_location();
         let lexeme = self.current_lexeme();
         let value = Token::unescape(lexeme);
         Ok(Token::new(
             TokenKind::StringLiteral,
             Some(Literal::String(value.into())),
-            lexeme,
+            lexeme.into(),
             location,
         ))
     }
 
-    fn parse_number_token(&self) -> Result<Token<'a>, LexingError> {
+    fn parse_number_token(&self) -> Result<Token, LexingError> {
         let location = self.start_location();
         let lexeme = self.current_lexeme();
         match lexeme.parse::<f64>() {
             Ok(value) => Ok(Token::new(
                 TokenKind::NumberLiteral,
                 Some(Literal::Number(value)),
-                lexeme,
+                lexeme.into(),
                 location,
             )),
             Err(_) => Err(LexingError {
@@ -223,8 +223,8 @@ impl<'a> Tokens<'a> {
     }
 }
 
-impl<'a> Iterator for Tokens<'a> {
-    type Item = Result<Token<'a>, LexingError>;
+impl Iterator for Tokens<'_> {
+    type Item = Result<Token, LexingError>;
 
     #[allow(clippy::too_many_lines)]
     fn next(&mut self) -> Option<Self::Item> {
@@ -237,7 +237,7 @@ impl<'a> Iterator for Tokens<'a> {
                         return Some(Ok(Token::new(
                             TokenKind::EndOfFile,
                             None,
-                            "",
+                            "".into(),
                             self.current_location(0),
                         )));
                     },
@@ -485,7 +485,7 @@ impl<'a> Iterator for Tokens<'a> {
     }
 }
 
-fn keyword_or_identifier(lexeme: &str, location: SourceSpan) -> Token<'_> {
+fn keyword_or_identifier(lexeme: &str, location: SourceSpan) -> Token {
     let token_kind = match lexeme {
         "and" => TokenKind::And,
         "class" => TokenKind::Class,
@@ -505,7 +505,7 @@ fn keyword_or_identifier(lexeme: &str, location: SourceSpan) -> Token<'_> {
         "while" => TokenKind::While,
         _ => TokenKind::Identifier,
     };
-    Token::new(token_kind, None, lexeme, location)
+    Token::new(token_kind, None, lexeme.into(), location)
 }
 
 #[cfg(test)]

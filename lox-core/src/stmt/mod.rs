@@ -40,29 +40,29 @@ pub trait StmtElement {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Stmt<'a> {
-    Block(Block<'a>),
-    Class(Class<'a>),
-    Expression(Expression<'a>),
-    Function(Function<'a>),
-    If(If<'a>),
-    Print(Print<'a>),
-    Return(Return<'a>),
-    Var(Var<'a>),
-    While(While<'a>),
+pub enum Stmt {
+    Block(Block),
+    Class(Class),
+    Expression(Expression),
+    Function(Function),
+    If(If),
+    Print(Print),
+    Return(Return),
+    Var(Var),
+    While(While),
 }
 
 macro_rules! impl_stmt {
     ($stmt_type:ty, $variant:ident, $visitor_method:ident) => {
         #[allow(single_use_lifetimes)]
-        impl<'a> From<$stmt_type> for Stmt<'a> {
+        impl From<$stmt_type> for Stmt {
             fn from(stmt: $stmt_type) -> Self {
                 Self::$variant(stmt)
             }
         }
 
         #[allow(single_use_lifetimes, unused_lifetimes)]
-        impl<'a> StmtElement for $stmt_type {
+        impl StmtElement for $stmt_type {
             fn accept<V>(
                 &self,
                 visitor: &mut V,
@@ -77,17 +77,17 @@ macro_rules! impl_stmt {
     };
 }
 
-impl_stmt!(Block<'a>, Block, visit_block_stmt);
-impl_stmt!(Class<'a>, Class, visit_class_stmt);
-impl_stmt!(Expression<'a>, Expression, visit_expression_stmt);
-impl_stmt!(Function<'a>, Function, visit_function_stmt);
-impl_stmt!(If<'a>, If, visit_if_stmt);
-impl_stmt!(Print<'a>, Print, visit_print_stmt);
-impl_stmt!(Return<'a>, Return, visit_return_stmt);
-impl_stmt!(Var<'a>, Var, visit_var_stmt);
-impl_stmt!(While<'a>, While, visit_while_stmt);
+impl_stmt!(Block, Block, visit_block_stmt);
+impl_stmt!(Class, Class, visit_class_stmt);
+impl_stmt!(Expression, Expression, visit_expression_stmt);
+impl_stmt!(Function, Function, visit_function_stmt);
+impl_stmt!(If, If, visit_if_stmt);
+impl_stmt!(Print, Print, visit_print_stmt);
+impl_stmt!(Return, Return, visit_return_stmt);
+impl_stmt!(Var, Var, visit_var_stmt);
+impl_stmt!(While, While, visit_while_stmt);
 
-impl StmtElement for Stmt<'_> {
+impl StmtElement for Stmt {
     fn accept<V>(&self, visitor: &mut V, rtc: &mut RuntimeContext<'_>) -> <V as StmtVisitor>::Output
     where
         V: StmtVisitor,
@@ -106,45 +106,45 @@ impl StmtElement for Stmt<'_> {
     }
 }
 
-impl<'a> From<Expr<'a>> for Stmt<'a> {
-    fn from(expr: Expr<'a>) -> Self {
+impl From<Expr> for Stmt {
+    fn from(expr: Expr) -> Self {
         Self::Expression(Expression::new(expr))
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Block<'a> {
-    statements: Vec<Stmt<'a>>,
+pub struct Block {
+    statements: Vec<Stmt>,
 }
 
-impl<'a> Block<'a> {
-    pub const fn new(statements: Vec<Stmt<'a>>) -> Self {
+impl Block {
+    pub const fn new(statements: Vec<Stmt>) -> Self {
         Self { statements }
     }
 
-    pub fn statements(&self) -> &[Stmt<'a>] {
+    pub fn statements(&self) -> &[Stmt] {
         &self.statements
     }
 }
 
-impl<'a> FromIterator<Stmt<'a>> for Block<'a> {
-    fn from_iter<T: IntoIterator<Item = Stmt<'a>>>(iter: T) -> Self {
-        Block::new(iter.into_iter().collect())
+impl FromIterator<Stmt> for Block {
+    fn from_iter<T: IntoIterator<Item = Stmt>>(iter: T) -> Self {
+        Self::new(iter.into_iter().collect())
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Class<'a> {
-    name: Option<Token<'a>>,
-    superclass: Option<Variable<'a>>,
-    methods: Vec<Function<'a>>,
+pub struct Class {
+    name: Option<Token>,
+    superclass: Option<Variable>,
+    methods: Vec<Function>,
 }
 
-impl<'a> Class<'a> {
+impl Class {
     pub const fn new(
-        name: Option<Token<'a>>,
-        superclass: Option<Variable<'a>>,
-        methods: Vec<Function<'a>>,
+        name: Option<Token>,
+        superclass: Option<Variable>,
+        methods: Vec<Function>,
     ) -> Self {
         Self {
             name,
@@ -153,60 +153,56 @@ impl<'a> Class<'a> {
         }
     }
 
-    pub const fn name(&self) -> Option<&Token<'a>> {
+    pub const fn name(&self) -> Option<&Token> {
         self.name.as_ref()
     }
 
-    pub const fn superclass(&self) -> Option<&Variable<'a>> {
+    pub const fn superclass(&self) -> Option<&Variable> {
         self.superclass.as_ref()
     }
 
-    pub fn methods(&self) -> &[Function<'a>] {
+    pub fn methods(&self) -> &[Function] {
         &self.methods
     }
 }
 
 /// An expression statement.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Expression<'a>(Expr<'a>);
+pub struct Expression(Expr);
 
-impl<'a> Expression<'a> {
-    pub const fn new(expr: Expr<'a>) -> Self {
+impl Expression {
+    pub const fn new(expr: Expr) -> Self {
         Self(expr)
     }
 
-    pub const fn expression(&self) -> &Expr<'a> {
+    pub const fn expression(&self) -> &Expr {
         &self.0
     }
 }
 
-impl<'a> Deref for Expression<'a> {
-    type Target = Expr<'a>;
+impl Deref for Expression {
+    type Target = Expr;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<'a> Borrow<Expr<'a>> for Expression<'a> {
-    fn borrow(&self) -> &Expr<'a> {
+impl Borrow<Expr> for Expression {
+    fn borrow(&self) -> &Expr {
         &self.0
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Function<'a> {
-    name: Option<Token<'a>>,
-    parameters: Vec<Token<'a>>,
-    body: Vec<Stmt<'a>>,
+pub struct Function {
+    name: Token,
+    parameters: Vec<Token>,
+    body: Vec<Stmt>,
 }
 
-impl<'a> Function<'a> {
-    pub const fn new(
-        name: Option<Token<'a>>,
-        parameters: Vec<Token<'a>>,
-        body: Vec<Stmt<'a>>,
-    ) -> Self {
+impl Function {
+    pub const fn new(name: Token, parameters: Vec<Token>, body: Vec<Stmt>) -> Self {
         Self {
             name,
             parameters,
@@ -214,28 +210,28 @@ impl<'a> Function<'a> {
         }
     }
 
-    pub const fn name(&self) -> Option<&Token<'a>> {
-        self.name.as_ref()
+    pub const fn name(&self) -> Token {
+        self.name
     }
 
-    pub fn parameters(&self) -> &[Token<'a>] {
+    pub fn parameters(&self) -> &[Token] {
         &self.parameters
     }
 
-    pub fn body(&self) -> &[Stmt<'a>] {
+    pub fn body(&self) -> &[Stmt] {
         &self.body
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct If<'a> {
-    condition: Expr<'a>,
-    then_branch: Box<Stmt<'a>>,
-    else_branch: Option<Box<Stmt<'a>>>,
+pub struct If {
+    condition: Expr,
+    then_branch: Box<Stmt>,
+    else_branch: Option<Box<Stmt>>,
 }
 
-impl<'a> If<'a> {
-    pub fn new(condition: Expr<'a>, then_branch: Stmt<'a>, else_branch: Option<Stmt<'a>>) -> Self {
+impl If {
+    pub fn new(condition: Expr, then_branch: Stmt, else_branch: Option<Stmt>) -> Self {
         Self {
             condition,
             then_branch: Box::new(then_branch),
@@ -243,93 +239,93 @@ impl<'a> If<'a> {
         }
     }
 
-    pub const fn condition(&self) -> &Expr<'a> {
+    pub const fn condition(&self) -> &Expr {
         &self.condition
     }
 
-    pub const fn then_branch(&self) -> &Stmt<'a> {
+    pub const fn then_branch(&self) -> &Stmt {
         &self.then_branch
     }
 
-    pub fn else_branch(&self) -> Option<&Stmt<'a>> {
+    pub fn else_branch(&self) -> Option<&Stmt> {
         self.else_branch.as_deref()
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Print<'a> {
-    expression: Expr<'a>,
+pub struct Print {
+    expression: Expr,
 }
 
-impl<'a> Print<'a> {
-    pub const fn new(expr: Expr<'a>) -> Self {
+impl Print {
+    pub const fn new(expr: Expr) -> Self {
         Self { expression: expr }
     }
 
-    pub const fn expression(&self) -> &Expr<'a> {
+    pub const fn expression(&self) -> &Expr {
         &self.expression
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Return<'a> {
-    keyword: Token<'a>,
-    value: Option<Expr<'a>>,
+pub struct Return {
+    keyword: Token,
+    value: Option<Expr>,
 }
 
-impl<'a> Return<'a> {
-    pub const fn new(keyword: Token<'a>, value: Option<Expr<'a>>) -> Self {
+impl Return {
+    pub const fn new(keyword: Token, value: Option<Expr>) -> Self {
         Self { keyword, value }
     }
 
-    pub const fn keyword(&self) -> &Token<'a> {
+    pub const fn keyword(&self) -> &Token {
         &self.keyword
     }
 
-    pub const fn value(&self) -> Option<&Expr<'a>> {
+    pub const fn value(&self) -> Option<&Expr> {
         self.value.as_ref()
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Var<'a> {
-    name: Token<'a>,
-    initializer: Option<Expr<'a>>,
+pub struct Var {
+    name: Token,
+    initializer: Option<Expr>,
 }
 
-impl<'a> Var<'a> {
-    pub const fn new(name: Token<'a>, initializer: Option<Expr<'a>>) -> Self {
+impl Var {
+    pub const fn new(name: Token, initializer: Option<Expr>) -> Self {
         Self { name, initializer }
     }
 
-    pub const fn name(&self) -> &Token<'a> {
+    pub const fn name(&self) -> &Token {
         &self.name
     }
 
-    pub const fn initializer(&self) -> Option<&Expr<'a>> {
+    pub const fn initializer(&self) -> Option<&Expr> {
         self.initializer.as_ref()
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct While<'a> {
-    condition: Expr<'a>,
-    body: Box<Stmt<'a>>,
+pub struct While {
+    condition: Expr,
+    body: Box<Stmt>,
 }
 
-impl<'a> While<'a> {
-    pub fn new(condition: Expr<'a>, body: Stmt<'a>) -> Self {
+impl While {
+    pub fn new(condition: Expr, body: Stmt) -> Self {
         Self {
             condition,
             body: Box::new(body),
         }
     }
 
-    pub const fn condition(&self) -> &Expr<'a> {
+    pub const fn condition(&self) -> &Expr {
         &self.condition
     }
 
-    pub fn body(&self) -> &Stmt<'a> {
+    pub fn body(&self) -> &Stmt {
         &self.body
     }
 }

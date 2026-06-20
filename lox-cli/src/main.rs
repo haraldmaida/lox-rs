@@ -46,8 +46,8 @@ fn main() -> miette::Result<()> {
                     println!("{output}");
                 },
                 Err(error) => {
-                    let error = Report::from(error)
-                        .with_source_code(NamedSource::new(source, source_code.clone()));
+                    let error =
+                        Report::from(error).with_source_code(NamedSource::new(source, source_code));
                     eprintln!("\n{error}\n");
                 },
             }

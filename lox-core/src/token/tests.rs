@@ -559,7 +559,7 @@ mod token {
         let token = Token {
             kind: TokenKind::EndOfFile,
             literal: None,
-            lexeme: "",
+            lexeme: "".into(),
             location: (2, 1).into(),
         };
         let display_string = token.to_string();
@@ -571,7 +571,7 @@ mod token {
         let token = Token {
             kind: TokenKind::Nil,
             literal: None,
-            lexeme: "nil",
+            lexeme: "nil".into(),
             location: (2, 1).into(),
         };
         let display_string = token.to_string();
@@ -583,7 +583,7 @@ mod token {
         let token = Token {
             kind: TokenKind::True,
             literal: None,
-            lexeme: "true",
+            lexeme: "true".into(),
             location: (2, 1).into(),
         };
         let display_string = token.to_string();
@@ -595,7 +595,7 @@ mod token {
         let token = Token {
             kind: TokenKind::BangEqual,
             literal: None,
-            lexeme: "!=",
+            lexeme: "!=".into(),
             location: (2, 1).into(),
         };
         let display_string = token.to_string();
@@ -607,7 +607,7 @@ mod token {
         let token = Token {
             kind: TokenKind::StringLiteral,
             literal: Some(Literal::String("Hello, World!".into())),
-            lexeme: "\"Hello, World!\"",
+            lexeme: "\"Hello, World!\"".into(),
             location: (2, 1).into(),
         };
         let display_string = token.to_string();
@@ -619,7 +619,7 @@ mod token {
         let token = Token {
             kind: TokenKind::NumberLiteral,
             literal: Some(Literal::Number(123.)),
-            lexeme: "123",
+            lexeme: "123".into(),
             location: (2, 1).into(),
         };
         let display_string = token.to_string();
@@ -631,7 +631,7 @@ mod token {
         let token = Token {
             kind: TokenKind::NumberLiteral,
             literal: Some(Literal::Number(123.456)),
-            lexeme: "123.456",
+            lexeme: "123.456".into(),
             location: (2, 1).into(),
         };
         let display_string = token.to_string();
@@ -643,7 +643,7 @@ mod token {
         let token = Token {
             kind: TokenKind::Identifier,
             literal: None,
-            lexeme: "foo",
+            lexeme: "foo".into(),
             location: (2, 1).into(),
         };
         let display_string = token.to_string();
@@ -655,7 +655,7 @@ mod token {
         let token = Token {
             kind: TokenKind::EndOfFile,
             literal: None,
-            lexeme: "",
+            lexeme: "".into(),
             location: (2, 1).into(),
         };
         let display_string = format!("{token:#}");
@@ -667,7 +667,7 @@ mod token {
         let token = Token {
             kind: TokenKind::StringLiteral,
             literal: Some(Literal::String("Hello, World!".into())),
-            lexeme: "\"Hello, World!\"",
+            lexeme: "\"Hello, World!\"".into(),
             location: (2, 1).into(),
         };
         let display_string = format!("{token:#}");
@@ -679,7 +679,7 @@ mod token {
         let token = Token {
             kind: TokenKind::NumberLiteral,
             literal: Some(Literal::Number(123.)),
-            lexeme: "123",
+            lexeme: "123".into(),
             location: (2, 1).into(),
         };
         let display_string = format!("{token:#}");
@@ -691,7 +691,7 @@ mod token {
         let token = Token {
             kind: TokenKind::NumberLiteral,
             literal: Some(Literal::Number(123.456)),
-            lexeme: "123.456",
+            lexeme: "123.456".into(),
             location: (2, 1).into(),
         };
         let display_string = format!("{token:#}");
@@ -703,7 +703,7 @@ mod token {
         let token = Token {
             kind: TokenKind::Identifier,
             literal: None,
-            lexeme: "foo",
+            lexeme: "foo".into(),
             location: (2, 1).into(),
         };
         let display_string = format!("{token:#}");

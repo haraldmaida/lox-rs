@@ -24,7 +24,7 @@ struct EnvironmentNode {
 }
 
 impl Environment {
-    pub fn new_global() -> Self {
+    pub fn new_root() -> Self {
         Self {
             node: Rc::new(RefCell::new(EnvironmentNode {
                 enclosing: None,

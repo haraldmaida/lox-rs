@@ -1,6 +1,9 @@
 #[cfg(any(test, feature = "dsl"))]
 pub use dsl::*;
 
+use crate::interpreter::RuntimeError;
+use crate::runtime::RuntimeContext;
+use crate::stmt::Function;
 use lasso::{Spur, ThreadedRodeo};
 use std::fmt;
 use std::fmt::Display;
@@ -51,6 +54,7 @@ pub enum Value {
     Bool(bool),
     Number(f64),
     String(String),
+    Callable(Callable),
 }
 
 impl Display for Value {
@@ -60,6 +64,7 @@ impl Display for Value {
             Self::Bool(value) => write!(f, "{value}"),
             Self::Number(value) => write!(f, "{value}"),
             Self::String(value) => write!(f, "{value}"),
+            Self::Callable(value) => write!(f, "{value}"),
         }
     }
 }
@@ -111,6 +116,137 @@ impl From<String> for Value {
 impl From<&str> for Value {
     fn from(value: &str) -> Self {
         Self::String(value.to_owned())
+    }
+}
+
+impl From<Callable> for Value {
+    fn from(value: Callable) -> Self {
+        Self::Callable(value)
+    }
+}
+
+impl From<LoxFunction> for Value {
+    fn from(value: LoxFunction) -> Self {
+        Self::Callable(Callable::LoxFunction(value))
+    }
+}
+
+impl From<NativeFunction> for Value {
+    fn from(value: NativeFunction) -> Self {
+        Self::Callable(Callable::NativeFunction(value))
+    }
+}
+
+pub trait Call {
+    type Interpreter;
+
+    fn arity(&self) -> usize;
+
+    fn call(
+        &self,
+        interpreter: &mut Self::Interpreter,
+        rtc: &mut RuntimeContext<'_>,
+        arguments: &[Value],
+    ) -> Result<Value, RuntimeError>;
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Callable {
+    LoxFunction(LoxFunction),
+    NativeFunction(NativeFunction),
+}
+
+impl Display for Callable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::LoxFunction(fun) => write!(f, "{fun}"),
+            Self::NativeFunction(fun) => write!(f, "{fun}"),
+        }
+    }
+}
+
+impl PartialOrd for Callable {
+    fn partial_cmp(&self, _other: &Self) -> Option<std::cmp::Ordering> {
+        None
+    }
+}
+
+impl From<LoxFunction> for Callable {
+    fn from(value: LoxFunction) -> Self {
+        Self::LoxFunction(value)
+    }
+}
+
+impl From<NativeFunction> for Callable {
+    fn from(value: NativeFunction) -> Self {
+        Self::NativeFunction(value)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct LoxFunction {
+    declaration: Function,
+}
+
+impl Display for LoxFunction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<fn {}>", self.declaration.name())
+    }
+}
+
+impl LoxFunction {
+    pub const fn new(declaration: Function) -> Self {
+        Self { declaration }
+    }
+
+    pub const fn declaration(&self) -> &Function {
+        &self.declaration
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct NativeFunction {
+    name: Symbol,
+    parameters: Vec<Symbol>,
+    fun_ptr: fn(&[Value]) -> Result<Value, RuntimeError>,
+}
+
+impl Display for NativeFunction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "<fn {}>", self.name)
+    }
+}
+
+impl NativeFunction {
+    pub const fn new(
+        name: Symbol,
+        parameters: Vec<Symbol>,
+        fun_ptr: fn(&[Value]) -> Result<Value, RuntimeError>,
+    ) -> Self {
+        Self {
+            name,
+            parameters,
+            fun_ptr,
+        }
+    }
+
+    pub const fn name(&self) -> Symbol {
+        self.name
+    }
+
+    pub fn parameters(&self) -> &[Symbol] {
+        &self.parameters
+    }
+
+    pub fn fun_ptr(&self) -> fn(&[Value]) -> Result<Value, RuntimeError> {
+        self.fun_ptr
+    }
+}
+
+impl PartialEq for NativeFunction {
+    fn eq(&self, other: &Self) -> bool {
+        // function pointers may not be unique, so we exclude them from the comparison
+        self.name == other.name && self.parameters == other.parameters
     }
 }
 

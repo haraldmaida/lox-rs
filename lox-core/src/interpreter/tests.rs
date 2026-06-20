@@ -3,10 +3,10 @@ use crate::data::value;
 use crate::expr::{
     Expr, ExprExt, assign, binary, grouping, literal, logical, nil, unary, variable,
 };
-use crate::stmt::{IfExt, StmtExt, block, if_, print, var, while_};
+use crate::stmt::{IfExt, StmtExt, block, function, if_, print, return_, var, while_};
 use crate::token::{
-    and, bang, bang_equal, equal_equal, greater, greater_equal, identifier, less, less_equal,
-    minus, or, plus, slash, star,
+    and, bang, bang_equal, equal_equal, greater, greater_equal, identifier, keyword, less,
+    less_equal, minus, or, plus, slash, star,
 };
 use asserting::prelude::*;
 use std::io;
@@ -1262,4 +1262,44 @@ fn execute_while_loop_with_multiple_statements() {
     assert_that!(String::from_utf8(out))
         .ok()
         .is_equal_to("1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n");
+}
+
+#[test]
+fn execute_function_declaration() {
+    let stmt = Stmt::from(function(
+        identifier("foo", (4, 1)),
+        vec![identifier("x", (8, 1)), identifier("y", (11, 1))],
+        [return_(
+            keyword(TokenKind::Return, "return", (16, 6)),
+            binary(
+                variable(identifier("x", (23, 1))),
+                plus((25, 1)),
+                variable(identifier("y", (27, 1))),
+            )
+            .expr(),
+        )
+        .stmt()],
+    ));
+
+    let mut interpreter = Interpreter::default();
+
+    let result = interpreter.execute(&mut sink_rtc(), &stmt);
+
+    assert_that!(result).is_ok();
+    assert_that!(interpreter.environment().lookup("foo"))
+        .ok()
+        .is_equal_to(Value::from(LoxFunction::new(function(
+            identifier("foo", (4, 1)),
+            vec![identifier("x", (8, 1)), identifier("y", (11, 1))],
+            [return_(
+                keyword(TokenKind::Return, "return", (16, 6)),
+                binary(
+                    variable(identifier("x", (23, 1))),
+                    plus((25, 1)),
+                    variable(identifier("y", (27, 1))),
+                )
+                .expr(),
+            )
+            .stmt()],
+        ))));
 }
