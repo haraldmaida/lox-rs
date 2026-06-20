@@ -3,6 +3,7 @@ pub mod data;
 pub mod environment;
 pub mod expr;
 pub mod interpreter;
+pub mod native;
 pub mod parse;
 pub mod program;
 pub mod runtime;
