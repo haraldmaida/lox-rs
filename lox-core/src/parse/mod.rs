@@ -206,6 +206,8 @@ where
     }
 
     fn synchronize(&mut self) -> Result<(), SyntaxError> {
+        self.advance()?;
+
         while let Some(token) = self.advance()? {
             match token.kind {
                 TokenKind::Semicolon => return Ok(()),
