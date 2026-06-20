@@ -4,27 +4,27 @@ use proptest::prelude::*;
 
 proptest! {
     #[test]
-    fn defining_a_variable_and_looking_it_up_it_returns_the_same_value(
+    fn defining_a_variable_and_looking_it_up_returns_the_same_value(
         name in any::<String>(),
         value in any::<Value>(),
     ) {
-        let mut environment = Environment::default();
+        let environment = Environment::global();
 
         let symbol = Symbol::from(name);
         environment.define(symbol, value.clone());
-        let maybe_value = environment.get(symbol);
+        let maybe_value = environment.lookup(symbol);
 
-        prop_assert_eq!(maybe_value, Ok(&value));
+        prop_assert_eq!(maybe_value, Ok(value));
     }
 
     #[test]
     fn looking_up_a_non_existing_variable_returns_an_error(
         name in any::<String>(),
     ) {
-        let environment = Environment::default();
+        let environment = Environment::global();
         let symbol = Symbol::from(name);
 
-        let maybe_value = environment.get(symbol);
+        let maybe_value = environment.lookup(symbol);
 
         prop_assert_eq!(maybe_value, Err(EnvironmentError::UndefinedVariable(symbol)));
     }
@@ -35,15 +35,15 @@ proptest! {
         value_before in any::<Value>(),
         value_after in any::<Value>(),
     ) {
-        let mut environment = Environment::default();
+        let environment = Environment::global();
         let symbol = Symbol::from(name);
         environment.define(symbol, value_before);
 
         let result = environment.assign(symbol, value_after.clone());
 
         prop_assert!(result.is_ok());
-        let maybe_value = environment.get(symbol);
-        prop_assert_eq!(maybe_value, Ok(&value_after));
+        let maybe_value = environment.lookup(symbol);
+        prop_assert_eq!(maybe_value, Ok(value_after));
     }
 
     #[test]
@@ -51,7 +51,7 @@ proptest! {
         name in any::<String>(),
         value in any::<Value>(),
     ) {
-        let mut environment = Environment::default();
+        let environment = Environment::global();
         let symbol = Symbol::from(name);
 
         let result = environment.assign(symbol, value);
@@ -61,153 +61,102 @@ proptest! {
 }
 
 #[test]
-fn can_create_new_scope_enclosing_the_current_one() {
-    let mut environment = Environment::default();
-    environment.define("foo", "some value");
+fn can_create_new_local_environment_that_is_enclosed_by_the_current_one() {
+    let global_env = Environment::global();
+    global_env.define("foo", "some value");
 
-    environment.create_new_scope();
-    environment.define("bar", "another value");
+    let local_env = global_env.new_local();
+    local_env.define("bar", "another value");
 
-    assert_that!(environment.get("foo")).is_equal_to(Ok(&Value::from("some value")));
-    assert_that!(environment.get("bar")).is_equal_to(Ok(&Value::from("another value")));
+    assert_that!(local_env.lookup("foo")).is_equal_to(Ok(Value::from("some value")));
+    assert_that!(local_env.lookup("bar")).is_equal_to(Ok(Value::from("another value")));
 }
 
 #[test]
-fn a_new_scope_shadows_a_variable_with_same_name_from_the_enclosing_scope() {
-    let mut environment = Environment::default();
-    environment.define("foo", "some value");
-    environment.define("bar", "another value");
+fn a_new_local_environment_shadows_a_variable_with_same_name_from_the_enclosing_environment() {
+    let global_env = Environment::global();
+    global_env.define("foo", "some value");
+    global_env.define("bar", "another value");
 
-    environment.create_new_scope();
-    environment.define("foo", "different value");
-    environment.define("baz", "yet another value");
+    let local_env = global_env.new_local();
+    local_env.define("foo", "different value");
+    local_env.define("baz", "yet another value");
 
-    assert_that!(environment.get("foo")).is_equal_to(Ok(&Value::from("different value")));
-    assert_that!(environment.get("bar")).is_equal_to(Ok(&Value::from("another value")));
-    assert_that!(environment.get("baz")).is_equal_to(Ok(&Value::from("yet another value")));
+    assert_that!(local_env.lookup("foo")).is_equal_to(Ok(Value::from("different value")));
+    assert_that!(local_env.lookup("bar")).is_equal_to(Ok(Value::from("another value")));
+    assert_that!(local_env.lookup("baz")).is_equal_to(Ok(Value::from("yet another value")));
 }
 
 #[test]
-fn can_assign_to_a_variable_defined_in_the_enclosing_scope() {
-    let mut environment = Environment::default();
-    environment.define("foo", "some value");
+fn can_assign_to_a_variable_defined_in_the_enclosing_environment() {
+    let global_env = Environment::global();
+    global_env.define("foo", "some value");
 
-    environment.create_new_scope();
-    environment.define("bar", "another value");
+    let local_env = global_env.new_local();
+    local_env.define("bar", "another value");
 
-    let assign_result = environment.assign("foo", "different value");
+    let assign_result = local_env.assign("foo", "different value");
     assert_that!(assign_result).is_ok();
 
-    assert_that!(environment.get("foo")).is_equal_to(Ok(&Value::from("different value")));
-    assert_that!(environment.get("bar")).is_equal_to(Ok(&Value::from("another value")));
+    assert_that!(local_env.lookup("foo")).is_equal_to(Ok(Value::from("different value")));
+    assert_that!(local_env.lookup("bar")).is_equal_to(Ok(Value::from("another value")));
 }
 
 #[test]
-fn destroying_an_enclosing_scope_does_not_affect_the_enclosed_scope() {
-    let mut environment = Environment::default();
-    environment.define("foo", "some value");
-    environment.define("bar", "another value");
+fn dropping_a_local_environment_does_not_affect_the_enclosing_environment() {
+    let global_env = Environment::global();
+    global_env.define("foo", "some value");
+    global_env.define("bar", "another value");
 
-    environment.create_new_scope();
-    environment.define("foo", "different value");
-    environment.define("baz", "yet another value");
+    let local_env = global_env.new_local();
+    local_env.define("foo", "different value");
+    local_env.define("baz", "yet another value");
 
-    assert_that!(environment.get("foo")).is_equal_to(Ok(&Value::from("different value")));
-    assert_that!(environment.get("bar")).is_equal_to(Ok(&Value::from("another value")));
+    assert_that!(local_env.lookup("foo")).is_equal_to(Ok(Value::from("different value")));
+    assert_that!(local_env.lookup("bar")).is_equal_to(Ok(Value::from("another value")));
 
-    environment.destroy_current_scope();
+    drop(local_env);
 
-    assert_that!(environment.get("foo")).is_equal_to(Ok(&Value::from("some value")));
-    assert_that!(environment.get("bar")).is_equal_to(Ok(&Value::from("another value")));
-    assert_that!(environment.get("baz"))
+    assert_that!(global_env.lookup("foo")).is_equal_to(Ok(Value::from("some value")));
+    assert_that!(global_env.lookup("bar")).is_equal_to(Ok(Value::from("another value")));
+    assert_that!(global_env.lookup("baz"))
         .is_equal_to(Err(EnvironmentError::UndefinedVariable("baz".into())));
 }
 
 #[test]
-fn the_root_scope_can_not_be_destroyed() {
-    let mut environment = Environment::default();
-    environment.define("foo", "some value");
-    environment.define("bar", "another value");
+fn creating_a_new_local_environment_after_dropping_the_last_one() {
+    let global_env = Environment::global();
+    global_env.define("foo", "some value");
+    global_env.define("bar", "another value");
 
-    environment.destroy_current_scope();
-
-    assert_that!(environment.get("foo")).is_equal_to(Ok(&Value::from("some value")));
-    assert_that!(environment.get("bar")).is_equal_to(Ok(&Value::from("another value")));
-}
-
-#[test]
-fn creating_a_new_scope_after_destroying_the_last_one() {
-    let mut environment = Environment::default();
-    environment.define("foo", "some value");
-    environment.define("bar", "another value");
-
-    assert_that!(environment.get("foo")).is_equal_to(Ok(&Value::from("some value")));
-    assert_that!(environment.get("bar")).is_equal_to(Ok(&Value::from("another value")));
-    assert_that!(environment.get("baz"))
+    assert_that!(global_env.lookup("foo")).is_equal_to(Ok(Value::from("some value")));
+    assert_that!(global_env.lookup("bar")).is_equal_to(Ok(Value::from("another value")));
+    assert_that!(global_env.lookup("baz"))
         .is_equal_to(Err(EnvironmentError::UndefinedVariable("baz".into())));
 
-    environment.create_new_scope();
-    environment.define("foo", "different value");
-    environment.define("baz", "yet another value");
+    let local_env = global_env.new_local();
+    local_env.define("foo", "different value");
+    local_env.define("baz", "yet another value");
 
-    assert_that!(environment.get("foo")).is_equal_to(Ok(&Value::from("different value")));
-    assert_that!(environment.get("bar")).is_equal_to(Ok(&Value::from("another value")));
-    assert_that!(environment.get("baz")).is_equal_to(Ok(&Value::from("yet another value")));
+    assert_that!(local_env.lookup("foo")).is_equal_to(Ok(Value::from("different value")));
+    assert_that!(local_env.lookup("bar")).is_equal_to(Ok(Value::from("another value")));
+    assert_that!(local_env.lookup("baz")).is_equal_to(Ok(Value::from("yet another value")));
 
-    environment.destroy_current_scope();
-    assert_that!(environment.get("foo")).is_equal_to(Ok(&Value::from("some value")));
-    assert_that!(environment.get("bar")).is_equal_to(Ok(&Value::from("another value")));
-    assert_that!(environment.get("baz"))
+    drop(local_env);
+
+    assert_that!(global_env.lookup("foo")).is_equal_to(Ok(Value::from("some value")));
+    assert_that!(global_env.lookup("bar")).is_equal_to(Ok(Value::from("another value")));
+    assert_that!(global_env.lookup("baz"))
         .is_equal_to(Err(EnvironmentError::UndefinedVariable("baz".into())));
 
-    environment.create_new_scope();
-    environment.define("foo", "completely different value");
-    environment.define("qux", "third value");
+    let local_env = global_env.new_local();
+    local_env.define("foo", "completely different value");
+    local_env.define("qux", "third value");
 
-    assert_that!(environment.get("foo"))
-        .is_equal_to(Ok(&Value::from("completely different value")));
-    assert_that!(environment.get("bar")).is_equal_to(Ok(&Value::from("another value")));
-    assert_that!(environment.get("baz"))
+    assert_that!(local_env.lookup("foo"))
+        .is_equal_to(Ok(Value::from("completely different value")));
+    assert_that!(local_env.lookup("bar")).is_equal_to(Ok(Value::from("another value")));
+    assert_that!(local_env.lookup("baz"))
         .is_equal_to(Err(EnvironmentError::UndefinedVariable("baz".into())));
-    assert_that!(environment.get("qux")).is_equal_to(Ok(&Value::from("third value")));
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ScopeAction {
-    CreateNewScope,
-    DestroyCurrentScope,
-}
-
-impl Arbitrary for ScopeAction {
-    type Parameters = ();
-
-    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        prop_oneof![Just(Self::CreateNewScope), Just(Self::DestroyCurrentScope),].boxed()
-    }
-
-    type Strategy = BoxedStrategy<Self>;
-}
-
-proptest! {
-    #[test]
-    fn arbitray_creating_and_destroying_scopes_preserves_the_path_to_the_root_scope(
-        actions in prop::collection::vec(any::<ScopeAction>(), 1..100)
-    ) {
-        let mut environment = Environment::default();
-        environment.define("foo", "the value");
-
-        prop_assert_eq!(environment.get("foo"), Ok(&Value::from("the value")));
-
-        for action in actions {
-            match action {
-                ScopeAction::CreateNewScope => {
-                    environment.create_new_scope();
-                },
-                ScopeAction::DestroyCurrentScope => {
-                    environment.destroy_current_scope();
-                },
-            }
-            prop_assert_eq!(environment.get("foo"), Ok(&Value::from("the value")));
-        }
-    }
+    assert_that!(local_env.lookup("qux")).is_equal_to(Ok(Value::from("third value")));
 }

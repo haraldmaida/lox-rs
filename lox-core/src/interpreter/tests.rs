@@ -752,7 +752,7 @@ fn execute_var_stmt_with_initializer() {
     let result = interpreter.execute(&mut rtc, &stmt);
 
     assert_that!(result).is_ok();
-    assert_that!(interpreter.environment().get("my_var")).is_equal_to(Ok(&Value::Number(42.)));
+    assert_that!(interpreter.environment().lookup("my_var")).is_equal_to(Ok(Value::Number(42.)));
 }
 
 #[test]
@@ -764,7 +764,7 @@ fn execute_var_stmt_without_initializer() {
     let result = interpreter.execute(&mut rtc, &stmt);
 
     assert_that!(result).is_ok();
-    assert_that!(interpreter.environment().get("foo")).is_equal_to(Ok(&Value::Nil));
+    assert_that!(interpreter.environment().lookup("foo")).is_equal_to(Ok(Value::Nil));
 }
 
 #[test]
@@ -791,7 +791,7 @@ fn execute_var_stmt_with_variable_expression() {
     let result = interpreter.execute(&mut rtc, &var_stmt);
 
     assert_that!(result).is_ok();
-    assert_that!(interpreter.environment().get("foo")).is_equal_to(Ok(&Value::Number(5.)));
+    assert_that!(interpreter.environment().lookup("foo")).is_equal_to(Ok(Value::Number(5.)));
 }
 
 #[test]
@@ -822,7 +822,7 @@ fn evaluate_assign_expr_stmt_to_existing_variable() {
     let assign_result = interpreter.evaluate(&assign_to_foo);
 
     assert_that!(assign_result).is_equal_to(Ok(Value::Number(99.)));
-    assert_that!(interpreter.environment().get("foo")).is_equal_to(Ok(&Value::Number(99.)));
+    assert_that!(interpreter.environment().lookup("foo")).is_equal_to(Ok(Value::Number(99.)));
 }
 
 #[test]
@@ -844,9 +844,9 @@ fn evaluate_assign_expr_stmt_to_not_existing_variable() {
             RuntimeErrorCode::UndefinedVariable("foo".into()),
             identifier("foo", (23, 3)),
         ));
-    assert_that!(interpreter.environment().get("foo"))
+    assert_that!(interpreter.environment().lookup("foo"))
         .is_equal_to(Err(EnvironmentError::UndefinedVariable("foo".into())));
-    assert_that!(interpreter.environment().get("a")).is_equal_to(Ok(&Value::Number(123.)));
+    assert_that!(interpreter.environment().lookup("a")).is_equal_to(Ok(Value::Number(123.)));
 }
 
 #[test]
@@ -876,8 +876,8 @@ fn execute_block_with_var_declarations_and_assignments() {
     let result = interpreter.execute(&mut rtc, &block);
 
     assert_that!(result).is_ok();
-    assert_that!(interpreter.environment().get("a")).is_equal_to(Ok(&Value::Number(5.)));
-    assert_that!(interpreter.environment().get("b"))
+    assert_that!(interpreter.environment().lookup("a")).is_equal_to(Ok(Value::Number(5.)));
+    assert_that!(interpreter.environment().lookup("b"))
         .err()
         .is_equal_to(EnvironmentError::UndefinedVariable("b".into()));
 }
@@ -901,8 +901,8 @@ fn execute_block_with_var_declarations_and_assignments_and_runtime_error() {
         RuntimeErrorCode::UndefinedVariable("c".into()),
         identifier("c", (24, 1)),
     ));
-    assert_that!(interpreter.environment().get("a")).is_equal_to(Ok(&Value::Number(3.)));
-    assert_that!(interpreter.environment().get("b"))
+    assert_that!(interpreter.environment().lookup("a")).is_equal_to(Ok(Value::Number(3.)));
+    assert_that!(interpreter.environment().lookup("b"))
         .err()
         .is_equal_to(EnvironmentError::UndefinedVariable("b".into()));
 }
@@ -1086,8 +1086,8 @@ fn evaluate_logical_and_where_both_conditions_are_true() {
 
     assert_that!(result).ok().is_equal_to(value(true));
     // expecting that both assignments are executed
-    assert_that!(interpreter.environment().get("x")).is_equal_to(Ok(&Value::Number(50.)));
-    assert_that!(interpreter.environment().get("y")).is_equal_to(Ok(&Value::Number(0.)));
+    assert_that!(interpreter.environment().lookup("x")).is_equal_to(Ok(Value::Number(50.)));
+    assert_that!(interpreter.environment().lookup("y")).is_equal_to(Ok(Value::Number(0.)));
 }
 
 #[test]
@@ -1118,10 +1118,10 @@ fn evaluate_logical_and_where_first_condition_is_false() {
 
     assert_that!(result).ok().is_equal_to(value(false));
     // expecting the left assignment is executed
-    assert_that!(interpreter.environment().get("x")).is_equal_to(Ok(&Value::Number(50.)));
+    assert_that!(interpreter.environment().lookup("x")).is_equal_to(Ok(Value::Number(50.)));
     // expecting the `and` stops evaluating after the left condition because it is `false`
     // second assignment right from the `and` is not executed
-    assert_that!(interpreter.environment().get("y")).is_equal_to(Ok(&Value::Number(10.)));
+    assert_that!(interpreter.environment().lookup("y")).is_equal_to(Ok(Value::Number(10.)));
 }
 
 #[test]
@@ -1152,10 +1152,10 @@ fn evaluate_logical_or_where_first_condition_is_true() {
 
     assert_that!(result).ok().is_equal_to(value(true));
     // expecting the left assignment is executed
-    assert_that!(interpreter.environment().get("x")).is_equal_to(Ok(&Value::Number(50.)));
+    assert_that!(interpreter.environment().lookup("x")).is_equal_to(Ok(Value::Number(50.)));
     // expecting the `or` stops after the first condition because its `true`
     // second assignment right from the `or` is not executed
-    assert_that!(interpreter.environment().get("y")).is_equal_to(Ok(&Value::Number(10.)));
+    assert_that!(interpreter.environment().lookup("y")).is_equal_to(Ok(Value::Number(10.)));
 }
 
 #[test]
@@ -1186,8 +1186,8 @@ fn evaluate_logical_or_where_second_condition_is_true() {
 
     assert_that!(result).ok().is_equal_to(value(true));
     // expecting that both assignments are executed
-    assert_that!(interpreter.environment().get("x")).is_equal_to(Ok(&Value::Number(50.)));
-    assert_that!(interpreter.environment().get("y")).is_equal_to(Ok(&Value::Number(0.)));
+    assert_that!(interpreter.environment().lookup("x")).is_equal_to(Ok(Value::Number(50.)));
+    assert_that!(interpreter.environment().lookup("y")).is_equal_to(Ok(Value::Number(0.)));
 }
 
 #[test]
@@ -1220,7 +1220,7 @@ fn execute_while_loop_with_single_statement() {
 
     drop(rtc);
     assert_that!(result).is_ok();
-    assert_that!(interpreter.environment().get("x")).is_equal_to(Ok(&Value::Number(10.)));
+    assert_that!(interpreter.environment().lookup("x")).is_equal_to(Ok(Value::Number(10.)));
     assert_that!(String::from_utf8(out)).ok().is_equal_to("");
 }
 
@@ -1258,7 +1258,7 @@ fn execute_while_loop_with_multiple_statements() {
 
     drop(rtc);
     assert_that!(result).is_ok();
-    assert_that!(interpreter.environment().get("x")).is_equal_to(Ok(&Value::Number(10.)));
+    assert_that!(interpreter.environment().lookup("x")).is_equal_to(Ok(Value::Number(10.)));
     assert_that!(String::from_utf8(out))
         .ok()
         .is_equal_to("1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n");

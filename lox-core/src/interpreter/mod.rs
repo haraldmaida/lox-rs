@@ -99,9 +99,16 @@ impl RuntimeError {
 }
 
 /// A tree-walk interpreter for Lox.
-#[derive(Default)]
 pub struct Interpreter {
     environment: Environment,
+}
+
+impl Default for Interpreter {
+    fn default() -> Self {
+        Self {
+            environment: Environment::global(),
+        }
+    }
 }
 
 impl Interpreter {
@@ -267,8 +274,7 @@ impl ExprVisitor for Interpreter {
     fn visit_variable_expr(&mut self, expr: &Variable) -> Self::Output {
         let symbol = Symbol::intern(expr.name().lexeme());
         self.environment
-            .get(symbol)
-            .cloned()
+            .lookup(symbol)
             .map_err(|err| RuntimeError::new(err.into(), *expr.name()))
     }
 }
@@ -277,15 +283,15 @@ impl StmtVisitor for Interpreter {
     type Output = Result<(), RuntimeError>;
 
     fn visit_block_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Block) -> Self::Output {
-        self.environment.create_new_scope();
+        self.environment = self.environment.new_local();
         for a_stmt in stmt.statements() {
             let result = self.execute(rtc, a_stmt);
             if let Err(error) = result {
-                self.environment.destroy_current_scope();
+                self.environment = self.environment.enclosing();
                 return Err(error);
             }
         }
-        self.environment.destroy_current_scope();
+        self.environment = self.environment.enclosing();
         Ok(())
     }
 
