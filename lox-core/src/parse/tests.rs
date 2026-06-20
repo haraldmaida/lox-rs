@@ -3,10 +3,10 @@ use crate::expr::{
     ExprExt, assign, binary, call, grouping, literal, logical, nil, unary, variable,
 };
 use crate::program::program;
-use crate::stmt::{IfExt, StmtExt, block, if_, print, stmt, var, while_};
+use crate::stmt::{IfExt, StmtExt, block, function, if_, print, return_, stmt, var, while_};
 use crate::token::{
-    and, bang, bang_equal, equal_equal, greater, greater_equal, identifier, less, less_equal,
-    minus, or, plus, right_paren, slash, star,
+    and, bang, bang_equal, equal_equal, greater, greater_equal, identifier, keyword, less,
+    less_equal, minus, or, plus, right_paren, slash, star,
 };
 use crate::tokenize::Tokenize;
 use asserting::prelude::*;
@@ -867,4 +867,41 @@ fn parse_function_call_with_256_arguments() {
         code: SyntaxErrorCode::TooManyCallArguments(256, 255),
         location: (1174, 1).into(),
     }]);
+}
+
+#[test]
+fn parse_function_declaration_with_2_arguments_and_return() {
+    let source_code = "fun foo(x, y) { return x + y; }";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().is_equal_to(program([function(
+        identifier("foo", (4, 3)),
+        [identifier("x", (8, 1)), identifier("y", (11, 1))],
+        [return_(
+            keyword(TokenKind::Return, "return", (16, 6)),
+            binary(
+                variable(identifier("x", (23, 1))),
+                plus((25, 1)),
+                variable(identifier("y", (27, 1))),
+            )
+            .expr(),
+        )
+        .stmt()],
+    )
+    .stmt()]));
+}
+
+#[test]
+fn parse_function_declaration_no_arguments_and_no_return() {
+    let source_code = "fun foo() { print \"Hello, World!\"; }";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().is_equal_to(program([function(
+        identifier("foo", (4, 3)),
+        [],
+        [print(literal("Hello, World!")).stmt()],
+    )
+    .stmt()]));
 }

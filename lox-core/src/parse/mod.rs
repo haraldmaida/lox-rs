@@ -1,6 +1,6 @@
 use crate::expr::{Assign, Binary, Call, Expr, Grouping, Literal, Logical, Unary, Variable};
 use crate::program::Program;
-use crate::stmt::{Block, Expression, If, Print, Stmt, Var, While};
+use crate::stmt::{Block, Expression, Function, If, Print, Return, Stmt, Var, While};
 use crate::token;
 use crate::token::{Token, TokenKind};
 use crate::tokenize::{LexingError, LexingErrorCode};
@@ -22,6 +22,7 @@ pub enum SyntaxErrorCode {
     MissingForInitializer,
     MissingToken(TokenKind),
     TooManyCallArguments(usize, usize),
+    TooManyFunctionParameters(usize, usize),
     UnexpectedEndOfInput,
     UnexpectedCharacter(char),
     UnexpectedToken(TokenKind),
@@ -62,6 +63,12 @@ impl Display for SyntaxErrorCode {
                 write!(
                     f,
                     "too many arguments ({count}) in function call. the maximum number of arguments is limited to {max_count}."
+                )
+            },
+            Self::TooManyFunctionParameters(count, max_count) => {
+                write!(
+                    f,
+                    "too many parameters ({count}) in function declaration. the maximum number of parameters is limited to {max_count}."
                 )
             },
             Self::UnexpectedEndOfInput => {
@@ -258,6 +265,7 @@ where
             Ok(None) => None,
             Ok(Some(token)) => match token.kind {
                 TokenKind::EndOfFile => None,
+                TokenKind::Fun => Some(self.function("function")),
                 TokenKind::Var => Some(self.var_declaration()),
                 _ => {
                     self.revert(token);
@@ -266,6 +274,39 @@ where
             },
             Err(err) => Some(Err(err)),
         }
+    }
+
+    fn function(&mut self, _kind: &str) -> Result<Stmt<'a>, SyntaxError> {
+        let name = self.consume(TokenKind::Identifier)?;
+        self.consume(TokenKind::LeftParen)?;
+        let mut parameters = Vec::new();
+        if let Some(token) = self.advance()? {
+            if token.kind == TokenKind::RightParen {
+            } else {
+                self.revert(token);
+                loop {
+                    parameters.push(self.consume(TokenKind::Identifier)?);
+                    if let Some(token) = self.advance()?
+                        && token.kind != TokenKind::Comma
+                    {
+                        self.revert(token);
+                        break;
+                    }
+                }
+                self.consume(TokenKind::RightParen)?;
+            }
+        } else {
+            return Err(self.error(SyntaxErrorCode::MissingToken(TokenKind::RightParen)));
+        }
+        if parameters.len() > MAX_CALL_ARGUMENTS {
+            return Err(self.error(SyntaxErrorCode::TooManyFunctionParameters(
+                parameters.len(),
+                MAX_CALL_ARGUMENTS,
+            )));
+        }
+        self.consume(TokenKind::LeftBrace)?;
+        let body = self.block()?;
+        Ok(Function::new(Some(name), parameters, body).into())
     }
 
     fn var_declaration(&mut self) -> Result<Stmt<'a>, SyntaxError> {
@@ -308,10 +349,11 @@ where
         match self.advance() {
             Ok(None) => Err(self.error(SyntaxErrorCode::UnexpectedEndOfInput)),
             Ok(Some(token)) => match token.kind {
-                TokenKind::LeftBrace => self.block(),
+                TokenKind::LeftBrace => self.block().map(Block::new).map(Stmt::from),
                 TokenKind::For => self.for_statement(),
                 TokenKind::If => self.if_statement(),
                 TokenKind::Print => self.print_statement(),
+                TokenKind::Return => self.return_statement(token),
                 TokenKind::While => self.while_statement(),
                 _ => {
                     self.revert(token);
@@ -322,13 +364,13 @@ where
         }
     }
 
-    fn block(&mut self) -> Result<Stmt<'a>, SyntaxError> {
+    fn block(&mut self) -> Result<Vec<Stmt<'a>>, SyntaxError> {
         let mut statements = Vec::new();
         while let Some(stmt) = self.declaration_inside_block() {
             statements.push(stmt?);
         }
         self.consume(TokenKind::RightBrace)?;
-        Ok(Block::new(statements).into())
+        Ok(statements)
     }
 
     fn for_statement(&mut self) -> Result<Stmt<'a>, SyntaxError> {
@@ -408,6 +450,25 @@ where
         let expr = self.expression()?;
         self.consume(TokenKind::Semicolon)?;
         Ok(Print::new(expr).into())
+    }
+
+    fn return_statement(&mut self, return_token: Token<'a>) -> Result<Stmt<'a>, SyntaxError> {
+        if let Some(token) = self.advance()? {
+            let value = if token.kind == TokenKind::Semicolon {
+                None
+            } else {
+                self.revert(token);
+                let expr = self.expression()?;
+                self.consume(TokenKind::Semicolon)?;
+                Some(expr)
+            };
+            Ok(Return::new(return_token, value).into())
+        } else {
+            Err(SyntaxError {
+                code: SyntaxErrorCode::UnexpectedEndOfInput,
+                location: return_token.location,
+            })
+        }
     }
 
     fn while_statement(&mut self) -> Result<Stmt<'a>, SyntaxError> {

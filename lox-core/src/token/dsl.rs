@@ -154,6 +154,10 @@ pub fn if_<'a>(location: impl Into<SourceSpan>) -> Token<'a> {
     Token::new(TokenKind::If, None, "if", location.into())
 }
 
+pub fn keyword(kind: TokenKind, lexeme: &str, location: impl Into<SourceSpan>) -> Token<'_> {
+    Token::new(kind, None, lexeme, location.into())
+}
+
 pub fn nil<'a>(location: impl Into<SourceSpan>) -> Token<'a> {
     Token::new(TokenKind::Nil, None, "nil", location.into())
 }
