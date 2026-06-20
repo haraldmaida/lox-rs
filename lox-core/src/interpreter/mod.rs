@@ -106,7 +106,7 @@ pub struct Interpreter {
 impl Default for Interpreter {
     fn default() -> Self {
         Self {
-            environment: Environment::global(),
+            environment: Environment::new_global(),
         }
     }
 }
