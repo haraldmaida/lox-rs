@@ -402,7 +402,7 @@ impl StmtVisitor for Interpreter {
         _rtc: &mut RuntimeContext<'_>,
         stmt: &Function,
     ) -> Self::Output {
-        let function = LoxFunction::new(stmt.clone());
+        let function = LoxFunction::new(stmt.clone(), self.environment.clone());
         self.environment.define(stmt.name().lexeme(), function);
         Continue(())
     }
@@ -491,7 +491,7 @@ impl data::Call for LoxFunction {
         rtc: &mut RuntimeContext<'_>,
         arguments: &[Value],
     ) -> Result<Value, RuntimeError> {
-        let environment = interpreter.globals().new_local();
+        let environment = self.closure().new_local();
         self.declaration()
             .parameters()
             .iter()

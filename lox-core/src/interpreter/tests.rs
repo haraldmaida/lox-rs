@@ -1291,20 +1291,23 @@ fn execute_function_declaration() {
     assert_that!(result).is_ok();
     assert_that!(interpreter.environment().lookup("foo"))
         .ok()
-        .is_equal_to(Value::from(LoxFunction::new(function(
-            identifier("foo", (4, 1)),
-            vec![identifier("x", (8, 1)), identifier("y", (11, 1))],
-            [return_(
-                keyword(TokenKind::Return, "return", (16, 6)),
-                binary(
-                    variable(identifier("x", (23, 1))),
-                    plus((25, 1)),
-                    variable(identifier("y", (27, 1))),
+        .is_equal_to(Value::from(LoxFunction::new(
+            function(
+                identifier("foo", (4, 1)),
+                vec![identifier("x", (8, 1)), identifier("y", (11, 1))],
+                [return_(
+                    keyword(TokenKind::Return, "return", (16, 6)),
+                    binary(
+                        variable(identifier("x", (23, 1))),
+                        plus((25, 1)),
+                        variable(identifier("y", (27, 1))),
+                    )
+                    .expr(),
                 )
-                .expr(),
-            )
-            .stmt()],
-        ))));
+                .stmt()],
+            ),
+            interpreter.environment().clone(),
+        )));
 }
 
 #[test]
@@ -1361,7 +1364,6 @@ fn execute_function_declaration_and_call_with_return_value() {
     interpreter.interpret(&mut rtc, &program);
 
     drop(rtc);
-    // dbg!(interpreter.environment());
     assert_that!(String::from_utf8(stderr)).ok().is_empty();
     assert_that!(String::from_utf8(stdout)).ok().is_equal_to(
         "0\n1\n1\n2\n3\n5\n8\n13\n21\n34\n55\n89\n144\n233\n377\n610\n987\n1597\n2584\n4181\n",
@@ -1405,4 +1407,43 @@ fn execute_native_function_call_to_clock() {
         .ok()
         .is_not_close_to(0.)
         .is_between(start_time, end_time);
+}
+
+#[test]
+fn execute_closure_count() {
+    let source_code = r"
+    fun makeCounter() {
+        var i = 0;
+
+        fun count() {
+            i = i + 1;
+            return i;
+        }
+
+        return count;
+    }
+
+    var counter = makeCounter();
+    print counter();
+    print counter();
+    print counter();
+";
+
+    let program = source_code
+        .tokenize()
+        .parse()
+        .expect("failed to parse source code");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+    let mut interpreter = Interpreter::default();
+
+    interpreter.interpret(&mut rtc, &program);
+
+    drop(rtc);
+    assert_that!(String::from_utf8(stderr)).ok().is_empty();
+    assert_that!(String::from_utf8(stdout))
+        .ok()
+        .is_equal_to("1\n2\n3\n");
 }

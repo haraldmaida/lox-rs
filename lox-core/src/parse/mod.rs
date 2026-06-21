@@ -336,6 +336,7 @@ where
                     None
                 },
                 TokenKind::EndOfFile => None,
+                TokenKind::Fun => Some(self.function("function")),
                 TokenKind::Var => Some(self.var_declaration()),
                 _ => {
                     self.revert(token);

@@ -1,18 +1,25 @@
 #[cfg(any(test, feature = "dsl"))]
 pub use dsl::*;
 
+use crate::environment::Environment;
 use crate::interpreter::RuntimeError;
 use crate::runtime::RuntimeContext;
 use crate::stmt::Function;
 use lasso::{Spur, ThreadedRodeo};
 use std::fmt;
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 use std::sync::LazyLock;
 
 static SYMBOL_TABLE: LazyLock<ThreadedRodeo> = LazyLock::new(ThreadedRodeo::new);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Symbol(Spur);
+
+impl Debug for Symbol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Symbol({:?}:{})", self.0, self.as_str())
+    }
+}
 
 impl Symbol {
     pub fn intern(identifier: &str) -> Self {
@@ -185,9 +192,10 @@ impl From<NativeFunction> for Callable {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct LoxFunction {
     declaration: Function,
+    closure: Environment,
 }
 
 impl Display for LoxFunction {
@@ -196,13 +204,26 @@ impl Display for LoxFunction {
     }
 }
 
+impl PartialEq for LoxFunction {
+    fn eq(&self, other: &Self) -> bool {
+        self.declaration == other.declaration
+    }
+}
+
 impl LoxFunction {
-    pub const fn new(declaration: Function) -> Self {
-        Self { declaration }
+    pub const fn new(declaration: Function, closure: Environment) -> Self {
+        Self {
+            declaration,
+            closure,
+        }
     }
 
     pub const fn declaration(&self) -> &Function {
         &self.declaration
+    }
+
+    pub const fn closure(&self) -> &Environment {
+        &self.closure
     }
 }
 

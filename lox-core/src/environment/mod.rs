@@ -14,7 +14,7 @@ pub struct Environment {
     node: Rc<RefCell<EnvironmentNode>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct EnvironmentNode {
     /// the environment enclosing this environment. only the root environment
     /// (global scope) has no parent (enclosing = None)
@@ -40,13 +40,6 @@ impl Environment {
                 enclosing: Some(self.node.clone()),
                 values: HashMap::default(),
             })),
-        }
-    }
-
-    #[must_use]
-    pub fn global(&self) -> Self {
-        Self {
-            node: self.root_node(),
         }
     }
 
