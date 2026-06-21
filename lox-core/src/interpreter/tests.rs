@@ -3,11 +3,13 @@ use crate::data::value;
 use crate::expr::{
     Expr, ExprExt, assign, binary, grouping, literal, logical, nil, unary, variable,
 };
+use crate::parse::Parse;
 use crate::stmt::{IfExt, StmtExt, block, function, if_, print, return_, var, while_};
 use crate::token::{
     and, bang, bang_equal, equal_equal, greater, greater_equal, identifier, keyword, less,
     less_equal, minus, or, plus, slash, star,
 };
+use crate::tokenize::Tokenize;
 use asserting::prelude::*;
 use std::io;
 
@@ -20,7 +22,7 @@ fn evaluate_literal_nil() {
     let expr = Expr::from(nil());
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Nil);
 }
@@ -30,7 +32,7 @@ fn evaluate_literal_bool() {
     let expr = Expr::from(literal(true));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -40,7 +42,7 @@ fn evaluate_literal_number() {
     let expr = Expr::from(literal(123.456));
 
     let mut interpreter = Interpreter::default();
-    let Ok(Value::Number(value)) = interpreter.evaluate(&expr) else {
+    let Ok(Value::Number(value)) = interpreter.evaluate(&mut sink_rtc(), &expr) else {
         panic!("expected a number");
     };
 
@@ -52,7 +54,7 @@ fn evaluate_literal_string() {
     let expr = Expr::from(Literal::String("Hello, world!".into()));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value)
         .ok()
@@ -64,7 +66,7 @@ fn evaluate_grouping_expression() {
     let expr = Expr::from(grouping(literal(123.456)));
 
     let mut interpreter = Interpreter::default();
-    let Ok(Value::Number(value)) = interpreter.evaluate(&expr) else {
+    let Ok(Value::Number(value)) = interpreter.evaluate(&mut sink_rtc(), &expr) else {
         panic!("expected a number");
     };
 
@@ -76,7 +78,7 @@ fn evaluate_unary_expr_bang_for_true() {
     let expr = Expr::from(unary(bang((1, 2)), literal(true)));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
@@ -86,7 +88,7 @@ fn evaluate_unary_expr_bang_for_false() {
     let expr = Expr::from(unary(bang((1, 2)), literal(false)));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -96,7 +98,7 @@ fn evaluate_unary_expr_bang_for_number_0() {
     let expr = Expr::from(unary(bang((1, 2)), literal(0.)));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
@@ -106,7 +108,7 @@ fn evaluate_unary_expr_bang_for_string() {
     let expr = Expr::from(unary(bang((1, 2)), Literal::String("0".into())));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
@@ -116,7 +118,7 @@ fn evaluate_unary_expr_minus_with_number() {
     let expr = Expr::from(unary(minus((1, 2)), literal(123.456)));
 
     let mut interpreter = Interpreter::default();
-    let Ok(Value::Number(value)) = interpreter.evaluate(&expr) else {
+    let Ok(Value::Number(value)) = interpreter.evaluate(&mut sink_rtc(), &expr) else {
         panic!("expected a number");
     };
 
@@ -128,7 +130,7 @@ fn evaluate_unary_expr_minus_with_boolean_returns_runtime_error() {
     let expr = Expr::from(unary(minus((1, 2)), literal(true)));
 
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&expr);
+    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
@@ -144,7 +146,7 @@ fn evaluate_unary_expr_minus_with_string_returns_runtime_error() {
     ));
 
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&expr);
+    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
@@ -157,7 +159,7 @@ fn evaluate_unary_expr_minus_with_nil_returns_runtime_error() {
     let expr = Expr::from(unary(minus((1, 2)), Literal::Nil));
 
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&expr);
+    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
@@ -170,7 +172,7 @@ fn evaluate_unary_expr_with_illegal_operator() {
     let expr = Expr::from(unary(plus((1, 2)), literal(123.456)));
 
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&expr);
+    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::NotAnUnaryOperator,
@@ -183,7 +185,7 @@ fn evaluate_binary_expr_minus_with_numbers() {
     let expr = Expr::from(binary(literal(123.456), minus((1, 2)), literal(789.012)));
 
     let mut interpreter = Interpreter::default();
-    let Ok(Value::Number(value)) = interpreter.evaluate(&expr) else {
+    let Ok(Value::Number(value)) = interpreter.evaluate(&mut sink_rtc(), &expr) else {
         panic!("expected a number");
     };
 
@@ -195,7 +197,7 @@ fn evaluate_binary_expr_minus_with_booleans_returns_runtime_error() {
     let expr = Expr::from(binary(literal(true), minus((1, 2)), literal(false)));
 
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&expr);
+    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
@@ -212,7 +214,7 @@ fn evaluate_binary_expr_minus_with_strings_returns_runtime_error() {
     ));
 
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&expr);
+    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
@@ -225,7 +227,7 @@ fn evaluate_binary_expr_minus_with_nil_returns_runtime_error() {
     let expr = Expr::from(binary(Literal::Nil, minus((1, 2)), literal(123.456)));
 
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&expr);
+    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
@@ -238,7 +240,7 @@ fn evaluate_binary_expr_plus_with_numbers() {
     let expr = Expr::from(binary(literal(123.456), plus((1, 2)), literal(789.012)));
 
     let mut interpreter = Interpreter::default();
-    let Ok(Value::Number(value)) = interpreter.evaluate(&expr) else {
+    let Ok(Value::Number(value)) = interpreter.evaluate(&mut sink_rtc(), &expr) else {
         panic!("expected a number");
     };
 
@@ -254,7 +256,7 @@ fn evaluate_binary_expr_plus_with_strings() {
     ));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value)
         .ok()
@@ -270,7 +272,7 @@ fn evaluate_binary_expr_plus_with_string_and_number_returns_runtime_error() {
     ));
 
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&expr);
+    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandsOfDifferentType,
@@ -287,7 +289,7 @@ fn evaluate_binary_expr_plus_with_number_and_string_returns_runtime_error() {
     ));
 
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&expr);
+    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandsOfDifferentType,
@@ -300,7 +302,7 @@ fn evaluate_binary_expr_plus_with_booleans_returns_runtime_error() {
     let expr = Expr::from(binary(literal(true), plus((1, 2)), literal(false)));
 
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&expr);
+    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumberOrString,
@@ -313,7 +315,7 @@ fn evaluate_binary_expr_plus_with_nil_returns_runtime_error() {
     let expr = Expr::from(binary(Literal::Nil, plus((1, 2)), literal(123.456)));
 
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&expr);
+    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumberOrString,
@@ -326,7 +328,7 @@ fn evaluate_binary_expr_star_with_numbers() {
     let expr = Expr::from(binary(literal(-123.456), star((1, 2)), literal(789.012)));
 
     let mut interpreter = Interpreter::default();
-    let Ok(Value::Number(value)) = interpreter.evaluate(&expr) else {
+    let Ok(Value::Number(value)) = interpreter.evaluate(&mut sink_rtc(), &expr) else {
         panic!("expected a number");
     };
 
@@ -338,7 +340,7 @@ fn evaluate_binary_expr_star_with_booleans_returns_runtime_error() {
     let expr = Expr::from(binary(literal(true), star((1, 2)), literal(false)));
 
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&expr);
+    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
@@ -355,7 +357,7 @@ fn evaluate_binary_expr_star_with_strings_returns_runtime_error() {
     ));
 
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&expr);
+    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
@@ -368,7 +370,7 @@ fn evaluate_binary_expr_star_with_nil_returns_runtime_error() {
     let expr = Expr::from(binary(Literal::Nil, star((1, 2)), literal(123.456)));
 
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&expr);
+    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
@@ -381,7 +383,7 @@ fn evaluate_binary_expr_slash_with_numbers() {
     let expr = Expr::from(binary(literal(123.456), slash((1, 2)), literal(789.012)));
 
     let mut interpreter = Interpreter::default();
-    let Ok(Value::Number(value)) = interpreter.evaluate(&expr) else {
+    let Ok(Value::Number(value)) = interpreter.evaluate(&mut sink_rtc(), &expr) else {
         panic!("expected a number");
     };
 
@@ -393,7 +395,7 @@ fn evaluate_binary_expr_slash_with_booleans_returns_runtime_error() {
     let expr = Expr::from(binary(literal(true), slash((1, 2)), literal(false)));
 
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&expr);
+    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
@@ -410,7 +412,7 @@ fn evaluate_binary_expr_slash_with_strings_returns_runtime_error() {
     ));
 
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&expr);
+    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
@@ -423,7 +425,7 @@ fn evaluate_binary_expr_slash_with_nil_returns_runtime_error() {
     let expr = Expr::from(binary(Literal::Nil, slash((1, 2)), literal(123.456)));
 
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&expr);
+    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
@@ -440,7 +442,7 @@ fn evaluate_binary_expr_bangequal_with_numbers() {
     ));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -450,7 +452,7 @@ fn evaluate_binary_expr_bangequal_with_booleans() {
     let expr = Expr::from(binary(literal(true), bang_equal((1, 2)), literal(false)));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -464,7 +466,7 @@ fn evaluate_binary_expr_bangequal_with_strings() {
     ));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
@@ -474,7 +476,7 @@ fn evaluate_binary_expr_bangequal_with_nils() {
     let expr = Expr::from(binary(Literal::Nil, bang_equal((1, 2)), Literal::Nil));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
@@ -488,7 +490,7 @@ fn evaluate_binary_expr_equalequal_with_numbers() {
     ));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
@@ -498,7 +500,7 @@ fn evaluate_binary_expr_equalequal_with_booleans() {
     let expr = Expr::from(binary(literal(true), equal_equal((1, 2)), literal(false)));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
@@ -512,7 +514,7 @@ fn evaluate_binary_expr_equalequal_with_strings() {
     ));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -522,7 +524,7 @@ fn evaluate_binary_expr_equalequal_with_nils() {
     let expr = Expr::from(binary(Literal::Nil, equal_equal((1, 2)), Literal::Nil));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -532,7 +534,7 @@ fn evaluate_binary_expr_greater_with_numbers() {
     let expr = Expr::from(binary(literal(123.456), greater((1, 2)), literal(789.012)));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
@@ -542,7 +544,7 @@ fn evaluate_binary_expr_greater_with_booleans() {
     let expr = Expr::from(binary(literal(true), greater((1, 2)), literal(false)));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -556,7 +558,7 @@ fn evaluate_binary_expr_greater_with_strings() {
     ));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -566,7 +568,7 @@ fn evaluate_binary_expr_greater_with_nils() {
     let expr = Expr::from(binary(Literal::Nil, greater((1, 2)), Literal::Nil));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
@@ -580,7 +582,7 @@ fn evaluate_binary_expr_greaterequal_with_numbers() {
     ));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
@@ -590,7 +592,7 @@ fn evaluate_binary_expr_greaterequal_with_booleans() {
     let expr = Expr::from(binary(literal(true), greater_equal((1, 2)), literal(true)));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -604,7 +606,7 @@ fn evaluate_binary_expr_greaterequal_with_strings() {
     ));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -614,7 +616,7 @@ fn evaluate_binary_expr_greaterequal_with_nils() {
     let expr = Expr::from(binary(Literal::Nil, greater_equal((1, 2)), Literal::Nil));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -624,7 +626,7 @@ fn evaluate_binary_expr_less_with_numbers() {
     let expr = Expr::from(binary(literal(123.456), less((1, 2)), literal(789.012)));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -634,7 +636,7 @@ fn evaluate_binary_expr_less_with_booleans() {
     let expr = Expr::from(binary(literal(true), less((1, 2)), literal(false)));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
@@ -648,7 +650,7 @@ fn evaluate_binary_expr_less_with_strings() {
     ));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -658,7 +660,7 @@ fn evaluate_binary_expr_less_with_nils() {
     let expr = Expr::from(binary(Literal::Nil, less((1, 2)), Literal::Nil));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
@@ -672,7 +674,7 @@ fn evaluate_binary_expr_lessequal_with_numbers() {
     ));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -682,7 +684,7 @@ fn evaluate_binary_expr_lessequal_with_booleans() {
     let expr = Expr::from(binary(literal(false), less_equal((1, 2)), literal(true)));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -696,7 +698,7 @@ fn evaluate_binary_expr_lessequal_with_strings() {
     ));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -706,7 +708,7 @@ fn evaluate_binary_expr_lessequal_with_nils() {
     let expr = Expr::from(binary(Literal::Nil, less_equal((1, 2)), Literal::Nil));
 
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&expr);
+    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -716,7 +718,7 @@ fn evaluate_binary_expr_with_illegal_operator() {
     let expr = Expr::from(binary(literal(123.456), bang((1, 2)), literal(789.012)));
 
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&expr);
+    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::NotABinaryOperator,
@@ -819,7 +821,7 @@ fn evaluate_assign_expr_stmt_to_existing_variable() {
     let declare_result = interpreter.execute(&mut rtc, &declare_foo);
     assert_that!(declare_result).is_ok();
 
-    let assign_result = interpreter.evaluate(&assign_to_foo);
+    let assign_result = interpreter.evaluate(&mut sink_rtc(), &assign_to_foo);
 
     assert_that!(assign_result).is_equal_to(Ok(Value::Number(99.)));
     assert_that!(interpreter.environment().lookup("foo")).is_equal_to(Ok(Value::Number(99.)));
@@ -836,7 +838,7 @@ fn evaluate_assign_expr_stmt_to_not_existing_variable() {
     let declare_result = interpreter.execute(&mut rtc, &declare_foo);
     assert_that!(declare_result).is_ok();
 
-    let assign_result = interpreter.evaluate(&assign_to_foo);
+    let assign_result = interpreter.evaluate(&mut sink_rtc(), &assign_to_foo);
 
     assert_that!(assign_result)
         .err()
@@ -1082,7 +1084,7 @@ fn evaluate_logical_and_where_both_conditions_are_true() {
     let y_result = interpreter.execute(&mut sink_rtc(), &declare_y);
     assert_that!(y_result).is_ok();
 
-    let result = interpreter.evaluate(&expr);
+    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(result).ok().is_equal_to(value(true));
     // expecting that both assignments are executed
@@ -1114,7 +1116,7 @@ fn evaluate_logical_and_where_first_condition_is_false() {
     let y_result = interpreter.execute(&mut sink_rtc(), &declare_y);
     assert_that!(y_result).is_ok();
 
-    let result = interpreter.evaluate(&expr);
+    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(result).ok().is_equal_to(value(false));
     // expecting the left assignment is executed
@@ -1148,7 +1150,7 @@ fn evaluate_logical_or_where_first_condition_is_true() {
     let y_result = interpreter.execute(&mut sink_rtc(), &declare_y);
     assert_that!(y_result).is_ok();
 
-    let result = interpreter.evaluate(&expr);
+    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(result).ok().is_equal_to(value(true));
     // expecting the left assignment is executed
@@ -1182,7 +1184,7 @@ fn evaluate_logical_or_where_second_condition_is_true() {
     let y_result = interpreter.execute(&mut sink_rtc(), &declare_y);
     assert_that!(y_result).is_ok();
 
-    let result = interpreter.evaluate(&expr);
+    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
 
     assert_that!(result).ok().is_equal_to(value(true));
     // expecting that both assignments are executed
@@ -1302,4 +1304,49 @@ fn execute_function_declaration() {
             )
             .stmt()],
         ))));
+}
+
+#[test]
+fn execute_function_declaration_and_call() {
+    let source_code = r#"
+    fun sayHi(first, last) {
+        print "Hi, " + first + " " + last + "!";
+    }
+
+    sayHi("Dear", "Reader");
+"#;
+
+    let mut out = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut out, io::sink());
+    let mut interpreter = Interpreter::default();
+
+    let program = source_code
+        .tokenize()
+        .parse()
+        .expect("failed to parse source code");
+    interpreter.interpret(&mut rtc, &program);
+
+    drop(rtc);
+    assert_that!(String::from_utf8(out))
+        .ok()
+        .is_equal_to("Hi, Dear Reader!\n");
+}
+
+#[test]
+fn execute_native_function_call_to_clock() {
+    let source_code = "print clock();";
+
+    let mut out = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut out, io::sink());
+    let mut interpreter = Interpreter::default();
+    let program = source_code
+        .tokenize()
+        .parse()
+        .expect("failed to parse source code");
+    interpreter.interpret(&mut rtc, &program);
+
+    drop(rtc);
+    assert_that!(String::from_utf8(out))
+        .ok()
+        .is_equal_to("0.0\n");
 }

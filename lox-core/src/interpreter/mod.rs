@@ -20,6 +20,7 @@ mod tests;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuntimeErrorCode {
+    CallExprOnNonCallable,
     /// This error should never occur. However, if it does occur, it is a bug
     /// in the parser. Please report an issue!
     NotABinaryOperator,
@@ -35,6 +36,7 @@ pub enum RuntimeErrorCode {
 impl Display for RuntimeErrorCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::CallExprOnNonCallable => write!(f, "cannot call a non-callable value"),
             Self::NotABinaryOperator => write!(
                 f,
                 "not a binary operator where a binary operator like '=', '+', '-', '*' or '/' is expected"
@@ -135,8 +137,12 @@ impl Interpreter {
         }
     }
 
-    pub fn evaluate(&mut self, expression: &Expr) -> Result<Value, RuntimeError> {
-        expression.accept(self)
+    pub fn evaluate(
+        &mut self,
+        rtc: &mut RuntimeContext<'_>,
+        expression: &Expr,
+    ) -> Result<Value, RuntimeError> {
+        expression.accept(rtc, self)
     }
 
     pub fn execute(
@@ -169,8 +175,8 @@ impl Interpreter {
 impl ExprVisitor for Interpreter {
     type Output = Result<Value, RuntimeError>;
 
-    fn visit_assign_expr(&mut self, expr: &Assign) -> Self::Output {
-        let value = self.evaluate(expr.value())?;
+    fn visit_assign_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Assign) -> Self::Output {
+        let value = self.evaluate(rtc, expr.value())?;
         let symbol = expr.name().lexeme();
         self.environment
             .assign(symbol, value.clone())
@@ -178,9 +184,9 @@ impl ExprVisitor for Interpreter {
         Ok(value)
     }
 
-    fn visit_binary_expr(&mut self, expr: &Binary) -> Self::Output {
-        let left = self.evaluate(expr.left())?;
-        let right = self.evaluate(expr.right())?;
+    fn visit_binary_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Binary) -> Self::Output {
+        let left = self.evaluate(rtc, expr.left())?;
+        let right = self.evaluate(rtc, expr.right())?;
 
         match expr.operator().kind() {
             TokenKind::BangEqual => Ok(Value::Bool(left != right)),
@@ -230,19 +236,40 @@ impl ExprVisitor for Interpreter {
         }
     }
 
-    fn visit_call_expr(&mut self, _expr: &Call) -> Self::Output {
+    fn visit_call_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Call) -> Self::Output {
+        let callee = self.evaluate(rtc, expr.callee())?;
+        let mut arguments = Vec::with_capacity(expr.arguments().len());
+        for argument in expr.arguments() {
+            let arg = self.evaluate(rtc, argument)?;
+            arguments.push(arg);
+        }
+        if let Value::Callable(callable) = callee {
+            data::Call::call(&callable, self, rtc, &arguments)
+        } else {
+            Err(RuntimeError::new(
+                RuntimeErrorCode::CallExprOnNonCallable,
+                *expr.paren(), // TODO improve error message for call expr
+            ))
+        }
+    }
+
+    fn visit_get_expr(&mut self, _rtc: &mut RuntimeContext<'_>, _expr: &Get) -> Self::Output {
         todo!()
     }
 
-    fn visit_get_expr(&mut self, _expr: &Get) -> Self::Output {
-        todo!()
+    fn visit_grouping_expr(
+        &mut self,
+        rtc: &mut RuntimeContext<'_>,
+        expr: &Grouping,
+    ) -> Self::Output {
+        self.evaluate(rtc, expr.expression())
     }
 
-    fn visit_grouping_expr(&mut self, expr: &Grouping) -> Self::Output {
-        self.evaluate(expr.expression())
-    }
-
-    fn visit_literal_expr(&mut self, expr: &Literal) -> Self::Output {
+    fn visit_literal_expr(
+        &mut self,
+        _rtc: &mut RuntimeContext<'_>,
+        expr: &Literal,
+    ) -> Self::Output {
         match expr {
             Literal::Nil => Ok(Value::Nil),
             Literal::Bool(value) => Ok(Value::Bool(*value)),
@@ -251,8 +278,8 @@ impl ExprVisitor for Interpreter {
         }
     }
 
-    fn visit_logical_expr(&mut self, expr: &Logical) -> Self::Output {
-        let left = self.evaluate(expr.left())?;
+    fn visit_logical_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Logical) -> Self::Output {
+        let left = self.evaluate(rtc, expr.left())?;
         if expr.operator().kind() == TokenKind::Or {
             if left.is_truthy() {
                 return Ok(left);
@@ -260,23 +287,23 @@ impl ExprVisitor for Interpreter {
         } else if !left.is_truthy() {
             return Ok(left);
         }
-        self.evaluate(expr.right())
+        self.evaluate(rtc, expr.right())
     }
 
-    fn visit_set_expr(&mut self, _expr: &Set) -> Self::Output {
+    fn visit_set_expr(&mut self, _rtc: &mut RuntimeContext<'_>, _expr: &Set) -> Self::Output {
         todo!()
     }
 
-    fn visit_super_expr(&mut self, _expr: &Super) -> Self::Output {
+    fn visit_super_expr(&mut self, _rtc: &mut RuntimeContext<'_>, _expr: &Super) -> Self::Output {
         todo!()
     }
 
-    fn visit_this_expr(&mut self, _expr: &This) -> Self::Output {
+    fn visit_this_expr(&mut self, _rtc: &mut RuntimeContext<'_>, _expr: &This) -> Self::Output {
         todo!()
     }
 
-    fn visit_unary_expr(&mut self, expr: &Unary) -> Self::Output {
-        let right = self.evaluate(expr.right())?;
+    fn visit_unary_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Unary) -> Self::Output {
+        let right = self.evaluate(rtc, expr.right())?;
         match expr.operator().kind() {
             TokenKind::Bang => Ok(Value::Bool(!right.is_truthy())),
             TokenKind::Minus => {
@@ -296,7 +323,11 @@ impl ExprVisitor for Interpreter {
         }
     }
 
-    fn visit_variable_expr(&mut self, expr: &Variable) -> Self::Output {
+    fn visit_variable_expr(
+        &mut self,
+        _rtc: &mut RuntimeContext<'_>,
+        expr: &Variable,
+    ) -> Self::Output {
         let symbol = expr.name().lexeme();
         self.environment
             .lookup(symbol)
@@ -317,10 +348,10 @@ impl StmtVisitor for Interpreter {
 
     fn visit_expression_stmt(
         &mut self,
-        _rtc: &mut RuntimeContext<'_>,
+        rtc: &mut RuntimeContext<'_>,
         stmt: &Expression,
     ) -> Self::Output {
-        self.evaluate(stmt.expression())?;
+        self.evaluate(rtc, stmt.expression())?;
         Ok(())
     }
 
@@ -335,7 +366,7 @@ impl StmtVisitor for Interpreter {
     }
 
     fn visit_if_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &If) -> Self::Output {
-        if self.evaluate(stmt.condition())?.is_truthy() {
+        if self.evaluate(rtc, stmt.condition())?.is_truthy() {
             self.execute(rtc, stmt.then_branch())
         } else if let Some(else_branch) = stmt.else_branch() {
             self.execute(rtc, else_branch)
@@ -345,7 +376,7 @@ impl StmtVisitor for Interpreter {
     }
 
     fn visit_print_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Print) -> Self::Output {
-        let value = self.evaluate(stmt.expression())?;
+        let value = self.evaluate(rtc, stmt.expression())?;
         writeln!(rtc.stdout(), "{value}").expect("failed to write to stdout");
         Ok(())
     }
@@ -354,9 +385,9 @@ impl StmtVisitor for Interpreter {
         todo!()
     }
 
-    fn visit_var_stmt(&mut self, _rtc: &mut RuntimeContext<'_>, stmt: &Var) -> Self::Output {
+    fn visit_var_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Var) -> Self::Output {
         let value = if let Some(initializer) = stmt.initializer() {
-            self.evaluate(initializer)?
+            self.evaluate(rtc, initializer)?
         } else {
             Value::Nil
         };
@@ -366,7 +397,7 @@ impl StmtVisitor for Interpreter {
     }
 
     fn visit_while_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &While) -> Self::Output {
-        while self.evaluate(stmt.condition())?.is_truthy() {
+        while self.evaluate(rtc, stmt.condition())?.is_truthy() {
             self.execute(rtc, stmt.body())?;
         }
         Ok(())
@@ -417,7 +448,8 @@ impl data::Call for LoxFunction {
             .for_each(|(param, arg)| environment.define(param.lexeme(), arg.clone()));
 
         let _return = interpreter.execute_block(rtc, environment, self.declaration().body());
-        todo!("how to handle return values from function calls?")
+        //todo!("how to handle return values from function calls?")
+        Ok(Value::Nil)
     }
 }
 

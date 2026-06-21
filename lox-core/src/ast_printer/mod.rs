@@ -3,6 +3,7 @@ use crate::expr::{
     Assign, Binary, Call, Expr, ExprElement, ExprVisitor, Get, Grouping, Literal, Logical, Set,
     Super, This, Unary, Variable,
 };
+use crate::runtime::RuntimeContext;
 use miette::Diagnostic;
 use std::fmt;
 
@@ -20,9 +21,9 @@ impl<W> AstPrinter<'_, W>
 where
     W: fmt::Write,
 {
-    pub fn print(expr: &Expr, out: &mut W) -> Result<(), Error> {
+    pub fn print(rtc: &mut RuntimeContext<'_>, expr: &Expr, out: &mut W) -> Result<(), Error> {
         let mut printer = AstPrinter { out };
-        expr.accept(&mut printer)
+        expr.accept(rtc, &mut printer)
     }
 
     fn write_bool(&mut self, value: bool) -> Result<(), Error> {
@@ -39,6 +40,7 @@ where
 
     fn write_grouped(
         &mut self,
+        rtc: &mut RuntimeContext<'_>,
         name: impl Into<Symbol>,
         expressions: &[&Expr],
     ) -> Result<(), Error> {
@@ -46,7 +48,7 @@ where
         write!(self.out, "({name}")?;
         for expr in expressions {
             write!(self.out, " ")?;
-            expr.accept(self)?;
+            expr.accept(rtc, self)?;
         }
         write!(self.out, ")")?;
         Ok(())
@@ -59,27 +61,35 @@ where
 {
     type Output = Result<(), Error>;
 
-    fn visit_assign_expr(&mut self, _expr: &Assign) -> Self::Output {
+    fn visit_assign_expr(&mut self, _rtc: &mut RuntimeContext<'_>, _expr: &Assign) -> Self::Output {
         todo!()
     }
 
-    fn visit_binary_expr(&mut self, expr: &Binary) -> Self::Output {
-        self.write_grouped(expr.operator().lexeme(), &[expr.left(), expr.right()])
+    fn visit_binary_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Binary) -> Self::Output {
+        self.write_grouped(rtc, expr.operator().lexeme(), &[expr.left(), expr.right()])
     }
 
-    fn visit_call_expr(&mut self, _expr: &Call) -> Self::Output {
+    fn visit_call_expr(&mut self, _rtc: &mut RuntimeContext<'_>, _expr: &Call) -> Self::Output {
         todo!()
     }
 
-    fn visit_get_expr(&mut self, _expr: &Get) -> Self::Output {
+    fn visit_get_expr(&mut self, _rtc: &mut RuntimeContext<'_>, _expr: &Get) -> Self::Output {
         todo!()
     }
 
-    fn visit_grouping_expr(&mut self, expr: &Grouping) -> Self::Output {
-        self.write_grouped("group", &[expr.expression()])
+    fn visit_grouping_expr(
+        &mut self,
+        rtc: &mut RuntimeContext<'_>,
+        expr: &Grouping,
+    ) -> Self::Output {
+        self.write_grouped(rtc, "group", &[expr.expression()])
     }
 
-    fn visit_literal_expr(&mut self, expr: &Literal) -> Self::Output {
+    fn visit_literal_expr(
+        &mut self,
+        _rtc: &mut RuntimeContext<'_>,
+        expr: &Literal,
+    ) -> Self::Output {
         match expr {
             Literal::Nil => self.write_str("nil"),
             Literal::Bool(value) => self.write_bool(*value),
@@ -88,27 +98,35 @@ where
         }
     }
 
-    fn visit_logical_expr(&mut self, _expr: &Logical) -> Self::Output {
+    fn visit_logical_expr(
+        &mut self,
+        _rtc: &mut RuntimeContext<'_>,
+        _expr: &Logical,
+    ) -> Self::Output {
         todo!()
     }
 
-    fn visit_set_expr(&mut self, _expr: &Set) -> Self::Output {
+    fn visit_set_expr(&mut self, _rtc: &mut RuntimeContext<'_>, _expr: &Set) -> Self::Output {
         todo!()
     }
 
-    fn visit_super_expr(&mut self, _expr: &Super) -> Self::Output {
+    fn visit_super_expr(&mut self, _rtc: &mut RuntimeContext<'_>, _expr: &Super) -> Self::Output {
         todo!()
     }
 
-    fn visit_this_expr(&mut self, _expr: &This) -> Self::Output {
+    fn visit_this_expr(&mut self, _rtc: &mut RuntimeContext<'_>, _expr: &This) -> Self::Output {
         todo!()
     }
 
-    fn visit_unary_expr(&mut self, expr: &Unary) -> Self::Output {
-        self.write_grouped(expr.operator().lexeme(), &[expr.right()])
+    fn visit_unary_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Unary) -> Self::Output {
+        self.write_grouped(rtc, expr.operator().lexeme(), &[expr.right()])
     }
 
-    fn visit_variable_expr(&mut self, _expr: &Variable) -> Self::Output {
+    fn visit_variable_expr(
+        &mut self,
+        _rtc: &mut RuntimeContext<'_>,
+        _expr: &Variable,
+    ) -> Self::Output {
         todo!()
     }
 }

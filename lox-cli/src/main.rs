@@ -42,7 +42,7 @@ fn main() -> miette::Result<()> {
             match source_code.tokenize().parse_expr() {
                 Ok(ast) => {
                     let mut output = String::new();
-                    AstPrinter::print(&ast, &mut output)?;
+                    AstPrinter::print(&mut rtc, &ast, &mut output)?;
                     println!("{output}");
                 },
                 Err(error) => {

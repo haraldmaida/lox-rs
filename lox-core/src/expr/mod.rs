@@ -2,27 +2,40 @@
 pub use dsl::*;
 
 use crate::data::Symbol;
+use crate::runtime::RuntimeContext;
 use crate::token::Token;
 
 pub trait ExprVisitor {
     type Output;
 
-    fn visit_assign_expr(&mut self, expr: &Assign) -> Self::Output;
-    fn visit_binary_expr(&mut self, expr: &Binary) -> Self::Output;
-    fn visit_call_expr(&mut self, expr: &Call) -> Self::Output;
-    fn visit_get_expr(&mut self, expr: &Get) -> Self::Output;
-    fn visit_grouping_expr(&mut self, expr: &Grouping) -> Self::Output;
-    fn visit_literal_expr(&mut self, expr: &Literal) -> Self::Output;
-    fn visit_logical_expr(&mut self, expr: &Logical) -> Self::Output;
-    fn visit_set_expr(&mut self, expr: &Set) -> Self::Output;
-    fn visit_super_expr(&mut self, expr: &Super) -> Self::Output;
-    fn visit_this_expr(&mut self, expr: &This) -> Self::Output;
-    fn visit_unary_expr(&mut self, expr: &Unary) -> Self::Output;
-    fn visit_variable_expr(&mut self, expr: &Variable) -> Self::Output;
+    fn visit_assign_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Assign) -> Self::Output;
+    fn visit_binary_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Binary) -> Self::Output;
+    fn visit_call_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Call) -> Self::Output;
+    fn visit_get_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Get) -> Self::Output;
+    fn visit_grouping_expr(
+        &mut self,
+        rtc: &mut RuntimeContext<'_>,
+        expr: &Grouping,
+    ) -> Self::Output;
+    fn visit_literal_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Literal) -> Self::Output;
+    fn visit_logical_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Logical) -> Self::Output;
+    fn visit_set_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Set) -> Self::Output;
+    fn visit_super_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Super) -> Self::Output;
+    fn visit_this_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &This) -> Self::Output;
+    fn visit_unary_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Unary) -> Self::Output;
+    fn visit_variable_expr(
+        &mut self,
+        rtc: &mut RuntimeContext<'_>,
+        expr: &Variable,
+    ) -> Self::Output;
 }
 
 pub trait ExprElement {
-    fn accept<V>(&self, visitor: &mut V) -> <V as ExprVisitor>::Output
+    fn accept<V>(
+        &self,
+        rtc: &mut RuntimeContext<'_>,
+        visitor: &mut V,
+    ) -> <V as ExprVisitor>::Output
     where
         V: ExprVisitor;
 }
@@ -54,11 +67,15 @@ macro_rules! impl_expr {
 
         #[allow(single_use_lifetimes, unused_lifetimes)]
         impl ExprElement for $expr_type {
-            fn accept<V>(&self, visitor: &mut V) -> <V as ExprVisitor>::Output
+            fn accept<V>(
+                &self,
+                rtc: &mut RuntimeContext<'_>,
+                visitor: &mut V,
+            ) -> <V as ExprVisitor>::Output
             where
                 V: ExprVisitor,
             {
-                visitor.$visitor_method(self)
+                visitor.$visitor_method(rtc, self)
             }
         }
     };
@@ -78,23 +95,23 @@ impl_expr!(Unary, Unary, visit_unary_expr);
 impl_expr!(Variable, Variable, visit_variable_expr);
 
 impl ExprElement for Expr {
-    fn accept<V>(&self, visitor: &mut V) -> <V as ExprVisitor>::Output
+    fn accept<V>(&self, rtc: &mut RuntimeContext<'_>, visitor: &mut V) -> <V as ExprVisitor>::Output
     where
         V: ExprVisitor,
     {
         match self {
-            Self::Assign(expr) => visitor.visit_assign_expr(expr),
-            Self::Binary(expr) => visitor.visit_binary_expr(expr),
-            Self::Call(expr) => visitor.visit_call_expr(expr),
-            Self::Get(expr) => visitor.visit_get_expr(expr),
-            Self::Grouping(expr) => visitor.visit_grouping_expr(expr),
-            Self::Literal(expr) => visitor.visit_literal_expr(expr),
-            Self::Logical(expr) => visitor.visit_logical_expr(expr),
-            Self::Set(expr) => visitor.visit_set_expr(expr),
-            Self::Super(expr) => visitor.visit_super_expr(expr),
-            Self::This(expr) => visitor.visit_this_expr(expr),
-            Self::Unary(expr) => visitor.visit_unary_expr(expr),
-            Self::Variable(expr) => visitor.visit_variable_expr(expr),
+            Self::Assign(expr) => visitor.visit_assign_expr(rtc, expr),
+            Self::Binary(expr) => visitor.visit_binary_expr(rtc, expr),
+            Self::Call(expr) => visitor.visit_call_expr(rtc, expr),
+            Self::Get(expr) => visitor.visit_get_expr(rtc, expr),
+            Self::Grouping(expr) => visitor.visit_grouping_expr(rtc, expr),
+            Self::Literal(expr) => visitor.visit_literal_expr(rtc, expr),
+            Self::Logical(expr) => visitor.visit_logical_expr(rtc, expr),
+            Self::Set(expr) => visitor.visit_set_expr(rtc, expr),
+            Self::Super(expr) => visitor.visit_super_expr(rtc, expr),
+            Self::This(expr) => visitor.visit_this_expr(rtc, expr),
+            Self::Unary(expr) => visitor.visit_unary_expr(rtc, expr),
+            Self::Variable(expr) => visitor.visit_variable_expr(rtc, expr),
         }
     }
 }
