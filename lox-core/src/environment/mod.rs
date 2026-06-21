@@ -5,8 +5,8 @@ use std::rc::Rc;
 
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
 pub enum EnvironmentError {
-    #[error("variable '{0}' is not defined")]
-    UndefinedVariable(Symbol),
+    #[error("definition for identifier '{0}' not found")]
+    IdentifierNotFound(Symbol),
 }
 
 #[derive(Debug, Clone)]
@@ -85,7 +85,7 @@ impl Environment {
             }
             current.clone_from(&node.borrow().enclosing);
         }
-        Err(EnvironmentError::UndefinedVariable(name))
+        Err(EnvironmentError::IdentifierNotFound(name))
     }
 
     pub fn define(&self, name: impl Into<Symbol>, value: impl Into<Value>) {
@@ -111,7 +111,7 @@ impl Environment {
             .values
             .get(&name)
             .cloned()
-            .ok_or(EnvironmentError::UndefinedVariable(name))
+            .ok_or(EnvironmentError::IdentifierNotFound(name))
     }
 }
 

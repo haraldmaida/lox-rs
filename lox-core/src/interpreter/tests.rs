@@ -12,6 +12,7 @@ use crate::token::{
 use crate::tokenize::Tokenize;
 use asserting::prelude::*;
 use std::io;
+use std::time::SystemTime;
 
 fn sink_rtc<'a>() -> RuntimeContext<'a> {
     RuntimeContext::new(io::sink(), io::sink())
@@ -847,7 +848,7 @@ fn evaluate_assign_expr_stmt_to_not_existing_variable() {
             identifier("foo", (23, 3)),
         ));
     assert_that!(interpreter.environment().lookup("foo"))
-        .is_equal_to(Err(EnvironmentError::UndefinedVariable("foo".into())));
+        .is_equal_to(Err(EnvironmentError::IdentifierNotFound("foo".into())));
     assert_that!(interpreter.environment().lookup("a")).is_equal_to(Ok(Value::Number(123.)));
 }
 
@@ -881,7 +882,7 @@ fn execute_block_with_var_declarations_and_assignments() {
     assert_that!(interpreter.environment().lookup("a")).is_equal_to(Ok(Value::Number(5.)));
     assert_that!(interpreter.environment().lookup("b"))
         .err()
-        .is_equal_to(EnvironmentError::UndefinedVariable("b".into()));
+        .is_equal_to(EnvironmentError::IdentifierNotFound("b".into()));
 }
 
 #[test]
@@ -906,7 +907,7 @@ fn execute_block_with_var_declarations_and_assignments_and_runtime_error() {
     assert_that!(interpreter.environment().lookup("a")).is_equal_to(Ok(Value::Number(3.)));
     assert_that!(interpreter.environment().lookup("b"))
         .err()
-        .is_equal_to(EnvironmentError::UndefinedVariable("b".into()));
+        .is_equal_to(EnvironmentError::IdentifierNotFound("b".into()));
 }
 
 #[test]
@@ -1316,37 +1317,92 @@ fn execute_function_declaration_and_call() {
     sayHi("Dear", "Reader");
 "#;
 
-    let mut out = Vec::new();
-    let mut rtc = RuntimeContext::new(&mut out, io::sink());
-    let mut interpreter = Interpreter::default();
-
     let program = source_code
         .tokenize()
         .parse()
         .expect("failed to parse source code");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+    let mut interpreter = Interpreter::default();
+
     interpreter.interpret(&mut rtc, &program);
 
     drop(rtc);
-    assert_that!(String::from_utf8(out))
+    assert_that!(String::from_utf8(stderr)).ok().is_empty();
+    assert_that!(String::from_utf8(stdout))
         .ok()
         .is_equal_to("Hi, Dear Reader!\n");
 }
 
 #[test]
-fn execute_native_function_call_to_clock() {
-    let source_code = "print clock();";
+fn execute_function_declaration_and_call_with_return_value() {
+    let source_code = r"
+    fun fib(n) {
+        if (n <= 1) return n;
+        return fib(n - 2) + fib(n - 1);
+    }
 
-    let mut out = Vec::new();
-    let mut rtc = RuntimeContext::new(&mut out, io::sink());
-    let mut interpreter = Interpreter::default();
+    for (var i = 0; i < 20; i = i + 1) {
+        print fib(i);
+    }
+";
     let program = source_code
         .tokenize()
         .parse()
         .expect("failed to parse source code");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+    let mut interpreter = Interpreter::default();
+
     interpreter.interpret(&mut rtc, &program);
 
     drop(rtc);
-    assert_that!(String::from_utf8(out))
+    // dbg!(interpreter.environment());
+    assert_that!(String::from_utf8(stderr)).ok().is_empty();
+    assert_that!(String::from_utf8(stdout)).ok().is_equal_to(
+        "0\n1\n1\n2\n3\n5\n8\n13\n21\n34\n55\n89\n144\n233\n377\n610\n987\n1597\n2584\n4181\n",
+    );
+}
+
+fn system_time_as_secs() -> f64 {
+    SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs_f64()
+}
+
+#[test]
+fn execute_native_function_call_to_clock() {
+    let start_time = system_time_as_secs();
+
+    let source_code = "print clock();";
+
+    let program = source_code
+        .tokenize()
+        .parse()
+        .expect("failed to parse source code");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+    let mut interpreter = Interpreter::default();
+
+    interpreter.interpret(&mut rtc, &program);
+
+    drop(rtc);
+    assert_that!(String::from_utf8(stderr)).ok().is_empty();
+    let result = String::from_utf8(stdout)
+        .map_err(|err| err.to_string())
+        .and_then(|s| s.trim().parse::<f64>().map_err(|err| err.to_string()));
+
+    let end_time = system_time_as_secs();
+
+    assert_that!(result)
         .ok()
-        .is_equal_to("0.0\n");
+        .is_not_close_to(0.)
+        .is_between(start_time, end_time);
 }

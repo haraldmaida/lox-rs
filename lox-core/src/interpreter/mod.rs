@@ -1,10 +1,11 @@
 use crate::data;
-use crate::data::{Callable, LoxFunction, NativeFunction, Symbol, Value};
+use crate::data::{Callable, LoxFunction, NativeFunction, Symbol, Value, native_function};
 use crate::environment::{Environment, EnvironmentError};
 use crate::expr::{
     Assign, Binary, Call, Expr, ExprElement, ExprVisitor, Get, Grouping, Literal, Logical, Set,
     Super, This, Unary, Variable,
 };
+use crate::native::clock;
 use crate::runtime::RuntimeContext;
 use crate::stmt::{
     Block, Class, Expression, Function, If, Print, Return, Stmt, StmtElement, StmtVisitor, Var,
@@ -13,10 +14,9 @@ use crate::stmt::{
 use crate::token::{Token, TokenKind};
 use miette::{Diagnostic, SourceSpan};
 use std::fmt::Display;
+use std::ops::ControlFlow;
+use std::ops::ControlFlow::{Break, Continue};
 use std::{fmt, mem};
-
-#[cfg(test)]
-mod tests;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuntimeErrorCode {
@@ -30,6 +30,7 @@ pub enum RuntimeErrorCode {
     OperandNotANumber,
     OperandNotANumberOrString,
     OperandsOfDifferentType,
+    UndefinedFunction(Symbol),
     UndefinedVariable(Symbol),
 }
 
@@ -57,15 +58,8 @@ impl Display for RuntimeErrorCode {
                 f,
                 "operands are of different type but the operator requires all operands to be of the same type"
             ),
-            Self::UndefinedVariable(symbol) => write!(f, "undefined variable '{symbol}'"),
-        }
-    }
-}
-
-impl From<EnvironmentError> for RuntimeErrorCode {
-    fn from(error: EnvironmentError) -> Self {
-        match error {
-            EnvironmentError::UndefinedVariable(symbol) => Self::UndefinedVariable(symbol),
+            Self::UndefinedFunction(symbol) => write!(f, "call to undefined function '{symbol}'"),
+            Self::UndefinedVariable(symbol) => write!(f, "use of undefined variable '{symbol}'"),
         }
     }
 }
@@ -109,9 +103,11 @@ pub struct Interpreter {
 
 impl Default for Interpreter {
     fn default() -> Self {
+        let globals = Environment::new_root();
+        globals.define("clock", native_function("clock", [], clock));
         Self {
-            environment: Environment::new_root(),
-            globals: Environment::new_root(),
+            environment: globals.clone(),
+            globals,
         }
     }
 }
@@ -131,8 +127,9 @@ impl Interpreter {
     {
         let statements = program.as_ref();
         for stmt in statements {
-            if let Err(error) = self.execute(rtc, stmt) {
-                writeln!(rtc.stderr(), "{error}").expect("failed to write to stderr");
+            if let Break(Err(error)) = self.execute_internal(rtc, stmt) {
+                writeln!(rtc.stderr(), "{error}")
+                    .unwrap_or_else(|io_err| panic!("failed to write to stderr: {io_err}"));
             }
         }
     }
@@ -142,7 +139,10 @@ impl Interpreter {
         rtc: &mut RuntimeContext<'_>,
         expression: &Expr,
     ) -> Result<Value, RuntimeError> {
-        expression.accept(rtc, self)
+        match self.evaluate_internal(rtc, expression) {
+            Continue(value) | Break(Ok(value)) => Ok(value),
+            Break(Err(error)) => Err(error),
+        }
     }
 
     pub fn execute(
@@ -150,6 +150,25 @@ impl Interpreter {
         rtc: &mut RuntimeContext<'_>,
         statement: &Stmt,
     ) -> Result<(), RuntimeError> {
+        match self.execute_internal(rtc, statement) {
+            Continue(()) | Break(Ok(_)) => Ok(()),
+            Break(Err(error)) => Err(error),
+        }
+    }
+
+    fn evaluate_internal(
+        &mut self,
+        rtc: &mut RuntimeContext<'_>,
+        expression: &Expr,
+    ) -> ControlFlow<Result<Value, RuntimeError>, Value> {
+        expression.accept(rtc, self)
+    }
+
+    fn execute_internal(
+        &mut self,
+        rtc: &mut RuntimeContext<'_>,
+        statement: &Stmt,
+    ) -> ControlFlow<Result<Value, RuntimeError>, ()> {
         statement.accept(self, rtc)
     }
 
@@ -158,98 +177,117 @@ impl Interpreter {
         rtc: &mut RuntimeContext<'_>,
         environment: Environment,
         statements: &[Stmt],
-    ) -> Result<(), RuntimeError> {
+    ) -> ControlFlow<Result<Value, RuntimeError>, ()> {
         let previous_environment = mem::replace(&mut self.environment, environment);
         for a_stmt in statements {
-            let result = self.execute(rtc, a_stmt);
-            if let Err(error) = result {
-                self.environment = previous_environment;
-                return Err(error);
+            match self.execute_internal(rtc, a_stmt) {
+                Continue(()) => {},
+                Break(result) => {
+                    self.environment = previous_environment;
+                    return Break(result);
+                },
             }
         }
         self.environment = previous_environment;
-        Ok(())
+        Continue(())
     }
 }
 
 impl ExprVisitor for Interpreter {
-    type Output = Result<Value, RuntimeError>;
+    type Output = ControlFlow<Result<Value, RuntimeError>, Value>;
 
     fn visit_assign_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Assign) -> Self::Output {
-        let value = self.evaluate(rtc, expr.value())?;
+        let value = self.evaluate_internal(rtc, expr.value())?;
         let symbol = expr.name().lexeme();
-        self.environment
-            .assign(symbol, value.clone())
-            .map_err(|err| RuntimeError::new(err.into(), *expr.name()))?;
-        Ok(value)
+        match self.environment.assign(symbol, value.clone()) {
+            Ok(()) => Continue(value),
+            Err(EnvironmentError::IdentifierNotFound(symbol)) => Break(Err(RuntimeError::new(
+                RuntimeErrorCode::UndefinedVariable(symbol),
+                *expr.name(),
+            ))),
+        }
     }
 
     fn visit_binary_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Binary) -> Self::Output {
-        let left = self.evaluate(rtc, expr.left())?;
-        let right = self.evaluate(rtc, expr.right())?;
+        let left = self.evaluate_internal(rtc, expr.left())?;
+        let right = self.evaluate_internal(rtc, expr.right())?;
 
         match expr.operator().kind() {
-            TokenKind::BangEqual => Ok(Value::Bool(left != right)),
-            TokenKind::EqualEqual => Ok(Value::Bool(left == right)),
-            TokenKind::Greater => Ok(Value::Bool(left > right)),
-            TokenKind::GreaterEqual => Ok(Value::Bool(left >= right)),
-            TokenKind::Less => Ok(Value::Bool(left < right)),
-            TokenKind::LessEqual => Ok(Value::Bool(left <= right)),
+            TokenKind::BangEqual => Continue(Value::Bool(left != right)),
+            TokenKind::EqualEqual => Continue(Value::Bool(left == right)),
+            TokenKind::Greater => Continue(Value::Bool(left > right)),
+            TokenKind::GreaterEqual => Continue(Value::Bool(left >= right)),
+            TokenKind::Less => Continue(Value::Bool(left < right)),
+            TokenKind::LessEqual => Continue(Value::Bool(left <= right)),
             TokenKind::Minus => match (left, right) {
-                (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left - right)),
-                _ => Err(RuntimeError::new(
+                (Value::Number(left), Value::Number(right)) => {
+                    Continue(Value::Number(left - right))
+                },
+                _ => Break(Err(RuntimeError::new(
                     RuntimeErrorCode::OperandNotANumber,
                     *expr.operator(),
-                )),
+                ))),
             },
             TokenKind::Plus => match (left, right) {
-                (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left + right)),
-                (Value::String(left), Value::String(right)) => {
-                    Ok(Value::String(format!("{left}{right}")))
+                (Value::Number(left), Value::Number(right)) => {
+                    Continue(Value::Number(left + right))
                 },
-                (Value::String(_), Value::Number(_)) | (Value::Number(_), Value::String(_)) => Err(
-                    RuntimeError::new(RuntimeErrorCode::OperandsOfDifferentType, *expr.operator()),
-                ),
-                _ => Err(RuntimeError::new(
+                (Value::String(left), Value::String(right)) => {
+                    Continue(Value::String(format!("{left}{right}")))
+                },
+                (Value::String(_), Value::Number(_)) | (Value::Number(_), Value::String(_)) => {
+                    Break(Err(RuntimeError::new(
+                        RuntimeErrorCode::OperandsOfDifferentType,
+                        *expr.operator(),
+                    )))
+                },
+                _ => Break(Err(RuntimeError::new(
                     RuntimeErrorCode::OperandNotANumberOrString,
                     *expr.operator(),
-                )),
+                ))),
             },
             TokenKind::Slash => match (left, right) {
-                (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left / right)),
-                _ => Err(RuntimeError::new(
+                (Value::Number(left), Value::Number(right)) => {
+                    Continue(Value::Number(left / right))
+                },
+                _ => Break(Err(RuntimeError::new(
                     RuntimeErrorCode::OperandNotANumber,
                     *expr.operator(),
-                )),
+                ))),
             },
             TokenKind::Star => match (left, right) {
-                (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left * right)),
-                _ => Err(RuntimeError::new(
+                (Value::Number(left), Value::Number(right)) => {
+                    Continue(Value::Number(left * right))
+                },
+                _ => Break(Err(RuntimeError::new(
                     RuntimeErrorCode::OperandNotANumber,
                     *expr.operator(),
-                )),
+                ))),
             },
-            _ => Err(RuntimeError::new(
+            _ => Break(Err(RuntimeError::new(
                 RuntimeErrorCode::NotABinaryOperator,
                 *expr.operator(),
-            )),
+            ))),
         }
     }
 
     fn visit_call_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Call) -> Self::Output {
-        let callee = self.evaluate(rtc, expr.callee())?;
+        let callee = self.evaluate_internal(rtc, expr.callee())?;
         let mut arguments = Vec::with_capacity(expr.arguments().len());
         for argument in expr.arguments() {
-            let arg = self.evaluate(rtc, argument)?;
+            let arg = self.evaluate_internal(rtc, argument)?;
             arguments.push(arg);
         }
         if let Value::Callable(callable) = callee {
-            data::Call::call(&callable, self, rtc, &arguments)
+            match data::Call::call(&callable, self, rtc, &arguments) {
+                Ok(value) => Continue(value),
+                Err(error) => Break(Err(error)),
+            }
         } else {
-            Err(RuntimeError::new(
+            Break(Err(RuntimeError::new(
                 RuntimeErrorCode::CallExprOnNonCallable,
                 *expr.paren(), // TODO improve error message for call expr
-            ))
+            )))
         }
     }
 
@@ -262,7 +300,7 @@ impl ExprVisitor for Interpreter {
         rtc: &mut RuntimeContext<'_>,
         expr: &Grouping,
     ) -> Self::Output {
-        self.evaluate(rtc, expr.expression())
+        self.evaluate_internal(rtc, expr.expression())
     }
 
     fn visit_literal_expr(
@@ -271,23 +309,23 @@ impl ExprVisitor for Interpreter {
         expr: &Literal,
     ) -> Self::Output {
         match expr {
-            Literal::Nil => Ok(Value::Nil),
-            Literal::Bool(value) => Ok(Value::Bool(*value)),
-            Literal::Number(value) => Ok(Value::Number(*value)),
-            Literal::String(value) => Ok(Value::String(value.to_string())),
+            Literal::Nil => Continue(Value::Nil),
+            Literal::Bool(value) => Continue(Value::Bool(*value)),
+            Literal::Number(value) => Continue(Value::Number(*value)),
+            Literal::String(value) => Continue(Value::String(value.to_string())),
         }
     }
 
     fn visit_logical_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Logical) -> Self::Output {
-        let left = self.evaluate(rtc, expr.left())?;
+        let left = self.evaluate_internal(rtc, expr.left())?;
         if expr.operator().kind() == TokenKind::Or {
             if left.is_truthy() {
-                return Ok(left);
+                return Continue(left);
             }
         } else if !left.is_truthy() {
-            return Ok(left);
+            return Continue(left);
         }
-        self.evaluate(rtc, expr.right())
+        self.evaluate_internal(rtc, expr.right())
     }
 
     fn visit_set_expr(&mut self, _rtc: &mut RuntimeContext<'_>, _expr: &Set) -> Self::Output {
@@ -303,23 +341,23 @@ impl ExprVisitor for Interpreter {
     }
 
     fn visit_unary_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Unary) -> Self::Output {
-        let right = self.evaluate(rtc, expr.right())?;
+        let right = self.evaluate_internal(rtc, expr.right())?;
         match expr.operator().kind() {
-            TokenKind::Bang => Ok(Value::Bool(!right.is_truthy())),
+            TokenKind::Bang => Continue(Value::Bool(!right.is_truthy())),
             TokenKind::Minus => {
                 if let Value::Number(number) = right {
-                    Ok(Value::Number(-number))
+                    Continue(Value::Number(-number))
                 } else {
-                    Err(RuntimeError::new(
+                    Break(Err(RuntimeError::new(
                         RuntimeErrorCode::OperandNotANumber,
                         *expr.operator(),
-                    ))
+                    )))
                 }
             },
-            _ => Err(RuntimeError::new(
+            _ => Break(Err(RuntimeError::new(
                 RuntimeErrorCode::NotAnUnaryOperator,
                 *expr.operator(),
-            )),
+            ))),
         }
     }
 
@@ -329,14 +367,18 @@ impl ExprVisitor for Interpreter {
         expr: &Variable,
     ) -> Self::Output {
         let symbol = expr.name().lexeme();
-        self.environment
-            .lookup(symbol)
-            .map_err(|err| RuntimeError::new(err.into(), *expr.name()))
+        match self.environment.lookup(symbol) {
+            Ok(value) => Continue(value),
+            Err(EnvironmentError::IdentifierNotFound(symbol)) => Break(Err(RuntimeError::new(
+                RuntimeErrorCode::UndefinedVariable(symbol),
+                *expr.name(),
+            ))),
+        }
     }
 }
 
 impl StmtVisitor for Interpreter {
-    type Output = Result<(), RuntimeError>;
+    type Output = ControlFlow<Result<Value, RuntimeError>, ()>;
 
     fn visit_block_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Block) -> Self::Output {
         self.execute_block(rtc, self.environment.new_local(), stmt.statements())
@@ -351,8 +393,8 @@ impl StmtVisitor for Interpreter {
         rtc: &mut RuntimeContext<'_>,
         stmt: &Expression,
     ) -> Self::Output {
-        self.evaluate(rtc, stmt.expression())?;
-        Ok(())
+        self.evaluate_internal(rtc, stmt.expression())?;
+        Continue(())
     }
 
     fn visit_function_stmt(
@@ -362,45 +404,54 @@ impl StmtVisitor for Interpreter {
     ) -> Self::Output {
         let function = LoxFunction::new(stmt.clone());
         self.environment.define(stmt.name().lexeme(), function);
-        Ok(())
+        Continue(())
     }
 
     fn visit_if_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &If) -> Self::Output {
-        if self.evaluate(rtc, stmt.condition())?.is_truthy() {
-            self.execute(rtc, stmt.then_branch())
+        if self.evaluate_internal(rtc, stmt.condition())?.is_truthy() {
+            self.execute_internal(rtc, stmt.then_branch())
         } else if let Some(else_branch) = stmt.else_branch() {
-            self.execute(rtc, else_branch)
+            self.execute_internal(rtc, else_branch)
         } else {
-            Ok(())
+            Continue(())
         }
     }
 
     fn visit_print_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Print) -> Self::Output {
-        let value = self.evaluate(rtc, stmt.expression())?;
-        writeln!(rtc.stdout(), "{value}").expect("failed to write to stdout");
-        Ok(())
+        let value = self.evaluate_internal(rtc, stmt.expression())?;
+        if let Err(err) = writeln!(rtc.stdout(), "{value}") {
+            writeln!(rtc.stderr(), "{err}").expect("failed to write to stderr");
+        }
+        Continue(())
     }
 
-    fn visit_return_stmt(&mut self, _rtc: &mut RuntimeContext<'_>, _stmt: &Return) -> Self::Output {
-        todo!()
+    fn visit_return_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Return) -> Self::Output {
+        let return_value = match stmt.value() {
+            None => Value::Nil,
+            Some(expression) => match self.evaluate_internal(rtc, expression) {
+                Continue(value) | Break(Ok(value)) => value,
+                Break(Err(error)) => return Break(Err(error)),
+            },
+        };
+        Break(Ok(return_value))
     }
 
     fn visit_var_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Var) -> Self::Output {
         let value = if let Some(initializer) = stmt.initializer() {
-            self.evaluate(rtc, initializer)?
+            self.evaluate_internal(rtc, initializer)?
         } else {
             Value::Nil
         };
         let symbol = stmt.name().lexeme();
         self.environment.define(symbol, value);
-        Ok(())
+        Continue(())
     }
 
     fn visit_while_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &While) -> Self::Output {
-        while self.evaluate(rtc, stmt.condition())?.is_truthy() {
-            self.execute(rtc, stmt.body())?;
+        while self.evaluate_internal(rtc, stmt.condition())?.is_truthy() {
+            self.execute_internal(rtc, stmt.body())?;
         }
-        Ok(())
+        Continue(())
     }
 }
 
@@ -447,9 +498,11 @@ impl data::Call for LoxFunction {
             .zip(arguments.iter())
             .for_each(|(param, arg)| environment.define(param.lexeme(), arg.clone()));
 
-        let _return = interpreter.execute_block(rtc, environment, self.declaration().body());
-        //todo!("how to handle return values from function calls?")
-        Ok(Value::Nil)
+        match interpreter.execute_block(rtc, environment, self.declaration().body()) {
+            Continue(()) => Ok(Value::Nil),
+            Break(Ok(value)) => Ok(value),
+            Break(Err(error)) => Err(error),
+        }
     }
 }
 
@@ -469,3 +522,6 @@ impl data::Call for NativeFunction {
         self.fun_ptr()(arguments)
     }
 }
+
+#[cfg(test)]
+mod tests;

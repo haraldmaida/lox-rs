@@ -150,6 +150,8 @@ pub trait Call {
     ) -> Result<Value, RuntimeError>;
 }
 
+pub type FunPtr = fn(&[Value]) -> Result<Value, RuntimeError>;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Callable {
     LoxFunction(LoxFunction),
@@ -208,7 +210,7 @@ impl LoxFunction {
 pub struct NativeFunction {
     name: Symbol,
     parameters: Vec<Symbol>,
-    fun_ptr: fn(&[Value]) -> Result<Value, RuntimeError>,
+    fun_ptr: FunPtr,
 }
 
 impl Display for NativeFunction {
@@ -248,6 +250,14 @@ impl PartialEq for NativeFunction {
         // function pointers may not be unique, so we exclude them from the comparison
         self.name == other.name && self.parameters == other.parameters
     }
+}
+
+pub fn native_function(
+    name: impl Into<Symbol>,
+    parameters: impl IntoIterator<Item = Symbol>,
+    fun_ptr: FunPtr,
+) -> NativeFunction {
+    NativeFunction::new(name.into(), parameters.into_iter().collect(), fun_ptr)
 }
 
 #[cfg(any(test, feature = "dsl"))]

@@ -26,7 +26,7 @@ proptest! {
 
         let maybe_value = environment.lookup(symbol);
 
-        prop_assert_eq!(maybe_value, Err(EnvironmentError::UndefinedVariable(symbol)));
+        prop_assert_eq!(maybe_value, Err(EnvironmentError::IdentifierNotFound(symbol)));
     }
 
     #[test]
@@ -56,7 +56,7 @@ proptest! {
 
         let result = environment.assign(symbol, value);
 
-        prop_assert_eq!(result, Err(EnvironmentError::UndefinedVariable(symbol)));
+        prop_assert_eq!(result, Err(EnvironmentError::IdentifierNotFound(symbol)));
     }
 }
 
@@ -120,7 +120,7 @@ fn dropping_a_local_environment_does_not_affect_the_enclosing_environment() {
     assert_that!(global_env.lookup("foo")).is_equal_to(Ok(Value::from("some value")));
     assert_that!(global_env.lookup("bar")).is_equal_to(Ok(Value::from("another value")));
     assert_that!(global_env.lookup("baz"))
-        .is_equal_to(Err(EnvironmentError::UndefinedVariable("baz".into())));
+        .is_equal_to(Err(EnvironmentError::IdentifierNotFound("baz".into())));
 }
 
 #[test]
@@ -132,7 +132,7 @@ fn creating_a_new_local_environment_after_dropping_the_last_one() {
     assert_that!(global_env.lookup("foo")).is_equal_to(Ok(Value::from("some value")));
     assert_that!(global_env.lookup("bar")).is_equal_to(Ok(Value::from("another value")));
     assert_that!(global_env.lookup("baz"))
-        .is_equal_to(Err(EnvironmentError::UndefinedVariable("baz".into())));
+        .is_equal_to(Err(EnvironmentError::IdentifierNotFound("baz".into())));
 
     let local_env = global_env.new_local();
     local_env.define("foo", "different value");
@@ -147,7 +147,7 @@ fn creating_a_new_local_environment_after_dropping_the_last_one() {
     assert_that!(global_env.lookup("foo")).is_equal_to(Ok(Value::from("some value")));
     assert_that!(global_env.lookup("bar")).is_equal_to(Ok(Value::from("another value")));
     assert_that!(global_env.lookup("baz"))
-        .is_equal_to(Err(EnvironmentError::UndefinedVariable("baz".into())));
+        .is_equal_to(Err(EnvironmentError::IdentifierNotFound("baz".into())));
 
     let local_env = global_env.new_local();
     local_env.define("foo", "completely different value");
@@ -157,6 +157,6 @@ fn creating_a_new_local_environment_after_dropping_the_last_one() {
         .is_equal_to(Ok(Value::from("completely different value")));
     assert_that!(local_env.lookup("bar")).is_equal_to(Ok(Value::from("another value")));
     assert_that!(local_env.lookup("baz"))
-        .is_equal_to(Err(EnvironmentError::UndefinedVariable("baz".into())));
+        .is_equal_to(Err(EnvironmentError::IdentifierNotFound("baz".into())));
     assert_that!(local_env.lookup("qux")).is_equal_to(Ok(Value::from("third value")));
 }
