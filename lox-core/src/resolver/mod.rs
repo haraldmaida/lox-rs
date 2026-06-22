@@ -95,20 +95,12 @@ impl Resolver {
     }
 
     fn declare(&mut self, name: Token) {
-        debug_assert!(
-            !self.scopes.is_empty(),
-            "can't declare a symbol outside of a scope"
-        );
         if let Some(scope) = self.scopes.last_mut() {
             scope.insert(name.lexeme(), VarState::Declared);
         }
     }
 
     fn define(&mut self, name: Token) {
-        debug_assert!(
-            !self.scopes.is_empty(),
-            "can't define a symbol outside of a scope"
-        );
         if let Some(scope) = self.scopes.last_mut() {
             scope.insert(name.lexeme(), VarState::Initialized);
         }
