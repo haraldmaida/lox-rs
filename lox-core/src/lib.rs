@@ -6,6 +6,7 @@ pub mod interpreter;
 pub mod native;
 pub mod parse;
 pub mod program;
+pub mod resolver;
 pub mod runtime;
 pub mod stmt;
 pub mod token;
