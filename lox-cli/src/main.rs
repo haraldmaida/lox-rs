@@ -23,7 +23,9 @@ use std::path::Path;
 fn main() -> miette::Result<()> {
     let cli = Cli::parse();
 
-    let mut rtc = RuntimeContext::new(std::io::stdout(), std::io::stderr());
+    let mut stdout = std::io::stdout();
+    let mut stderr = std::io::stderr();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
 
     match &cli.command {
         Command::Tokenize { source } => {

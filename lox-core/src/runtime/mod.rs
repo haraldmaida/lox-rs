@@ -1,16 +1,13 @@
 use std::io;
 
 pub struct RuntimeContext<'a> {
-    stdout: Box<dyn io::Write + 'a>,
-    stderr: Box<dyn io::Write + 'a>,
+    stdout: &'a mut dyn io::Write,
+    stderr: &'a mut dyn io::Write,
 }
 
 impl<'a> RuntimeContext<'a> {
-    pub fn new(stdout: impl io::Write + 'a, stderr: impl io::Write + 'a) -> Self {
-        Self {
-            stdout: Box::new(stdout),
-            stderr: Box::new(stderr),
-        }
+    pub fn new(stdout: &'a mut impl io::Write, stderr: &'a mut impl io::Write) -> Self {
+        Self { stdout, stderr }
     }
 
     pub fn stdout(&mut self) -> &mut dyn io::Write {

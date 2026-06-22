@@ -11,19 +11,18 @@ use crate::token::{
 };
 use crate::tokenize::Tokenize;
 use asserting::prelude::*;
-use std::io;
 use std::time::SystemTime;
-
-fn sink_rtc<'a>() -> RuntimeContext<'a> {
-    RuntimeContext::new(io::sink(), io::sink())
-}
 
 #[test]
 fn evaluate_literal_nil() {
     let expr = Expr::from(nil());
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Nil);
 }
@@ -32,8 +31,12 @@ fn evaluate_literal_nil() {
 fn evaluate_literal_bool() {
     let expr = Expr::from(literal(true));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -42,8 +45,12 @@ fn evaluate_literal_bool() {
 fn evaluate_literal_number() {
     let expr = Expr::from(literal(123.456));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let Ok(Value::Number(value)) = interpreter.evaluate(&mut sink_rtc(), &expr) else {
+
+    let Ok(Value::Number(value)) = interpreter.evaluate(&mut rtc, &expr) else {
         panic!("expected a number");
     };
 
@@ -54,8 +61,12 @@ fn evaluate_literal_number() {
 fn evaluate_literal_string() {
     let expr = Expr::from(Literal::String("Hello, world!".into()));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value)
         .ok()
@@ -66,8 +77,12 @@ fn evaluate_literal_string() {
 fn evaluate_grouping_expression() {
     let expr = Expr::from(grouping(literal(123.456)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let Ok(Value::Number(value)) = interpreter.evaluate(&mut sink_rtc(), &expr) else {
+
+    let Ok(Value::Number(value)) = interpreter.evaluate(&mut rtc, &expr) else {
         panic!("expected a number");
     };
 
@@ -78,8 +93,12 @@ fn evaluate_grouping_expression() {
 fn evaluate_unary_expr_bang_for_true() {
     let expr = Expr::from(unary(bang((1, 2)), literal(true)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
@@ -88,8 +107,12 @@ fn evaluate_unary_expr_bang_for_true() {
 fn evaluate_unary_expr_bang_for_false() {
     let expr = Expr::from(unary(bang((1, 2)), literal(false)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -98,8 +121,12 @@ fn evaluate_unary_expr_bang_for_false() {
 fn evaluate_unary_expr_bang_for_number_0() {
     let expr = Expr::from(unary(bang((1, 2)), literal(0.)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
@@ -108,8 +135,12 @@ fn evaluate_unary_expr_bang_for_number_0() {
 fn evaluate_unary_expr_bang_for_string() {
     let expr = Expr::from(unary(bang((1, 2)), Literal::String("0".into())));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
@@ -118,8 +149,12 @@ fn evaluate_unary_expr_bang_for_string() {
 fn evaluate_unary_expr_minus_with_number() {
     let expr = Expr::from(unary(minus((1, 2)), literal(123.456)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let Ok(Value::Number(value)) = interpreter.evaluate(&mut sink_rtc(), &expr) else {
+
+    let Ok(Value::Number(value)) = interpreter.evaluate(&mut rtc, &expr) else {
         panic!("expected a number");
     };
 
@@ -130,8 +165,12 @@ fn evaluate_unary_expr_minus_with_number() {
 fn evaluate_unary_expr_minus_with_boolean_returns_runtime_error() {
     let expr = Expr::from(unary(minus((1, 2)), literal(true)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let result = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
@@ -146,8 +185,12 @@ fn evaluate_unary_expr_minus_with_string_returns_runtime_error() {
         Literal::String("Hello, world!".into()),
     ));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let result = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
@@ -159,8 +202,12 @@ fn evaluate_unary_expr_minus_with_string_returns_runtime_error() {
 fn evaluate_unary_expr_minus_with_nil_returns_runtime_error() {
     let expr = Expr::from(unary(minus((1, 2)), Literal::Nil));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let result = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
@@ -172,8 +219,12 @@ fn evaluate_unary_expr_minus_with_nil_returns_runtime_error() {
 fn evaluate_unary_expr_with_illegal_operator() {
     let expr = Expr::from(unary(plus((1, 2)), literal(123.456)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let result = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::NotAnUnaryOperator,
@@ -185,8 +236,12 @@ fn evaluate_unary_expr_with_illegal_operator() {
 fn evaluate_binary_expr_minus_with_numbers() {
     let expr = Expr::from(binary(literal(123.456), minus((1, 2)), literal(789.012)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let Ok(Value::Number(value)) = interpreter.evaluate(&mut sink_rtc(), &expr) else {
+
+    let Ok(Value::Number(value)) = interpreter.evaluate(&mut rtc, &expr) else {
         panic!("expected a number");
     };
 
@@ -197,8 +252,12 @@ fn evaluate_binary_expr_minus_with_numbers() {
 fn evaluate_binary_expr_minus_with_booleans_returns_runtime_error() {
     let expr = Expr::from(binary(literal(true), minus((1, 2)), literal(false)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let result = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
@@ -214,8 +273,12 @@ fn evaluate_binary_expr_minus_with_strings_returns_runtime_error() {
         Literal::String("Hello, world!".into()),
     ));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let result = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
@@ -227,8 +290,12 @@ fn evaluate_binary_expr_minus_with_strings_returns_runtime_error() {
 fn evaluate_binary_expr_minus_with_nil_returns_runtime_error() {
     let expr = Expr::from(binary(Literal::Nil, minus((1, 2)), literal(123.456)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let result = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
@@ -240,8 +307,12 @@ fn evaluate_binary_expr_minus_with_nil_returns_runtime_error() {
 fn evaluate_binary_expr_plus_with_numbers() {
     let expr = Expr::from(binary(literal(123.456), plus((1, 2)), literal(789.012)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let Ok(Value::Number(value)) = interpreter.evaluate(&mut sink_rtc(), &expr) else {
+
+    let Ok(Value::Number(value)) = interpreter.evaluate(&mut rtc, &expr) else {
         panic!("expected a number");
     };
 
@@ -256,8 +327,12 @@ fn evaluate_binary_expr_plus_with_strings() {
         Literal::String("world!".into()),
     ));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value)
         .ok()
@@ -272,8 +347,12 @@ fn evaluate_binary_expr_plus_with_string_and_number_returns_runtime_error() {
         literal(123.456),
     ));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let result = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandsOfDifferentType,
@@ -289,8 +368,12 @@ fn evaluate_binary_expr_plus_with_number_and_string_returns_runtime_error() {
         Literal::String("Anna".into()),
     ));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let result = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandsOfDifferentType,
@@ -302,8 +385,12 @@ fn evaluate_binary_expr_plus_with_number_and_string_returns_runtime_error() {
 fn evaluate_binary_expr_plus_with_booleans_returns_runtime_error() {
     let expr = Expr::from(binary(literal(true), plus((1, 2)), literal(false)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let result = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumberOrString,
@@ -315,8 +402,12 @@ fn evaluate_binary_expr_plus_with_booleans_returns_runtime_error() {
 fn evaluate_binary_expr_plus_with_nil_returns_runtime_error() {
     let expr = Expr::from(binary(Literal::Nil, plus((1, 2)), literal(123.456)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let result = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumberOrString,
@@ -328,8 +419,12 @@ fn evaluate_binary_expr_plus_with_nil_returns_runtime_error() {
 fn evaluate_binary_expr_star_with_numbers() {
     let expr = Expr::from(binary(literal(-123.456), star((1, 2)), literal(789.012)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let Ok(Value::Number(value)) = interpreter.evaluate(&mut sink_rtc(), &expr) else {
+
+    let Ok(Value::Number(value)) = interpreter.evaluate(&mut rtc, &expr) else {
         panic!("expected a number");
     };
 
@@ -340,8 +435,12 @@ fn evaluate_binary_expr_star_with_numbers() {
 fn evaluate_binary_expr_star_with_booleans_returns_runtime_error() {
     let expr = Expr::from(binary(literal(true), star((1, 2)), literal(false)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let result = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
@@ -357,8 +456,12 @@ fn evaluate_binary_expr_star_with_strings_returns_runtime_error() {
         literal(123.456),
     ));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let result = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
@@ -370,8 +473,12 @@ fn evaluate_binary_expr_star_with_strings_returns_runtime_error() {
 fn evaluate_binary_expr_star_with_nil_returns_runtime_error() {
     let expr = Expr::from(binary(Literal::Nil, star((1, 2)), literal(123.456)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let result = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
@@ -383,8 +490,12 @@ fn evaluate_binary_expr_star_with_nil_returns_runtime_error() {
 fn evaluate_binary_expr_slash_with_numbers() {
     let expr = Expr::from(binary(literal(123.456), slash((1, 2)), literal(789.012)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let Ok(Value::Number(value)) = interpreter.evaluate(&mut sink_rtc(), &expr) else {
+
+    let Ok(Value::Number(value)) = interpreter.evaluate(&mut rtc, &expr) else {
         panic!("expected a number");
     };
 
@@ -395,8 +506,12 @@ fn evaluate_binary_expr_slash_with_numbers() {
 fn evaluate_binary_expr_slash_with_booleans_returns_runtime_error() {
     let expr = Expr::from(binary(literal(true), slash((1, 2)), literal(false)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let result = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
@@ -412,8 +527,12 @@ fn evaluate_binary_expr_slash_with_strings_returns_runtime_error() {
         literal(123.456),
     ));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let result = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
@@ -425,8 +544,12 @@ fn evaluate_binary_expr_slash_with_strings_returns_runtime_error() {
 fn evaluate_binary_expr_slash_with_nil_returns_runtime_error() {
     let expr = Expr::from(binary(Literal::Nil, slash((1, 2)), literal(123.456)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let result = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::OperandNotANumber,
@@ -442,8 +565,12 @@ fn evaluate_binary_expr_bangequal_with_numbers() {
         literal(789.012),
     ));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -452,8 +579,12 @@ fn evaluate_binary_expr_bangequal_with_numbers() {
 fn evaluate_binary_expr_bangequal_with_booleans() {
     let expr = Expr::from(binary(literal(true), bang_equal((1, 2)), literal(false)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -466,8 +597,12 @@ fn evaluate_binary_expr_bangequal_with_strings() {
         Literal::String("Anna".into()),
     ));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
@@ -476,8 +611,12 @@ fn evaluate_binary_expr_bangequal_with_strings() {
 fn evaluate_binary_expr_bangequal_with_nils() {
     let expr = Expr::from(binary(Literal::Nil, bang_equal((1, 2)), Literal::Nil));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
@@ -490,8 +629,12 @@ fn evaluate_binary_expr_equalequal_with_numbers() {
         literal(789.012),
     ));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
@@ -500,8 +643,12 @@ fn evaluate_binary_expr_equalequal_with_numbers() {
 fn evaluate_binary_expr_equalequal_with_booleans() {
     let expr = Expr::from(binary(literal(true), equal_equal((1, 2)), literal(false)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
@@ -514,8 +661,12 @@ fn evaluate_binary_expr_equalequal_with_strings() {
         Literal::String("Anna".into()),
     ));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -524,8 +675,12 @@ fn evaluate_binary_expr_equalequal_with_strings() {
 fn evaluate_binary_expr_equalequal_with_nils() {
     let expr = Expr::from(binary(Literal::Nil, equal_equal((1, 2)), Literal::Nil));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -534,8 +689,12 @@ fn evaluate_binary_expr_equalequal_with_nils() {
 fn evaluate_binary_expr_greater_with_numbers() {
     let expr = Expr::from(binary(literal(123.456), greater((1, 2)), literal(789.012)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
@@ -544,8 +703,12 @@ fn evaluate_binary_expr_greater_with_numbers() {
 fn evaluate_binary_expr_greater_with_booleans() {
     let expr = Expr::from(binary(literal(true), greater((1, 2)), literal(false)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -558,8 +721,12 @@ fn evaluate_binary_expr_greater_with_strings() {
         Literal::String("Anna".into()),
     ));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -568,8 +735,12 @@ fn evaluate_binary_expr_greater_with_strings() {
 fn evaluate_binary_expr_greater_with_nils() {
     let expr = Expr::from(binary(Literal::Nil, greater((1, 2)), Literal::Nil));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
@@ -582,8 +753,12 @@ fn evaluate_binary_expr_greaterequal_with_numbers() {
         literal(789.012),
     ));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
@@ -592,8 +767,12 @@ fn evaluate_binary_expr_greaterequal_with_numbers() {
 fn evaluate_binary_expr_greaterequal_with_booleans() {
     let expr = Expr::from(binary(literal(true), greater_equal((1, 2)), literal(true)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -606,8 +785,12 @@ fn evaluate_binary_expr_greaterequal_with_strings() {
         Literal::String("Anna".into()),
     ));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -616,8 +799,12 @@ fn evaluate_binary_expr_greaterequal_with_strings() {
 fn evaluate_binary_expr_greaterequal_with_nils() {
     let expr = Expr::from(binary(Literal::Nil, greater_equal((1, 2)), Literal::Nil));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -626,8 +813,12 @@ fn evaluate_binary_expr_greaterequal_with_nils() {
 fn evaluate_binary_expr_less_with_numbers() {
     let expr = Expr::from(binary(literal(123.456), less((1, 2)), literal(789.012)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -636,8 +827,12 @@ fn evaluate_binary_expr_less_with_numbers() {
 fn evaluate_binary_expr_less_with_booleans() {
     let expr = Expr::from(binary(literal(true), less((1, 2)), literal(false)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
@@ -650,8 +845,12 @@ fn evaluate_binary_expr_less_with_strings() {
         Literal::String("Billie".into()),
     ));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -660,8 +859,12 @@ fn evaluate_binary_expr_less_with_strings() {
 fn evaluate_binary_expr_less_with_nils() {
     let expr = Expr::from(binary(Literal::Nil, less((1, 2)), Literal::Nil));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(false));
 }
@@ -674,8 +877,12 @@ fn evaluate_binary_expr_lessequal_with_numbers() {
         literal(789.012),
     ));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -684,8 +891,12 @@ fn evaluate_binary_expr_lessequal_with_numbers() {
 fn evaluate_binary_expr_lessequal_with_booleans() {
     let expr = Expr::from(binary(literal(false), less_equal((1, 2)), literal(true)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -698,8 +909,12 @@ fn evaluate_binary_expr_lessequal_with_strings() {
         Literal::String("Anna".into()),
     ));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -708,8 +923,12 @@ fn evaluate_binary_expr_lessequal_with_strings() {
 fn evaluate_binary_expr_lessequal_with_nils() {
     let expr = Expr::from(binary(Literal::Nil, less_equal((1, 2)), Literal::Nil));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let value = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let value = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(value).ok().is_equal_to(Value::Bool(true));
 }
@@ -718,8 +937,12 @@ fn evaluate_binary_expr_lessequal_with_nils() {
 fn evaluate_binary_expr_with_illegal_operator() {
     let expr = Expr::from(binary(literal(123.456), bang((1, 2)), literal(789.012)));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
+
+    let result = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(result).has_error(RuntimeError::new(
         RuntimeErrorCode::NotABinaryOperator,
@@ -732,10 +955,11 @@ fn execute_print_stmt_with_expression() {
     let stmt = Stmt::from(print(binary(literal(84.), plus((1, 2)), literal(2.))));
 
     let mut stdout = Vec::new();
-    let mut rtc = RuntimeContext::new(&mut stdout, io::sink());
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
+
     let result = interpreter.execute(&mut rtc, &stmt);
-    drop(rtc);
 
     assert_that!(result).is_ok();
     assert_that!(String::from_utf8(stdout))
@@ -750,8 +974,11 @@ fn execute_var_stmt_with_initializer() {
         binary(literal(40.), plus((17, 1)), literal(2.)).expr(),
     ));
 
-    let mut rtc = sink_rtc();
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
+
     let result = interpreter.execute(&mut rtc, &stmt);
 
     assert_that!(result).is_ok();
@@ -762,8 +989,11 @@ fn execute_var_stmt_with_initializer() {
 fn execute_var_stmt_without_initializer() {
     let stmt = Stmt::from(var(identifier("foo", (4, 3)), None));
 
-    let mut rtc = sink_rtc();
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
+
     let result = interpreter.execute(&mut rtc, &stmt);
 
     assert_that!(result).is_ok();
@@ -784,8 +1014,11 @@ fn execute_var_stmt_with_variable_expression() {
         .expr(),
     ));
 
-    let mut rtc = sink_rtc();
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
+
     let result = interpreter.execute(&mut rtc, &declare_a);
     assert_that!(result).is_ok();
     let result = interpreter.execute(&mut rtc, &declare_b);
@@ -801,8 +1034,11 @@ fn execute_var_stmt_with_variable_expression() {
 fn execute_print_stmt_of_undefined_variable() {
     let stmt = Stmt::from(print(variable(identifier("foo", (4, 3)))));
 
-    let mut rtc = sink_rtc();
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
+
     let result = interpreter.execute(&mut rtc, &stmt);
 
     assert_that!(result).err().is_equal_to(RuntimeError::new(
@@ -817,12 +1053,15 @@ fn evaluate_assign_expr_stmt_to_existing_variable() {
 
     let assign_to_foo = Expr::from(assign(identifier("foo", (23, 3)), literal(99.)));
 
-    let mut rtc = sink_rtc();
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
+
     let declare_result = interpreter.execute(&mut rtc, &declare_foo);
     assert_that!(declare_result).is_ok();
 
-    let assign_result = interpreter.evaluate(&mut sink_rtc(), &assign_to_foo);
+    let assign_result = interpreter.evaluate(&mut rtc, &assign_to_foo);
 
     assert_that!(assign_result).is_equal_to(Ok(Value::Number(99.)));
     assert_that!(interpreter.environment().lookup("foo")).is_equal_to(Ok(Value::Number(99.)));
@@ -834,12 +1073,15 @@ fn evaluate_assign_expr_stmt_to_not_existing_variable() {
 
     let assign_to_foo = Expr::from(assign(identifier("foo", (23, 3)), literal(99.)));
 
-    let mut rtc = sink_rtc();
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
+
     let declare_result = interpreter.execute(&mut rtc, &declare_foo);
     assert_that!(declare_result).is_ok();
 
-    let assign_result = interpreter.evaluate(&mut sink_rtc(), &assign_to_foo);
+    let assign_result = interpreter.evaluate(&mut rtc, &assign_to_foo);
 
     assert_that!(assign_result)
         .err()
@@ -856,8 +1098,11 @@ fn evaluate_assign_expr_stmt_to_not_existing_variable() {
 fn execute_block_that_is_empty() {
     let stmt = Stmt::from(block(vec![]));
 
-    let mut rtc = sink_rtc();
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
+
     let result = interpreter.execute(&mut rtc, &stmt);
 
     assert_that!(result).is_ok();
@@ -871,8 +1116,11 @@ fn execute_block_with_var_declarations_and_assignments() {
     let assign_a = Expr::from(assign(identifier("a", (34, 1)), literal(5.).expr()));
     let block = Stmt::from(block(vec![declare_b, assign_b.stmt(), assign_a.stmt()]));
 
-    let mut rtc = sink_rtc();
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
+
     let result = interpreter.execute(&mut rtc, &declare_a);
     assert_that!(result).is_ok();
 
@@ -893,8 +1141,11 @@ fn execute_block_with_var_declarations_and_assignments_and_runtime_error() {
     let assign_a = Expr::from(assign(identifier("a", (34, 1)), literal(5.).expr()));
     let block = Stmt::from(block(vec![declare_b, assign_c.stmt(), assign_a.stmt()]));
 
-    let mut rtc = sink_rtc();
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
+
     let result = interpreter.execute(&mut rtc, &declare_a);
     assert_that!(result).is_ok();
 
@@ -914,15 +1165,15 @@ fn execute_block_with_var_declarations_and_assignments_and_runtime_error() {
 fn execute_if_stmt_single_then_stmt_no_else_branch() {
     let stmt = Stmt::from(if_(literal(true), print(literal("Hello, World!")).stmt()));
 
-    let mut out = Vec::new();
-    let mut rtc = RuntimeContext::new(&mut out, io::sink());
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
 
     let result = interpreter.execute(&mut rtc, &stmt);
 
-    drop(rtc);
     assert_that!(result).is_ok();
-    assert_that!(String::from_utf8(out))
+    assert_that!(String::from_utf8(stdout))
         .ok()
         .is_equal_to("Hello, World!\n");
 }
@@ -937,15 +1188,15 @@ fn execute_if_stmt_single_then_stmt_and_single_else_stmt() {
         .else_(print(literal("Goodbye, World!")).stmt()),
     );
 
-    let mut out = Vec::new();
-    let mut rtc = RuntimeContext::new(&mut out, io::sink());
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
 
     let result = interpreter.execute(&mut rtc, &stmt);
 
-    drop(rtc);
     assert_that!(result).is_ok();
-    assert_that!(String::from_utf8(out))
+    assert_that!(String::from_utf8(stdout))
         .ok()
         .is_equal_to("Goodbye, World!\n");
 }
@@ -966,17 +1217,20 @@ fn execute_if_stmt_multiple_then_stmts_no_else_branch() {
         ]),
     ));
 
-    let mut out = Vec::new();
-    let mut rtc = RuntimeContext::new(&mut out, io::sink());
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
+
     let result = interpreter.execute(&mut rtc, &declare_x);
     assert_that!(result).is_ok();
 
     let result = interpreter.execute(&mut rtc, &stmt);
 
-    drop(rtc);
     assert_that!(result).is_ok();
-    assert_that!(String::from_utf8(out)).ok().is_equal_to("7\n");
+    assert_that!(String::from_utf8(stdout))
+        .ok()
+        .is_equal_to("7\n");
 }
 
 #[test]
@@ -1016,17 +1270,18 @@ fn execute_if_stmt_multiple_then_stmts_and_multiple_else_stmts() {
         ])),
     );
 
-    let mut out = Vec::new();
-    let mut rtc = RuntimeContext::new(&mut out, io::sink());
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
+
     let result = interpreter.execute(&mut rtc, &declare_x);
     assert_that!(result).is_ok();
 
     let result = interpreter.execute(&mut rtc, &stmt);
 
-    drop(rtc);
     assert_that!(result).is_ok();
-    assert_that!(String::from_utf8(out))
+    assert_that!(String::from_utf8(stdout))
         .ok()
         .is_equal_to("102\n");
 }
@@ -1044,9 +1299,11 @@ fn execute_if_without_else_branch_and_nested_if_with_else_branch() {
         .else_(print(literal("x only"))),
     ));
 
-    let mut out = Vec::new();
-    let mut rtc = RuntimeContext::new(&mut out, io::sink());
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
+
     let result = interpreter.execute(&mut rtc, &declare_x);
     assert_that!(result).is_ok();
     let result = interpreter.execute(&mut rtc, &declare_y);
@@ -1054,9 +1311,8 @@ fn execute_if_without_else_branch_and_nested_if_with_else_branch() {
 
     let result = interpreter.execute(&mut rtc, &stmt);
 
-    drop(rtc);
     assert_that!(result).is_ok();
-    assert_that!(String::from_utf8(out))
+    assert_that!(String::from_utf8(stdout))
         .ok()
         .is_equal_to("x only\n");
 }
@@ -1079,13 +1335,17 @@ fn evaluate_logical_and_where_both_conditions_are_true() {
         ),
     ));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let x_result = interpreter.execute(&mut sink_rtc(), &declare_x);
+
+    let x_result = interpreter.execute(&mut rtc, &declare_x);
     assert_that!(x_result).is_ok();
-    let y_result = interpreter.execute(&mut sink_rtc(), &declare_y);
+    let y_result = interpreter.execute(&mut rtc, &declare_y);
     assert_that!(y_result).is_ok();
 
-    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
+    let result = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(result).ok().is_equal_to(value(true));
     // expecting that both assignments are executed
@@ -1111,13 +1371,17 @@ fn evaluate_logical_and_where_first_condition_is_false() {
         ),
     ));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let x_result = interpreter.execute(&mut sink_rtc(), &declare_x);
+
+    let x_result = interpreter.execute(&mut rtc, &declare_x);
     assert_that!(x_result).is_ok();
-    let y_result = interpreter.execute(&mut sink_rtc(), &declare_y);
+    let y_result = interpreter.execute(&mut rtc, &declare_y);
     assert_that!(y_result).is_ok();
 
-    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
+    let result = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(result).ok().is_equal_to(value(false));
     // expecting the left assignment is executed
@@ -1145,13 +1409,17 @@ fn evaluate_logical_or_where_first_condition_is_true() {
         ),
     ));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let x_result = interpreter.execute(&mut sink_rtc(), &declare_x);
+
+    let x_result = interpreter.execute(&mut rtc, &declare_x);
     assert_that!(x_result).is_ok();
-    let y_result = interpreter.execute(&mut sink_rtc(), &declare_y);
+    let y_result = interpreter.execute(&mut rtc, &declare_y);
     assert_that!(y_result).is_ok();
 
-    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
+    let result = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(result).ok().is_equal_to(value(true));
     // expecting the left assignment is executed
@@ -1179,13 +1447,17 @@ fn evaluate_logical_or_where_second_condition_is_true() {
         ),
     ));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
-    let x_result = interpreter.execute(&mut sink_rtc(), &declare_x);
+
+    let x_result = interpreter.execute(&mut rtc, &declare_x);
     assert_that!(x_result).is_ok();
-    let y_result = interpreter.execute(&mut sink_rtc(), &declare_y);
+    let y_result = interpreter.execute(&mut rtc, &declare_y);
     assert_that!(y_result).is_ok();
 
-    let result = interpreter.evaluate(&mut sink_rtc(), &expr);
+    let result = interpreter.evaluate(&mut rtc, &expr);
 
     assert_that!(result).ok().is_equal_to(value(true));
     // expecting that both assignments are executed
@@ -1213,18 +1485,19 @@ fn execute_while_loop_with_single_statement() {
         .expr(),
     ));
 
-    let mut out = Vec::new();
-    let mut rtc = RuntimeContext::new(&mut out, io::sink());
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
+
     let result = interpreter.execute(&mut rtc, &declare_x);
     assert_that!(result).is_ok();
 
     let result = interpreter.execute(&mut rtc, &while_loop);
 
-    drop(rtc);
     assert_that!(result).is_ok();
     assert_that!(interpreter.environment().lookup("x")).is_equal_to(Ok(Value::Number(10.)));
-    assert_that!(String::from_utf8(out)).ok().is_equal_to("");
+    assert_that!(String::from_utf8(stdout)).ok().is_equal_to("");
 }
 
 #[test]
@@ -1251,18 +1524,19 @@ fn execute_while_loop_with_multiple_statements() {
         ]),
     ));
 
-    let mut out = Vec::new();
-    let mut rtc = RuntimeContext::new(&mut out, io::sink());
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
+
     let result = interpreter.execute(&mut rtc, &declare_x);
     assert_that!(result).is_ok();
 
     let result = interpreter.execute(&mut rtc, &while_loop);
 
-    drop(rtc);
     assert_that!(result).is_ok();
     assert_that!(interpreter.environment().lookup("x")).is_equal_to(Ok(Value::Number(10.)));
-    assert_that!(String::from_utf8(out))
+    assert_that!(String::from_utf8(stdout))
         .ok()
         .is_equal_to("1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n");
 }
@@ -1284,9 +1558,12 @@ fn execute_function_declaration() {
         .stmt()],
     ));
 
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
 
-    let result = interpreter.execute(&mut sink_rtc(), &stmt);
+    let result = interpreter.execute(&mut rtc, &stmt);
 
     assert_that!(result).is_ok();
     assert_that!(interpreter.environment().lookup("foo"))
@@ -1332,7 +1609,6 @@ fn execute_function_declaration_and_call() {
 
     interpreter.interpret(&mut rtc, &program);
 
-    drop(rtc);
     assert_that!(String::from_utf8(stderr)).ok().is_empty();
     assert_that!(String::from_utf8(stdout))
         .ok()
@@ -1363,7 +1639,6 @@ fn execute_function_declaration_and_call_with_return_value() {
 
     interpreter.interpret(&mut rtc, &program);
 
-    drop(rtc);
     assert_that!(String::from_utf8(stderr)).ok().is_empty();
     assert_that!(String::from_utf8(stdout)).ok().is_equal_to(
         "0\n1\n1\n2\n3\n5\n8\n13\n21\n34\n55\n89\n144\n233\n377\n610\n987\n1597\n2584\n4181\n",
@@ -1395,7 +1670,6 @@ fn execute_native_function_call_to_clock() {
 
     interpreter.interpret(&mut rtc, &program);
 
-    drop(rtc);
     assert_that!(String::from_utf8(stderr)).ok().is_empty();
     let result = String::from_utf8(stdout)
         .map_err(|err| err.to_string())
@@ -1441,7 +1715,6 @@ fn execute_closure_count() {
 
     interpreter.interpret(&mut rtc, &program);
 
-    drop(rtc);
     assert_that!(String::from_utf8(stderr)).ok().is_empty();
     assert_that!(String::from_utf8(stdout))
         .ok()

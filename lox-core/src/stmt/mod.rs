@@ -2,38 +2,35 @@
 pub use dsl::*;
 
 use crate::expr::{Expr, Variable};
-use crate::runtime::RuntimeContext;
 use crate::token::Token;
 use std::borrow::Borrow;
 use std::ops::Deref;
 
 pub trait StmtVisitor {
+    type Context<'c>;
     type Output;
 
-    fn visit_block_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Block) -> Self::Output;
-    fn visit_class_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Class) -> Self::Output;
+    fn visit_block_stmt(&mut self, ctx: &mut Self::Context<'_>, stmt: &Block) -> Self::Output;
+    fn visit_class_stmt(&mut self, ctx: &mut Self::Context<'_>, stmt: &Class) -> Self::Output;
     fn visit_expression_stmt(
         &mut self,
-        rtc: &mut RuntimeContext<'_>,
+        ctx: &mut Self::Context<'_>,
         stmt: &Expression,
     ) -> Self::Output;
-    fn visit_function_stmt(
-        &mut self,
-        rtc: &mut RuntimeContext<'_>,
-        stmt: &Function,
-    ) -> Self::Output;
-    fn visit_if_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &If) -> Self::Output;
-    fn visit_print_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Print) -> Self::Output;
-    fn visit_return_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Return) -> Self::Output;
-    fn visit_var_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Var) -> Self::Output;
-    fn visit_while_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &While) -> Self::Output;
+    fn visit_function_stmt(&mut self, ctx: &mut Self::Context<'_>, stmt: &Function)
+    -> Self::Output;
+    fn visit_if_stmt(&mut self, ctx: &mut Self::Context<'_>, stmt: &If) -> Self::Output;
+    fn visit_print_stmt(&mut self, ctx: &mut Self::Context<'_>, stmt: &Print) -> Self::Output;
+    fn visit_return_stmt(&mut self, ctx: &mut Self::Context<'_>, stmt: &Return) -> Self::Output;
+    fn visit_var_stmt(&mut self, ctx: &mut Self::Context<'_>, stmt: &Var) -> Self::Output;
+    fn visit_while_stmt(&mut self, ctx: &mut Self::Context<'_>, stmt: &While) -> Self::Output;
 }
 
 pub trait StmtElement {
     fn accept<V>(
         &self,
         visitor: &mut V,
-        rtc: &mut RuntimeContext<'_>,
+        ctx: &mut <V as StmtVisitor>::Context<'_>,
     ) -> <V as StmtVisitor>::Output
     where
         V: StmtVisitor;
@@ -66,12 +63,12 @@ macro_rules! impl_stmt {
             fn accept<V>(
                 &self,
                 visitor: &mut V,
-                rtc: &mut RuntimeContext<'_>,
+                ctx: &mut <V as StmtVisitor>::Context<'_>,
             ) -> <V as StmtVisitor>::Output
             where
                 V: StmtVisitor,
             {
-                visitor.$visitor_method(rtc, self)
+                visitor.$visitor_method(ctx, self)
             }
         }
     };
@@ -88,20 +85,24 @@ impl_stmt!(Var, Var, visit_var_stmt);
 impl_stmt!(While, While, visit_while_stmt);
 
 impl StmtElement for Stmt {
-    fn accept<V>(&self, visitor: &mut V, rtc: &mut RuntimeContext<'_>) -> <V as StmtVisitor>::Output
+    fn accept<V>(
+        &self,
+        visitor: &mut V,
+        ctx: &mut <V as StmtVisitor>::Context<'_>,
+    ) -> <V as StmtVisitor>::Output
     where
         V: StmtVisitor,
     {
         match self {
-            Self::Block(stmt) => visitor.visit_block_stmt(rtc, stmt),
-            Self::Class(stmt) => visitor.visit_class_stmt(rtc, stmt),
-            Self::Expression(stmt) => visitor.visit_expression_stmt(rtc, stmt),
-            Self::Function(stmt) => visitor.visit_function_stmt(rtc, stmt),
-            Self::If(stmt) => visitor.visit_if_stmt(rtc, stmt),
-            Self::Print(stmt) => visitor.visit_print_stmt(rtc, stmt),
-            Self::Return(stmt) => visitor.visit_return_stmt(rtc, stmt),
-            Self::Var(stmt) => visitor.visit_var_stmt(rtc, stmt),
-            Self::While(stmt) => visitor.visit_while_stmt(rtc, stmt),
+            Self::Block(stmt) => visitor.visit_block_stmt(ctx, stmt),
+            Self::Class(stmt) => visitor.visit_class_stmt(ctx, stmt),
+            Self::Expression(stmt) => visitor.visit_expression_stmt(ctx, stmt),
+            Self::Function(stmt) => visitor.visit_function_stmt(ctx, stmt),
+            Self::If(stmt) => visitor.visit_if_stmt(ctx, stmt),
+            Self::Print(stmt) => visitor.visit_print_stmt(ctx, stmt),
+            Self::Return(stmt) => visitor.visit_return_stmt(ctx, stmt),
+            Self::Var(stmt) => visitor.visit_var_stmt(ctx, stmt),
+            Self::While(stmt) => visitor.visit_while_stmt(ctx, stmt),
         }
     }
 }
@@ -153,8 +154,8 @@ impl Class {
         }
     }
 
-    pub const fn name(&self) -> Option<&Token> {
-        self.name.as_ref()
+    pub const fn name(&self) -> Option<Token> {
+        self.name
     }
 
     pub const fn superclass(&self) -> Option<&Variable> {
@@ -278,8 +279,8 @@ impl Return {
         Self { keyword, value }
     }
 
-    pub const fn keyword(&self) -> &Token {
-        &self.keyword
+    pub const fn keyword(&self) -> Token {
+        self.keyword
     }
 
     pub const fn value(&self) -> Option<&Expr> {
@@ -298,8 +299,8 @@ impl Var {
         Self { name, initializer }
     }
 
-    pub const fn name(&self) -> &Token {
-        &self.name
+    pub const fn name(&self) -> Token {
+        self.name
     }
 
     pub const fn initializer(&self) -> Option<&Expr> {

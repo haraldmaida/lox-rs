@@ -5,8 +5,9 @@ use crate::data::Symbol;
 use miette::SourceSpan;
 use std::fmt;
 use std::fmt::{Debug, Display};
+use std::hash::{Hash, Hasher};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TokenKind {
     EndOfFile,
     LeftParen,
@@ -179,12 +180,28 @@ impl From<Symbol> for Literal {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy)]
 pub struct Token {
     pub kind: TokenKind,
     pub literal: Option<Literal>,
     pub lexeme: Symbol,
     pub location: SourceSpan,
+}
+
+impl PartialEq for Token {
+    fn eq(&self, other: &Self) -> bool {
+        self.lexeme == other.lexeme && self.location == other.location && self.kind == other.kind
+    }
+}
+
+impl Eq for Token {}
+
+impl Hash for Token {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.lexeme.hash(state);
+        self.location.hash(state);
+        self.kind.hash(state);
+    }
 }
 
 impl Token {

@@ -2,39 +2,33 @@
 pub use dsl::*;
 
 use crate::data::Symbol;
-use crate::runtime::RuntimeContext;
 use crate::token::Token;
 
 pub trait ExprVisitor {
+    type Context<'c>;
     type Output;
 
-    fn visit_assign_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Assign) -> Self::Output;
-    fn visit_binary_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Binary) -> Self::Output;
-    fn visit_call_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Call) -> Self::Output;
-    fn visit_get_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Get) -> Self::Output;
-    fn visit_grouping_expr(
-        &mut self,
-        rtc: &mut RuntimeContext<'_>,
-        expr: &Grouping,
-    ) -> Self::Output;
-    fn visit_literal_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Literal) -> Self::Output;
-    fn visit_logical_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Logical) -> Self::Output;
-    fn visit_set_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Set) -> Self::Output;
-    fn visit_super_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Super) -> Self::Output;
-    fn visit_this_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &This) -> Self::Output;
-    fn visit_unary_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Unary) -> Self::Output;
-    fn visit_variable_expr(
-        &mut self,
-        rtc: &mut RuntimeContext<'_>,
-        expr: &Variable,
-    ) -> Self::Output;
+    fn visit_assign_expr(&mut self, ctx: &mut Self::Context<'_>, expr: &Assign) -> Self::Output;
+    fn visit_binary_expr(&mut self, ctx: &mut Self::Context<'_>, expr: &Binary) -> Self::Output;
+    fn visit_call_expr(&mut self, ctx: &mut Self::Context<'_>, expr: &Call) -> Self::Output;
+    fn visit_get_expr(&mut self, ctx: &mut Self::Context<'_>, expr: &Get) -> Self::Output;
+    fn visit_grouping_expr(&mut self, ctx: &mut Self::Context<'_>, expr: &Grouping)
+    -> Self::Output;
+    fn visit_literal_expr(&mut self, ctx: &mut Self::Context<'_>, expr: &Literal) -> Self::Output;
+    fn visit_logical_expr(&mut self, ctx: &mut Self::Context<'_>, expr: &Logical) -> Self::Output;
+    fn visit_set_expr(&mut self, ctx: &mut Self::Context<'_>, expr: &Set) -> Self::Output;
+    fn visit_super_expr(&mut self, ctx: &mut Self::Context<'_>, expr: &Super) -> Self::Output;
+    fn visit_this_expr(&mut self, ctx: &mut Self::Context<'_>, expr: &This) -> Self::Output;
+    fn visit_unary_expr(&mut self, ctx: &mut Self::Context<'_>, expr: &Unary) -> Self::Output;
+    fn visit_variable_expr(&mut self, ctx: &mut Self::Context<'_>, expr: &Variable)
+    -> Self::Output;
 }
 
 pub trait ExprElement {
     fn accept<V>(
         &self,
-        rtc: &mut RuntimeContext<'_>,
         visitor: &mut V,
+        ctx: &mut <V as ExprVisitor>::Context<'_>,
     ) -> <V as ExprVisitor>::Output
     where
         V: ExprVisitor;
@@ -69,13 +63,13 @@ macro_rules! impl_expr {
         impl ExprElement for $expr_type {
             fn accept<V>(
                 &self,
-                rtc: &mut RuntimeContext<'_>,
                 visitor: &mut V,
+                ctx: &mut <V as ExprVisitor>::Context<'_>,
             ) -> <V as ExprVisitor>::Output
             where
                 V: ExprVisitor,
             {
-                visitor.$visitor_method(rtc, self)
+                visitor.$visitor_method(ctx, self)
             }
         }
     };
@@ -95,23 +89,27 @@ impl_expr!(Unary, Unary, visit_unary_expr);
 impl_expr!(Variable, Variable, visit_variable_expr);
 
 impl ExprElement for Expr {
-    fn accept<V>(&self, rtc: &mut RuntimeContext<'_>, visitor: &mut V) -> <V as ExprVisitor>::Output
+    fn accept<V>(
+        &self,
+        visitor: &mut V,
+        ctx: &mut <V as ExprVisitor>::Context<'_>,
+    ) -> <V as ExprVisitor>::Output
     where
         V: ExprVisitor,
     {
         match self {
-            Self::Assign(expr) => visitor.visit_assign_expr(rtc, expr),
-            Self::Binary(expr) => visitor.visit_binary_expr(rtc, expr),
-            Self::Call(expr) => visitor.visit_call_expr(rtc, expr),
-            Self::Get(expr) => visitor.visit_get_expr(rtc, expr),
-            Self::Grouping(expr) => visitor.visit_grouping_expr(rtc, expr),
-            Self::Literal(expr) => visitor.visit_literal_expr(rtc, expr),
-            Self::Logical(expr) => visitor.visit_logical_expr(rtc, expr),
-            Self::Set(expr) => visitor.visit_set_expr(rtc, expr),
-            Self::Super(expr) => visitor.visit_super_expr(rtc, expr),
-            Self::This(expr) => visitor.visit_this_expr(rtc, expr),
-            Self::Unary(expr) => visitor.visit_unary_expr(rtc, expr),
-            Self::Variable(expr) => visitor.visit_variable_expr(rtc, expr),
+            Self::Assign(expr) => visitor.visit_assign_expr(ctx, expr),
+            Self::Binary(expr) => visitor.visit_binary_expr(ctx, expr),
+            Self::Call(expr) => visitor.visit_call_expr(ctx, expr),
+            Self::Get(expr) => visitor.visit_get_expr(ctx, expr),
+            Self::Grouping(expr) => visitor.visit_grouping_expr(ctx, expr),
+            Self::Literal(expr) => visitor.visit_literal_expr(ctx, expr),
+            Self::Logical(expr) => visitor.visit_logical_expr(ctx, expr),
+            Self::Set(expr) => visitor.visit_set_expr(ctx, expr),
+            Self::Super(expr) => visitor.visit_super_expr(ctx, expr),
+            Self::This(expr) => visitor.visit_this_expr(ctx, expr),
+            Self::Unary(expr) => visitor.visit_unary_expr(ctx, expr),
+            Self::Variable(expr) => visitor.visit_variable_expr(ctx, expr),
         }
     }
 }
@@ -130,8 +128,8 @@ impl Assign {
         }
     }
 
-    pub const fn name(&self) -> &Token {
-        &self.name
+    pub const fn name(&self) -> Token {
+        self.name
     }
 
     pub fn value(&self) -> &Expr {
@@ -159,8 +157,8 @@ impl Binary {
         &self.left
     }
 
-    pub const fn operator(&self) -> &Token {
-        &self.operator
+    pub const fn operator(&self) -> Token {
+        self.operator
     }
 
     pub const fn right(&self) -> &Expr {
@@ -188,8 +186,8 @@ impl Call {
         &self.callee
     }
 
-    pub const fn paren(&self) -> &Token {
-        &self.paren
+    pub const fn paren(&self) -> Token {
+        self.paren
     }
 
     pub fn arguments(&self) -> &[Expr] {
@@ -215,8 +213,8 @@ impl Get {
         &self.object
     }
 
-    pub const fn name(&self) -> &Token {
-        &self.name
+    pub const fn name(&self) -> Token {
+        self.name
     }
 }
 
@@ -301,8 +299,8 @@ impl Logical {
         &self.left
     }
 
-    pub const fn operator(&self) -> &Token {
-        &self.operator
+    pub const fn operator(&self) -> Token {
+        self.operator
     }
 
     pub const fn right(&self) -> &Expr {
@@ -330,8 +328,8 @@ impl Set {
         &self.object
     }
 
-    pub const fn name(&self) -> &Token {
-        &self.name
+    pub const fn name(&self) -> Token {
+        self.name
     }
 
     pub const fn value(&self) -> &Expr {
@@ -339,7 +337,7 @@ impl Set {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Super {
     keyword: Token,
     method: Token,
@@ -350,16 +348,16 @@ impl Super {
         Self { keyword, method }
     }
 
-    pub const fn keyword(&self) -> &Token {
-        &self.keyword
+    pub const fn keyword(&self) -> Token {
+        self.keyword
     }
 
-    pub const fn method(&self) -> &Token {
-        &self.method
+    pub const fn method(&self) -> Token {
+        self.method
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct This {
     keyword: Token,
 }
@@ -369,8 +367,8 @@ impl This {
         Self { keyword }
     }
 
-    pub const fn keyword(&self) -> &Token {
-        &self.keyword
+    pub const fn keyword(&self) -> Token {
+        self.keyword
     }
 }
 
@@ -388,8 +386,8 @@ impl Unary {
         }
     }
 
-    pub const fn operator(&self) -> &Token {
-        &self.operator
+    pub const fn operator(&self) -> Token {
+        self.operator
     }
 
     pub const fn right(&self) -> &Expr {
@@ -397,7 +395,7 @@ impl Unary {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Variable {
     name: Token,
 }
@@ -407,8 +405,8 @@ impl Variable {
         Self { name }
     }
 
-    pub const fn name(&self) -> &Token {
-        &self.name
+    pub const fn name(&self) -> Token {
+        self.name
     }
 
     pub const fn take_name(self) -> Token {

@@ -3,7 +3,6 @@ pub use dsl::*;
 
 use crate::environment::Environment;
 use crate::interpreter::RuntimeError;
-use crate::runtime::RuntimeContext;
 use crate::stmt::Function;
 use lasso::{Spur, ThreadedRodeo};
 use std::fmt;
@@ -146,13 +145,14 @@ impl From<NativeFunction> for Value {
 
 pub trait Call {
     type Interpreter;
+    type Context<'c>;
 
     fn arity(&self) -> usize;
 
     fn call(
         &self,
         interpreter: &mut Self::Interpreter,
-        rtc: &mut RuntimeContext<'_>,
+        ctx: &mut Self::Context<'_>,
         arguments: &[Value],
     ) -> Result<Value, RuntimeError>;
 }

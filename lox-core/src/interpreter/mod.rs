@@ -120,7 +120,9 @@ impl Interpreter {
     pub const fn globals(&self) -> &Environment {
         &self.globals
     }
+}
 
+impl Interpreter {
     pub fn interpret<P>(&mut self, rtc: &mut RuntimeContext<'_>, program: P)
     where
         P: AsRef<[Stmt]>,
@@ -161,7 +163,7 @@ impl Interpreter {
         rtc: &mut RuntimeContext<'_>,
         expression: &Expr,
     ) -> ControlFlow<Result<Value, RuntimeError>, Value> {
-        expression.accept(rtc, self)
+        expression.accept(self, rtc)
     }
 
     fn execute_internal(
@@ -194,6 +196,7 @@ impl Interpreter {
 }
 
 impl ExprVisitor for Interpreter {
+    type Context<'a> = RuntimeContext<'a>;
     type Output = ControlFlow<Result<Value, RuntimeError>, Value>;
 
     fn visit_assign_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Assign) -> Self::Output {
@@ -203,7 +206,7 @@ impl ExprVisitor for Interpreter {
             Ok(()) => Continue(value),
             Err(EnvironmentError::IdentifierNotFound(symbol)) => Break(Err(RuntimeError::new(
                 RuntimeErrorCode::UndefinedVariable(symbol),
-                *expr.name(),
+                expr.name(),
             ))),
         }
     }
@@ -225,7 +228,7 @@ impl ExprVisitor for Interpreter {
                 },
                 _ => Break(Err(RuntimeError::new(
                     RuntimeErrorCode::OperandNotANumber,
-                    *expr.operator(),
+                    expr.operator(),
                 ))),
             },
             TokenKind::Plus => match (left, right) {
@@ -238,12 +241,12 @@ impl ExprVisitor for Interpreter {
                 (Value::String(_), Value::Number(_)) | (Value::Number(_), Value::String(_)) => {
                     Break(Err(RuntimeError::new(
                         RuntimeErrorCode::OperandsOfDifferentType,
-                        *expr.operator(),
+                        expr.operator(),
                     )))
                 },
                 _ => Break(Err(RuntimeError::new(
                     RuntimeErrorCode::OperandNotANumberOrString,
-                    *expr.operator(),
+                    expr.operator(),
                 ))),
             },
             TokenKind::Slash => match (left, right) {
@@ -252,7 +255,7 @@ impl ExprVisitor for Interpreter {
                 },
                 _ => Break(Err(RuntimeError::new(
                     RuntimeErrorCode::OperandNotANumber,
-                    *expr.operator(),
+                    expr.operator(),
                 ))),
             },
             TokenKind::Star => match (left, right) {
@@ -261,12 +264,12 @@ impl ExprVisitor for Interpreter {
                 },
                 _ => Break(Err(RuntimeError::new(
                     RuntimeErrorCode::OperandNotANumber,
-                    *expr.operator(),
+                    expr.operator(),
                 ))),
             },
             _ => Break(Err(RuntimeError::new(
                 RuntimeErrorCode::NotABinaryOperator,
-                *expr.operator(),
+                expr.operator(),
             ))),
         }
     }
@@ -286,7 +289,7 @@ impl ExprVisitor for Interpreter {
         } else {
             Break(Err(RuntimeError::new(
                 RuntimeErrorCode::CallExprOnNonCallable,
-                *expr.paren(), // TODO improve error message for call expr
+                expr.paren(), // TODO improve error message for call expr
             )))
         }
     }
@@ -350,13 +353,13 @@ impl ExprVisitor for Interpreter {
                 } else {
                     Break(Err(RuntimeError::new(
                         RuntimeErrorCode::OperandNotANumber,
-                        *expr.operator(),
+                        expr.operator(),
                     )))
                 }
             },
             _ => Break(Err(RuntimeError::new(
                 RuntimeErrorCode::NotAnUnaryOperator,
-                *expr.operator(),
+                expr.operator(),
             ))),
         }
     }
@@ -371,13 +374,14 @@ impl ExprVisitor for Interpreter {
             Ok(value) => Continue(value),
             Err(EnvironmentError::IdentifierNotFound(symbol)) => Break(Err(RuntimeError::new(
                 RuntimeErrorCode::UndefinedVariable(symbol),
-                *expr.name(),
+                expr.name(),
             ))),
         }
     }
 }
 
 impl StmtVisitor for Interpreter {
+    type Context<'c> = RuntimeContext<'c>;
     type Output = ControlFlow<Result<Value, RuntimeError>, ()>;
 
     fn visit_block_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Block) -> Self::Output {
@@ -457,6 +461,7 @@ impl StmtVisitor for Interpreter {
 
 impl data::Call for Callable {
     type Interpreter = Interpreter;
+    type Context<'c> = <Self::Interpreter as StmtVisitor>::Context<'c>;
 
     fn arity(&self) -> usize {
         match self {
@@ -468,18 +473,19 @@ impl data::Call for Callable {
     fn call(
         &self,
         interpreter: &mut Self::Interpreter,
-        rtc: &mut RuntimeContext<'_>,
+        ctx: &mut RuntimeContext<'_>,
         arguments: &[Value],
     ) -> Result<Value, RuntimeError> {
         match self {
-            Self::LoxFunction(fun) => fun.call(interpreter, rtc, arguments),
-            Self::NativeFunction(fun) => fun.call(&mut (), rtc, arguments),
+            Self::LoxFunction(fun) => fun.call(interpreter, ctx, arguments),
+            Self::NativeFunction(fun) => fun.call(&mut (), &mut (), arguments),
         }
     }
 }
 
 impl data::Call for LoxFunction {
     type Interpreter = Interpreter;
+    type Context<'c> = <Self::Interpreter as StmtVisitor>::Context<'c>;
 
     fn arity(&self) -> usize {
         self.declaration().parameters().len()
@@ -488,7 +494,7 @@ impl data::Call for LoxFunction {
     fn call(
         &self,
         interpreter: &mut Self::Interpreter,
-        rtc: &mut RuntimeContext<'_>,
+        ctx: &mut Self::Context<'_>,
         arguments: &[Value],
     ) -> Result<Value, RuntimeError> {
         let environment = self.closure().new_local();
@@ -498,7 +504,7 @@ impl data::Call for LoxFunction {
             .zip(arguments.iter())
             .for_each(|(param, arg)| environment.define(param.lexeme(), arg.clone()));
 
-        match interpreter.execute_block(rtc, environment, self.declaration().body()) {
+        match interpreter.execute_block(ctx, environment, self.declaration().body()) {
             Continue(()) => Ok(Value::Nil),
             Break(Ok(value)) => Ok(value),
             Break(Err(error)) => Err(error),
@@ -508,6 +514,7 @@ impl data::Call for LoxFunction {
 
 impl data::Call for NativeFunction {
     type Interpreter = ();
+    type Context<'c> = ();
 
     fn arity(&self) -> usize {
         self.parameters().len()
@@ -516,7 +523,7 @@ impl data::Call for NativeFunction {
     fn call(
         &self,
         _interpreter: &mut Self::Interpreter,
-        _rtc: &mut RuntimeContext<'_>,
+        _ctx: &mut Self::Context<'_>,
         arguments: &[Value],
     ) -> Result<Value, RuntimeError> {
         self.fun_ptr()(arguments)

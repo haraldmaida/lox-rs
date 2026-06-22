@@ -17,13 +17,13 @@ pub struct AstPrinter<'a, W> {
     out: &'a mut W,
 }
 
-impl<W> AstPrinter<'_, W>
+impl<'a, W> AstPrinter<'a, W>
 where
     W: fmt::Write,
 {
-    pub fn print(rtc: &mut RuntimeContext<'_>, expr: &Expr, out: &mut W) -> Result<(), Error> {
+    pub fn print(rtc: &mut RuntimeContext<'a>, expr: &Expr, out: &'a mut W) -> Result<(), Error> {
         let mut printer = AstPrinter { out };
-        expr.accept(rtc, &mut printer)
+        expr.accept(&mut printer, rtc)
     }
 
     fn write_bool(&mut self, value: bool) -> Result<(), Error> {
@@ -40,7 +40,7 @@ where
 
     fn write_grouped(
         &mut self,
-        rtc: &mut RuntimeContext<'_>,
+        ctx: &mut <Self as ExprVisitor>::Context<'_>,
         name: impl Into<Symbol>,
         expressions: &[&Expr],
     ) -> Result<(), Error> {
@@ -48,7 +48,7 @@ where
         write!(self.out, "({name}")?;
         for expr in expressions {
             write!(self.out, " ")?;
-            expr.accept(rtc, self)?;
+            expr.accept(self, ctx)?;
         }
         write!(self.out, ")")?;
         Ok(())
@@ -59,30 +59,31 @@ impl<W> ExprVisitor for AstPrinter<'_, W>
 where
     W: fmt::Write,
 {
+    type Context<'c> = RuntimeContext<'c>;
     type Output = Result<(), Error>;
 
-    fn visit_assign_expr(&mut self, _rtc: &mut RuntimeContext<'_>, _expr: &Assign) -> Self::Output {
+    fn visit_assign_expr(&mut self, _ctx: &mut Self::Context<'_>, _expr: &Assign) -> Self::Output {
         todo!()
     }
 
-    fn visit_binary_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Binary) -> Self::Output {
-        self.write_grouped(rtc, expr.operator().lexeme(), &[expr.left(), expr.right()])
+    fn visit_binary_expr(&mut self, ctx: &mut Self::Context<'_>, expr: &Binary) -> Self::Output {
+        self.write_grouped(ctx, expr.operator().lexeme(), &[expr.left(), expr.right()])
     }
 
-    fn visit_call_expr(&mut self, _rtc: &mut RuntimeContext<'_>, _expr: &Call) -> Self::Output {
+    fn visit_call_expr(&mut self, _ctx: &mut Self::Context<'_>, _expr: &Call) -> Self::Output {
         todo!()
     }
 
-    fn visit_get_expr(&mut self, _rtc: &mut RuntimeContext<'_>, _expr: &Get) -> Self::Output {
+    fn visit_get_expr(&mut self, _ctx: &mut Self::Context<'_>, _expr: &Get) -> Self::Output {
         todo!()
     }
 
     fn visit_grouping_expr(
         &mut self,
-        rtc: &mut RuntimeContext<'_>,
+        ctx: &mut Self::Context<'_>,
         expr: &Grouping,
     ) -> Self::Output {
-        self.write_grouped(rtc, "group", &[expr.expression()])
+        self.write_grouped(ctx, "group", &[expr.expression()])
     }
 
     fn visit_literal_expr(
