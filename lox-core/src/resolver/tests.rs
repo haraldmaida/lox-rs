@@ -1,7 +1,7 @@
 use super::*;
 use crate::data::Symbol;
 use crate::parse::Parse;
-use crate::token::identifier;
+use crate::token::{identifier, return_};
 use crate::tokenize::Tokenize;
 use asserting::prelude::*;
 use proptest::prelude::*;
@@ -193,5 +193,19 @@ fn resolve_finds_redeclared_variable_in_same_local_scope() {
         code: ResolverErrorCode::RedeclaredVariableInSameScope,
         token: identifier("a", (33, 1)),
         location: (33, 1).into(),
+    }]);
+}
+
+#[test]
+fn resolve_finds_return_stmt_outside_of_any_function() {
+    let mut resolver = Resolver::default();
+    let statements = parse("return \"at top level\";");
+
+    let result = resolver.resolve(&statements);
+
+    assert_that!(result).err().contains_exactly([ResolverError {
+        code: ResolverErrorCode::CannotReturnFromOutsideFunction,
+        token: return_((0, 6)),
+        location: (0, 6).into(),
     }]);
 }

@@ -58,6 +58,7 @@ enum VarState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResolverErrorCode {
     CannotReadLocalVariableInInitializer,
+    CannotReturnFromOutsideFunction,
     RedeclaredVariableInSameScope,
 }
 
@@ -73,6 +74,9 @@ impl Display for ResolverError {
         match self.code {
             ResolverErrorCode::CannotReadLocalVariableInInitializer => {
                 write!(f, "can't read local variable in its own initializer")
+            },
+            ResolverErrorCode::CannotReturnFromOutsideFunction => {
+                write!(f, "can't return from outside of any function")
             },
             ResolverErrorCode::RedeclaredVariableInSameScope => {
                 write!(
@@ -91,10 +95,18 @@ impl From<ResolverError> for Vec<ResolverError> {
     }
 }
 
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+enum FunctionKind {
+    #[default]
+    None,
+    Function,
+}
+
 #[derive(Default)]
 pub struct Resolver {
     scopes: Vec<HashMap<Symbol, VarState>>,
     resolution_map: ResolutionMap,
+    current_function: FunctionKind,
 }
 
 impl Resolver {
@@ -163,7 +175,12 @@ impl Resolver {
         }
     }
 
-    fn resolve_function(&mut self, function: &Function) -> Result<(), Vec<ResolverError>> {
+    fn resolve_function(
+        &mut self,
+        function: &Function,
+        kind: FunctionKind,
+    ) -> Result<(), Vec<ResolverError>> {
+        let enclosing_function = mem::replace(&mut self.current_function, kind);
         self.begin_scope();
         for param in function.parameters() {
             self.declare(*param)?;
@@ -171,6 +188,7 @@ impl Resolver {
         }
         self.resolve_stmts(function.body())?;
         self.end_scope();
+        self.current_function = enclosing_function;
         Ok(())
     }
 }
@@ -294,7 +312,7 @@ impl StmtVisitor for Resolver {
     ) -> Self::Output {
         self.declare(stmt.name())?;
         self.define(stmt.name());
-        self.resolve_function(stmt)
+        self.resolve_function(stmt, FunctionKind::Function)
     }
 
     fn visit_if_stmt(&mut self, _rtc: &mut Self::Context<'_>, stmt: &If) -> Self::Output {
@@ -311,6 +329,13 @@ impl StmtVisitor for Resolver {
     }
 
     fn visit_return_stmt(&mut self, _rtc: &mut Self::Context<'_>, stmt: &Return) -> Self::Output {
+        if self.current_function == FunctionKind::None {
+            return Err(vec![ResolverError {
+                code: ResolverErrorCode::CannotReturnFromOutsideFunction,
+                token: stmt.keyword(),
+                location: stmt.keyword().location,
+            }]);
+        }
         if let Some(value) = stmt.value() {
             self.resolve_expr(value)?;
         }
