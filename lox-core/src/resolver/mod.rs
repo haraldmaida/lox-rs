@@ -58,6 +58,7 @@ enum VarState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResolverErrorCode {
     CannotReadLocalVariableInInitializer,
+    RedeclaredVariableInSameScope,
 }
 
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
@@ -72,6 +73,13 @@ impl Display for ResolverError {
         match self.code {
             ResolverErrorCode::CannotReadLocalVariableInInitializer => {
                 write!(f, "can't read local variable in its own initializer")
+            },
+            ResolverErrorCode::RedeclaredVariableInSameScope => {
+                write!(
+                    f,
+                    "variable with name '{}' already declared in this scope",
+                    self.token.lexeme()
+                )
             },
         }
     }
@@ -104,10 +112,18 @@ impl Resolver {
         self.scopes.pop();
     }
 
-    fn declare(&mut self, name: Token) {
+    fn declare(&mut self, name: Token) -> Result<(), Vec<ResolverError>> {
         if let Some(scope) = self.scopes.last_mut() {
+            if scope.contains_key(&name.lexeme()) {
+                return Err(vec![ResolverError {
+                    code: ResolverErrorCode::RedeclaredVariableInSameScope,
+                    token: name,
+                    location: name.location,
+                }]);
+            }
             scope.insert(name.lexeme(), VarState::Declared);
         }
+        Ok(())
     }
 
     fn define(&mut self, name: Token) {
@@ -150,6 +166,7 @@ impl Resolver {
     fn resolve_function(&mut self, function: &Function) -> Result<(), Vec<ResolverError>> {
         self.begin_scope();
         for param in function.parameters() {
+            self.declare(*param)?;
             self.define(*param);
         }
         self.resolve_stmts(function.body())?;
@@ -275,6 +292,7 @@ impl StmtVisitor for Resolver {
         _rtc: &mut Self::Context<'_>,
         stmt: &Function,
     ) -> Self::Output {
+        self.declare(stmt.name())?;
         self.define(stmt.name());
         self.resolve_function(stmt)
     }
@@ -300,7 +318,7 @@ impl StmtVisitor for Resolver {
     }
 
     fn visit_var_stmt(&mut self, _rtc: &mut Self::Context<'_>, stmt: &Var) -> Self::Output {
-        self.declare(stmt.name());
+        self.declare(stmt.name())?;
         if let Some(initializer) = stmt.initializer() {
             self.resolve_expr(initializer)?;
         }

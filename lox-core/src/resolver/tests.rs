@@ -55,7 +55,7 @@ proptest! {
             resolver.begin_scope();
         }
 
-        resolver.declare(identifier("a", (0, 1)));
+        resolver.declare(identifier("a", (0, 1))).expect("call to Resolver::declare should succeed");
 
         prop_assert_eq!(resolver.scopes[current_depth - 1].get(&Symbol::intern("a")), Some(&VarState::Declared));
     }
@@ -180,4 +180,18 @@ fn resolve_does_not_track_global_variables_in_resolution_map() {
         .expect("resolution should succeed");
 
     assert_that!(resolution_map.get_distance(identifier("a", (11, 1)))).is_none();
+}
+
+#[test]
+fn resolve_finds_redeclared_variable_in_same_local_scope() {
+    let mut resolver = Resolver::default();
+    let statements = parse("fun bad() { var a = \"first\"; var a = \"second\"; }");
+
+    let result = resolver.resolve(&statements);
+
+    assert_that!(result).err().contains_exactly([ResolverError {
+        code: ResolverErrorCode::RedeclaredVariableInSameScope,
+        token: identifier("a", (33, 1)),
+        location: (33, 1).into(),
+    }]);
 }
