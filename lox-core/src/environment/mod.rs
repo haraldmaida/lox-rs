@@ -106,6 +106,65 @@ impl Environment {
             .cloned()
             .ok_or(EnvironmentError::IdentifierNotFound(name))
     }
+
+    pub fn assign_at(
+        &self,
+        distance: usize,
+        name: impl Into<Symbol>,
+        value: impl Into<Value>,
+    ) -> Result<(), EnvironmentError> {
+        let name = name.into();
+        let target_node = self
+            .ancestors()
+            .take(distance)
+            .last()
+            .unwrap_or_else(|| self.node.clone());
+        target_node.borrow_mut().values.insert(name, value.into());
+        Ok(())
+    }
+
+    pub fn lookup_at(
+        &self,
+        distance: usize,
+        name: impl Into<Symbol>,
+    ) -> Result<Value, EnvironmentError> {
+        let name = name.into();
+        let target_node = self
+            .ancestors()
+            .take(distance)
+            .last()
+            .unwrap_or_else(|| self.node.clone());
+        let target_environment = Self { node: target_node };
+        target_environment.lookup(name)
+    }
+
+    fn ancestors(&self) -> Ancestors {
+        Ancestors {
+            current: self.node.clone(),
+        }
+    }
+}
+
+struct Ancestors {
+    current: Rc<RefCell<EnvironmentNode>>,
+}
+
+impl Iterator for Ancestors {
+    type Item = Rc<RefCell<EnvironmentNode>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // we need to allow blocks in conditions, due to lifetime extension of the borrowed
+        // field `current`
+        // see also Clippy issue [15112](https://github.com/rust-lang/rust-clippy/issues/15112)
+        #[allow(clippy::blocks_in_conditions)]
+        match { self.current.borrow().enclosing.clone() } {
+            None => None,
+            Some(enclosing) => {
+                self.current = enclosing.clone();
+                Some(enclosing)
+            },
+        }
+    }
 }
 
 #[cfg(test)]

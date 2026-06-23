@@ -6,6 +6,8 @@ use crate::expr::{
     Super, This, Unary, Variable,
 };
 use crate::native::clock;
+use crate::program::Program;
+use crate::resolver::ResolutionMap;
 use crate::runtime::RuntimeContext;
 use crate::stmt::{
     Block, Class, Expression, Function, If, Print, Return, Stmt, StmtElement, StmtVisitor, Var,
@@ -99,6 +101,7 @@ impl RuntimeError {
 pub struct Interpreter {
     environment: Environment,
     globals: Environment,
+    locals: ResolutionMap,
 }
 
 impl Default for Interpreter {
@@ -108,6 +111,7 @@ impl Default for Interpreter {
         Self {
             environment: globals.clone(),
             globals,
+            locals: ResolutionMap::default(),
         }
     }
 }
@@ -123,11 +127,9 @@ impl Interpreter {
 }
 
 impl Interpreter {
-    pub fn interpret<P>(&mut self, rtc: &mut RuntimeContext<'_>, program: P)
-    where
-        P: AsRef<[Stmt]>,
-    {
-        let statements = program.as_ref();
+    pub fn interpret(&mut self, rtc: &mut RuntimeContext<'_>, program: &Program) {
+        self.locals.clone_from(program.resolution_map());
+        let statements = program.statements();
         for stmt in statements {
             if let Break(Err(error)) = self.execute_internal(rtc, stmt) {
                 writeln!(rtc.stderr(), "{error}")
@@ -144,6 +146,14 @@ impl Interpreter {
         match self.evaluate_internal(rtc, expression) {
             Continue(value) | Break(Ok(value)) => Ok(value),
             Break(Err(error)) => Err(error),
+        }
+    }
+
+    pub fn lookup_variable(&mut self, name: Token) -> Result<Value, EnvironmentError> {
+        if let Some(distance) = self.locals.get_distance(name) {
+            self.environment.lookup_at(distance, name.lexeme())
+        } else {
+            self.globals.lookup(name.lexeme())
         }
     }
 
@@ -202,7 +212,12 @@ impl ExprVisitor for Interpreter {
     fn visit_assign_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Assign) -> Self::Output {
         let value = self.evaluate_internal(rtc, expr.value())?;
         let symbol = expr.name().lexeme();
-        match self.environment.assign(symbol, value.clone()) {
+        let assign_result = if let Some(distance) = self.locals.get_distance(expr.name()) {
+            self.environment.assign_at(distance, symbol, value.clone())
+        } else {
+            self.globals.assign(symbol, value.clone())
+        };
+        match assign_result {
             Ok(()) => Continue(value),
             Err(EnvironmentError::IdentifierNotFound(symbol)) => Break(Err(RuntimeError::new(
                 RuntimeErrorCode::UndefinedVariable(symbol),
@@ -369,8 +384,7 @@ impl ExprVisitor for Interpreter {
         _rtc: &mut RuntimeContext<'_>,
         expr: &Variable,
     ) -> Self::Output {
-        let symbol = expr.name().lexeme();
-        match self.environment.lookup(symbol) {
+        match self.lookup_variable(expr.name()) {
             Ok(value) => Continue(value),
             Err(EnvironmentError::IdentifierNotFound(symbol)) => Break(Err(RuntimeError::new(
                 RuntimeErrorCode::UndefinedVariable(symbol),

@@ -1,6 +1,5 @@
 use crate::data::Symbol;
 use crate::expr::{Assign, Binary, Call, Expr, Grouping, Literal, Logical, Unary, Variable};
-use crate::program::Program;
 use crate::stmt::{Block, Expression, Function, If, Print, Return, Stmt, Var, While};
 use crate::token;
 use crate::token::{Token, TokenKind};
@@ -131,7 +130,7 @@ impl From<LexingError> for SyntaxError {
 }
 
 pub trait Parse<'a> {
-    fn parse(self) -> Result<Program, Vec<SyntaxError>>;
+    fn parse(self) -> Result<Vec<Stmt>, Vec<SyntaxError>>;
 
     fn parse_expr(self) -> Result<Expr, SyntaxError>;
 }
@@ -140,8 +139,8 @@ impl<'a, T> Parse<'a> for T
 where
     T: 'a + IntoIterator<Item = Result<Token, LexingError>>,
 {
-    fn parse(self) -> Result<Program, Vec<SyntaxError>> {
-        Parser::from(self).program()
+    fn parse(self) -> Result<Vec<Stmt>, Vec<SyntaxError>> {
+        Parser::from(self).statements()
     }
 
     fn parse_expr(self) -> Result<Expr, SyntaxError> {
@@ -238,7 +237,7 @@ where
         Ok(())
     }
 
-    fn program(&mut self) -> Result<Program, Vec<SyntaxError>> {
+    fn statements(&mut self) -> Result<Vec<Stmt>, Vec<SyntaxError>> {
         let mut errors = Vec::new();
         let mut statements = Vec::new();
         loop {
@@ -255,7 +254,7 @@ where
             }
         }
         if errors.is_empty() {
-            Ok(Program::new(statements))
+            Ok(statements)
         } else {
             Err(errors)
         }

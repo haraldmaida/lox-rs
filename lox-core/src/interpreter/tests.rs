@@ -3,13 +3,13 @@ use crate::data::value;
 use crate::expr::{
     Expr, ExprExt, assign, binary, grouping, literal, logical, nil, unary, variable,
 };
-use crate::parse::Parse;
+use crate::program::{IntoProgram, program};
+use crate::resolver::Resolve;
 use crate::stmt::{IfExt, StmtExt, block, function, if_, print, return_, var, while_};
 use crate::token::{
     and, bang, bang_equal, equal_equal, greater, greater_equal, identifier, keyword, less,
     less_equal, minus, or, plus, slash, star,
 };
-use crate::tokenize::Tokenize;
 use asserting::prelude::*;
 use std::time::SystemTime;
 
@@ -1116,17 +1116,20 @@ fn execute_block_with_var_declarations_and_assignments() {
     let assign_a = Expr::from(assign(identifier("a", (34, 1)), literal(5.).expr()));
     let block = Stmt::from(block(vec![declare_b, assign_b.stmt(), assign_a.stmt()]));
 
+    let program = vec![declare_a, block]
+        .resolve()
+        .into_program()
+        .expect("failed to parse program");
+
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
 
-    let result = interpreter.execute(&mut rtc, &declare_a);
-    assert_that!(result).is_ok();
+    interpreter.interpret(&mut rtc, &program);
 
-    let result = interpreter.execute(&mut rtc, &block);
-
-    assert_that!(result).is_ok();
+    assert_that!(String::from_utf8(stderr)).ok().is_empty();
+    assert_that!(String::from_utf8(stdout)).ok().is_empty();
     assert_that!(interpreter.environment().lookup("a")).is_equal_to(Ok(Value::Number(5.)));
     assert_that!(interpreter.environment().lookup("b"))
         .err()
@@ -1141,20 +1144,22 @@ fn execute_block_with_var_declarations_and_assignments_and_runtime_error() {
     let assign_a = Expr::from(assign(identifier("a", (34, 1)), literal(5.).expr()));
     let block = Stmt::from(block(vec![declare_b, assign_c.stmt(), assign_a.stmt()]));
 
+    let program = vec![declare_a, block]
+        .resolve()
+        .into_program()
+        .expect("failed to parse program");
+
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
     let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
     let mut interpreter = Interpreter::default();
 
-    let result = interpreter.execute(&mut rtc, &declare_a);
-    assert_that!(result).is_ok();
+    interpreter.interpret(&mut rtc, &program);
 
-    let result = interpreter.execute(&mut rtc, &block);
-
-    assert_that!(result).err().is_equal_to(RuntimeError::new(
-        RuntimeErrorCode::UndefinedVariable("c".into()),
-        identifier("c", (24, 1)),
-    ));
+    assert_that!(String::from_utf8(stderr))
+        .ok()
+        .is_equal_to("use of undefined variable 'c'\n");
+    assert_that!(String::from_utf8(stdout)).ok().is_empty();
     assert_that!(interpreter.environment().lookup("a")).is_equal_to(Ok(Value::Number(3.)));
     assert_that!(interpreter.environment().lookup("b"))
         .err()
@@ -1589,18 +1594,16 @@ fn execute_function_declaration() {
 
 #[test]
 fn execute_function_declaration_and_call() {
-    let source_code = r#"
+    let program = program(
+        r#"
     fun sayHi(first, last) {
         print "Hi, " + first + " " + last + "!";
     }
 
     sayHi("Dear", "Reader");
-"#;
-
-    let program = source_code
-        .tokenize()
-        .parse()
-        .expect("failed to parse source code");
+"#,
+    )
+    .expect("failed to parse program");
 
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
@@ -1617,7 +1620,8 @@ fn execute_function_declaration_and_call() {
 
 #[test]
 fn execute_function_declaration_and_call_with_return_value() {
-    let source_code = r"
+    let program = program(
+        r"
     fun fib(n) {
         if (n <= 1) return n;
         return fib(n - 2) + fib(n - 1);
@@ -1626,11 +1630,9 @@ fn execute_function_declaration_and_call_with_return_value() {
     for (var i = 0; i < 20; i = i + 1) {
         print fib(i);
     }
-";
-    let program = source_code
-        .tokenize()
-        .parse()
-        .expect("failed to parse source code");
+",
+    )
+    .expect("failed to parse program");
 
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
@@ -1656,12 +1658,7 @@ fn system_time_as_secs() -> f64 {
 fn execute_native_function_call_to_clock() {
     let start_time = system_time_as_secs();
 
-    let source_code = "print clock();";
-
-    let program = source_code
-        .tokenize()
-        .parse()
-        .expect("failed to parse source code");
+    let program = program("print clock();").expect("failed to parse program");
 
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
@@ -1685,7 +1682,8 @@ fn execute_native_function_call_to_clock() {
 
 #[test]
 fn execute_closure_count() {
-    let source_code = r"
+    let program = program(
+        r"
     fun makeCounter() {
         var i = 0;
 
@@ -1701,12 +1699,9 @@ fn execute_closure_count() {
     print counter();
     print counter();
     print counter();
-";
-
-    let program = source_code
-        .tokenize()
-        .parse()
-        .expect("failed to parse source code");
+",
+    )
+    .expect("failed to parse program");
 
     let mut stdout = Vec::new();
     let mut stderr = Vec::new();
@@ -1719,4 +1714,35 @@ fn execute_closure_count() {
     assert_that!(String::from_utf8(stdout))
         .ok()
         .is_equal_to("1\n2\n3\n");
+}
+
+#[test]
+fn execute_call_to_same_closure_in_different_environments() {
+    let program = program(
+        r#"
+    var a = "global";
+    {
+      fun showA() {
+        print a;
+      }
+
+      showA();
+      var a = "block";
+      showA();
+    }
+"#,
+    )
+    .expect("failed to parse program");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+    let mut interpreter = Interpreter::default();
+
+    interpreter.interpret(&mut rtc, &program);
+
+    assert_that!(String::from_utf8(stderr)).ok().is_empty();
+    assert_that!(String::from_utf8(stdout))
+        .ok()
+        .is_equal_to("global\nglobal\n");
 }

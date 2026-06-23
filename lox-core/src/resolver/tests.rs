@@ -1,13 +1,12 @@
 use super::*;
 use crate::data::Symbol;
 use crate::parse::Parse;
-use crate::program::Program;
 use crate::token::identifier;
 use crate::tokenize::Tokenize;
 use asserting::prelude::*;
 use proptest::prelude::*;
 
-fn parse(source: &str) -> Program {
+fn parse(source: &str) -> Vec<Stmt> {
     source.tokenize().parse().expect("parsing should succeed")
 }
 
@@ -79,10 +78,10 @@ proptest! {
 #[test]
 fn resolve_calculates_the_distance_to_a_local_variable() {
     let mut resolver = Resolver::default();
-    let program = parse("{ var a = 1; a; }");
+    let statements = parse("{ var a = 1; a; }");
 
     let resolution_map = resolver
-        .resolve(program)
+        .resolve(&statements)
         .expect("resolution should succeed");
 
     assert_that!(resolution_map.get_distance(identifier("a", (13, 1)))).is_equal_to(Some(0));
@@ -91,10 +90,10 @@ fn resolve_calculates_the_distance_to_a_local_variable() {
 #[test]
 fn resolve_calculates_the_distance_to_a_variable_in_an_outer_scope() {
     let mut resolver = Resolver::default();
-    let program = parse("{ var a = 1; { a; } }");
+    let statements = parse("{ var a = 1; { a; } }");
 
     let resolution_map = resolver
-        .resolve(program)
+        .resolve(&statements)
         .expect("resolution should succeed");
 
     assert_that!(resolution_map.get_distance(identifier("a", (15, 1)))).is_equal_to(Some(1));
@@ -103,10 +102,10 @@ fn resolve_calculates_the_distance_to_a_variable_in_an_outer_scope() {
 #[test]
 fn resolve_handles_shadowing_correctly() {
     let mut resolver = Resolver::default();
-    let program = parse("{ var a = 1; { var a = 2; a; } }");
+    let statements = parse("{ var a = 1; { var a = 2; a; } }");
 
     let resolution_map = resolver
-        .resolve(program)
+        .resolve(&statements)
         .expect("resolution should succeed");
 
     assert_that!(resolution_map.get_distance(identifier("a", (26, 1)))).is_equal_to(Some(0));
@@ -115,10 +114,10 @@ fn resolve_handles_shadowing_correctly() {
 #[test]
 fn resolve_resolves_function_parameters() {
     let mut resolver = Resolver::default();
-    let program = parse("fun foo(a) { a; }");
+    let statements = parse("fun foo(a) { a; }");
 
     let resolution_map = resolver
-        .resolve(program)
+        .resolve(&statements)
         .expect("resolution should succeed");
 
     assert_that!(resolution_map.get_distance(identifier("a", (13, 1)))).is_equal_to(Some(0));
@@ -128,9 +127,9 @@ fn resolve_resolves_function_parameters() {
 #[test]
 fn resolve_returns_error_when_reading_local_variable_in_its_own_initializer() {
     let mut resolver = Resolver::default();
-    let program = parse("{ var a = a; }");
+    let statements = parse("{ var a = a; }");
 
-    let result = resolver.resolve(program);
+    let result = resolver.resolve(&statements);
 
     assert_that!(result).err().contains_exactly([ResolverError {
         code: ResolverErrorCode::CannotReadLocalVariableInInitializer,
@@ -142,10 +141,10 @@ fn resolve_returns_error_when_reading_local_variable_in_its_own_initializer() {
 #[test]
 fn resolve_resolves_variables_in_assignments() {
     let mut resolver = Resolver::default();
-    let program = parse("{ var a = 1; a = 2; }");
+    let statements = parse("{ var a = 1; a = 2; }");
 
     let resolution_map = resolver
-        .resolve(program)
+        .resolve(&statements)
         .expect("resolution should succeed");
 
     assert_that!(resolution_map.get_distance(identifier("a", (13, 1)))).is_equal_to(Some(0));
@@ -154,11 +153,11 @@ fn resolve_resolves_variables_in_assignments() {
 #[test]
 fn resolve_resolves_variables_in_if_statements() {
     let mut resolver = Resolver::default();
-    let program =
+    let statements =
         parse("{ var a = true; if (a) { var b = a; print b; } else { var c = a; print c; } }");
 
     let resolution_map = resolver
-        .resolve(program)
+        .resolve(&statements)
         .expect("resolution should succeed");
 
     // condition
@@ -174,10 +173,10 @@ fn resolve_resolves_variables_in_if_statements() {
 #[test]
 fn resolve_does_not_track_global_variables_in_resolution_map() {
     let mut resolver = Resolver::default();
-    let program = parse("var a = 1; a;");
+    let statements = parse("var a = 1; a;");
 
     let resolution_map = resolver
-        .resolve(program)
+        .resolve(&statements)
         .expect("resolution should succeed");
 
     assert_that!(resolution_map.get_distance(identifier("a", (11, 1)))).is_none();

@@ -2,7 +2,6 @@ use super::*;
 use crate::expr::{
     ExprExt, assign, binary, call, grouping, literal, logical, nil, unary, variable,
 };
-use crate::program::program;
 use crate::stmt::{IfExt, StmtExt, block, function, if_, print, return_, stmt, var, while_};
 use crate::token::{
     and, bang, bang_equal, equal_equal, greater, greater_equal, identifier, keyword, less,
@@ -17,7 +16,7 @@ fn parse_empty_source_code() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([]));
+    assert_that!(result).ok().is_equal_to([]);
 }
 
 #[test]
@@ -241,9 +240,9 @@ fn parse_expression_statement() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([stmt(
+    assert_that!(result).ok().is_equal_to([stmt(
         binary(literal(84.), slash((3, 1)), literal(2.)).expr(),
-    )]));
+    )]);
 }
 
 #[test]
@@ -254,7 +253,7 @@ fn parse_print_string_literal() {
 
     assert_that!(result)
         .ok()
-        .is_equal_to(program([print(literal("Hello, World!")).stmt()]));
+        .is_equal_to([print(literal("Hello, World!")).stmt()]);
 }
 
 #[test]
@@ -263,11 +262,9 @@ fn parse_declaration_of_variable() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([var(
-        identifier("x", (4, 1)),
-        literal(42.).expr(),
-    )
-    .stmt()]));
+    assert_that!(result)
+        .ok()
+        .is_equal_to([var(identifier("x", (4, 1)), literal(42.).expr()).stmt()]);
 }
 
 #[test]
@@ -278,7 +275,7 @@ fn parse_print_variable() {
 
     assert_that!(result)
         .ok()
-        .is_equal_to(program([print(variable(identifier("foo", (6, 3)))).stmt()]));
+        .is_equal_to([print(variable(identifier("foo", (6, 3)))).stmt()]);
 }
 
 #[test]
@@ -287,12 +284,12 @@ fn parse_assignment_to_variable() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([
+    assert_that!(result).ok().is_equal_to([
         var(identifier("foo", (4, 3)), literal("before").expr()).stmt(),
         assign(identifier("foo", (20, 3)), literal("after"))
             .expr()
             .stmt(),
-    ]));
+    ]);
 }
 
 #[test]
@@ -313,9 +310,7 @@ fn parse_block_that_is_empty() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result)
-        .ok()
-        .is_equal_to(program([block([]).stmt()]));
+    assert_that!(result).ok().is_equal_to([block([]).stmt()]);
 }
 
 #[test]
@@ -326,9 +321,7 @@ fn parse_block_containing_one_statement() {
 
     assert_that!(result)
         .ok()
-        .is_equal_to(program([
-            block([print(literal("Hello, World!")).stmt()]).stmt()
-        ]));
+        .is_equal_to([block([print(literal("Hello, World!")).stmt()]).stmt()]);
 }
 
 #[test]
@@ -337,7 +330,7 @@ fn parse_block_containing_multiple_statements() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([block([
+    assert_that!(result).ok().is_equal_to([block([
         var(identifier("x", (6, 1)), literal(1.).expr()).stmt(),
         assign(
             identifier("x", (13, 1)),
@@ -351,7 +344,7 @@ fn parse_block_containing_multiple_statements() {
         .stmt(),
         print(variable(identifier("x", (30, 1)))).stmt(),
     ])
-    .stmt()]));
+    .stmt()]);
 }
 
 #[test]
@@ -360,11 +353,11 @@ fn parse_if_stmt_single_then_stmt_no_else_branch() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([if_(
+    assert_that!(result).ok().is_equal_to([if_(
         literal(true),
         print(literal("Hello, World!")).stmt(),
     )
-    .stmt()]));
+    .stmt()]);
 }
 
 #[test]
@@ -373,12 +366,12 @@ fn parse_if_stmt_single_then_stmt_and_single_else_stmt() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([if_(
+    assert_that!(result).ok().is_equal_to([if_(
         binary(literal(42.), greater((7, 1)), literal(41.)),
         print(literal("Hello, World!")).stmt(),
     )
     .else_(print(literal("Goodbye, World!")).stmt())
-    .stmt()]));
+    .stmt()]);
 }
 
 #[test]
@@ -387,7 +380,7 @@ fn parse_if_stmt_multiple_then_stmts_no_else_branch() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([if_(
+    assert_that!(result).ok().is_equal_to([if_(
         literal(true),
         block([
             assign(
@@ -399,7 +392,7 @@ fn parse_if_stmt_multiple_then_stmts_no_else_branch() {
             print(variable(identifier("x", (29, 1)))).stmt(),
         ]),
     )
-    .stmt()]));
+    .stmt()]);
 }
 
 #[test]
@@ -408,7 +401,7 @@ fn parse_if_stmt_multiple_then_stmts_and_multiple_else_stmts() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([if_(
+    assert_that!(result).ok().is_equal_to([if_(
         binary(variable(identifier("x", (4, 1))), less((6, 1)), literal(0.)),
         block([
             assign(
@@ -439,7 +432,7 @@ fn parse_if_stmt_multiple_then_stmts_and_multiple_else_stmts() {
         .stmt(),
         print(variable(identifier("x", (59, 1)))).stmt(),
     ]))
-    .stmt()]));
+    .stmt()]);
 }
 
 #[test]
@@ -448,7 +441,7 @@ fn parse_if_without_else_branch_and_nested_if_with_else_branch() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([if_(
+    assert_that!(result).ok().is_equal_to([if_(
         variable(identifier("x", (4, 1))),
         if_(
             variable(identifier("y", (11, 1))),
@@ -456,7 +449,7 @@ fn parse_if_without_else_branch_and_nested_if_with_else_branch() {
         )
         .else_(print(literal("x only"))),
     )
-    .stmt()]));
+    .stmt()]);
 }
 
 #[test]
@@ -509,7 +502,7 @@ fn parse_while_loop_with_single_statement() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([while_(
+    assert_that!(result).ok().is_equal_to([while_(
         binary(
             variable(identifier("x", (7, 1))),
             less((9, 1)),
@@ -525,7 +518,7 @@ fn parse_while_loop_with_single_statement() {
         )
         .expr(),
     )
-    .stmt()]));
+    .stmt()]);
 }
 
 #[test]
@@ -534,7 +527,7 @@ fn parse_while_loop_with_multiple_statements() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([while_(
+    assert_that!(result).ok().is_equal_to([while_(
         binary(
             variable(identifier("x", (7, 1))),
             less((9, 1)),
@@ -554,7 +547,7 @@ fn parse_while_loop_with_multiple_statements() {
             print(variable(identifier("x", (34, 1)))).stmt(),
         ]),
     )
-    .stmt()]));
+    .stmt()]);
 }
 
 #[test]
@@ -563,7 +556,7 @@ fn parse_for_loop_with_one_statement() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([block([
+    assert_that!(result).ok().is_equal_to([block([
         var(identifier("i", (9, 1)), literal(0.).expr()).stmt(),
         while_(
             binary(
@@ -587,7 +580,7 @@ fn parse_for_loop_with_one_statement() {
         )
         .stmt(),
     ])
-    .stmt()]));
+    .stmt()]);
 }
 
 #[test]
@@ -596,7 +589,7 @@ fn parse_for_loop_with_multiple_statements() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([block([
+    assert_that!(result).ok().is_equal_to([block([
         var(identifier("i", (9, 1)), literal(0.).expr()).stmt(),
         while_(
             binary(
@@ -633,7 +626,7 @@ fn parse_for_loop_with_multiple_statements() {
         )
         .stmt(),
     ])
-    .stmt()]));
+    .stmt()]);
 }
 
 #[test]
@@ -642,11 +635,11 @@ fn parse_for_loop_with_no_parts() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([while_(
+    assert_that!(result).ok().is_equal_to([while_(
         literal(true),
         print(literal("Hello, World!")).stmt(),
     )
-    .stmt()]));
+    .stmt()]);
 }
 
 #[test]
@@ -655,7 +648,7 @@ fn parse_for_loop_without_initializer() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([
+    assert_that!(result).ok().is_equal_to([
         var(identifier("i", (4, 1)), literal(5.).expr()).stmt(),
         while_(
             binary(
@@ -679,7 +672,7 @@ fn parse_for_loop_without_initializer() {
             .stmt(),
         )
         .stmt(),
-    ]));
+    ]);
 }
 
 #[test]
@@ -688,7 +681,7 @@ fn parse_for_loop_without_condition() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([block([
+    assert_that!(result).ok().is_equal_to([block([
         var(identifier("i", (9, 1)), literal(0.).expr()).stmt(),
         while_(
             literal(true),
@@ -708,7 +701,7 @@ fn parse_for_loop_without_condition() {
         )
         .stmt(),
     ])
-    .stmt()]));
+    .stmt()]);
 }
 
 #[test]
@@ -717,7 +710,7 @@ fn parse_for_loop_without_increment() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([block([
+    assert_that!(result).ok().is_equal_to([block([
         var(identifier("i", (9, 1)), literal(0.).expr()).stmt(),
         while_(
             binary(
@@ -729,7 +722,7 @@ fn parse_for_loop_without_increment() {
         )
         .stmt(),
     ])
-    .stmt()]));
+    .stmt()]);
 }
 
 #[test]
@@ -738,13 +731,13 @@ fn parse_function_call_with_no_arguments() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([call(
+    assert_that!(result).ok().is_equal_to([call(
         variable(identifier("foo", (0, 3))),
         right_paren((4, 1)),
         [],
     )
     .expr()
-    .stmt()]));
+    .stmt()]);
 }
 
 #[test]
@@ -753,13 +746,13 @@ fn parse_function_call_with_one_arguments() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([call(
+    assert_that!(result).ok().is_equal_to([call(
         variable(identifier("foo", (0, 3))),
         right_paren((6, 1)),
         [literal(42.).expr()],
     )
     .expr()
-    .stmt()]));
+    .stmt()]);
 }
 
 #[test]
@@ -768,13 +761,13 @@ fn parse_function_call_with_two_arguments() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([call(
+    assert_that!(result).ok().is_equal_to([call(
         variable(identifier("foo", (0, 3))),
         right_paren((23, 1)),
         [literal(42.).expr(), literal("Hello, World!").expr()],
     )
     .expr()
-    .stmt()]));
+    .stmt()]);
 }
 
 #[test]
@@ -783,7 +776,7 @@ fn parse_function_call_with_three_arguments() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([call(
+    assert_that!(result).ok().is_equal_to([call(
         variable(identifier("foo", (0, 3))),
         right_paren((26, 1)),
         [
@@ -793,7 +786,7 @@ fn parse_function_call_with_three_arguments() {
         ],
     )
     .expr()
-    .stmt()]));
+    .stmt()]);
 }
 
 #[test]
@@ -802,7 +795,7 @@ fn parse_function_call_with_grouping_in_an_argument() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([call(
+    assert_that!(result).ok().is_equal_to([call(
         variable(identifier("foo", (0, 3))),
         right_paren((15, 1)),
         [
@@ -811,7 +804,7 @@ fn parse_function_call_with_grouping_in_an_argument() {
         ],
     )
     .expr()
-    .stmt()]));
+    .stmt()]);
 }
 
 #[test]
@@ -820,7 +813,7 @@ fn parse_function_call_on_return_value_of_a_function_call() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([call(
+    assert_that!(result).ok().is_equal_to([call(
         call(
             call(
                 variable(identifier("foo", (0, 3))),
@@ -834,7 +827,7 @@ fn parse_function_call_on_return_value_of_a_function_call() {
         [variable(identifier("b", (9, 1))).expr()],
     )
     .expr()
-    .stmt()]));
+    .stmt()]);
 }
 
 fn generate_function_call_source_code(fun_name: &str, num_args: usize) -> String {
@@ -875,7 +868,7 @@ fn parse_function_declaration_with_2_arguments_and_return() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([function(
+    assert_that!(result).ok().is_equal_to([function(
         identifier("foo", (4, 3)),
         [identifier("x", (8, 1)), identifier("y", (11, 1))],
         [return_(
@@ -889,7 +882,7 @@ fn parse_function_declaration_with_2_arguments_and_return() {
         )
         .stmt()],
     )
-    .stmt()]));
+    .stmt()]);
 }
 
 #[test]
@@ -898,10 +891,10 @@ fn parse_function_declaration_no_arguments_and_no_return() {
 
     let result = source_code.tokenize().parse();
 
-    assert_that!(result).ok().is_equal_to(program([function(
+    assert_that!(result).ok().is_equal_to([function(
         identifier("foo", (4, 3)),
         [],
         [print(literal("Hello, World!")).stmt()],
     )
-    .stmt()]));
+    .stmt()]);
 }

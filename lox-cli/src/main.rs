@@ -14,6 +14,8 @@ use clap::Parser;
 use lox_core::ast_printer::AstPrinter;
 use lox_core::interpreter::Interpreter;
 use lox_core::parse::Parse;
+use lox_core::program::{IntoProgram, ProgramError};
+use lox_core::resolver::Resolve;
 use lox_core::runtime::RuntimeContext;
 use lox_core::tokenize::Tokenize;
 use miette::{IntoDiagnostic, NamedSource, Report, WrapErr};
@@ -56,7 +58,17 @@ fn main() -> miette::Result<()> {
         },
         Command::Interpret { source } => {
             let source_code = read_source_file(source)?;
-            match source_code.tokenize().parse() {
+            match source_code
+                .tokenize()
+                .parse()
+                .map_err(|errors| errors.into_iter().map(ProgramError::from).collect())
+                .and_then(|statements| {
+                    statements
+                        .resolve()
+                        .map_err(|errors| errors.into_iter().map(ProgramError::from).collect())
+                })
+                .into_program()
+            {
                 Ok(program) => {
                     let mut interpreter = Interpreter::default();
                     interpreter.interpret(&mut rtc, &program);

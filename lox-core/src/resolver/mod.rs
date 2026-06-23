@@ -3,7 +3,6 @@ use crate::expr::{
     Assign, Binary, Call, Expr, ExprElement, ExprVisitor, Get, Grouping, Literal, Logical, Set,
     Super, This, Unary, Variable,
 };
-use crate::program::Program;
 use crate::stmt::{
     Block, Class, Expression, Function, If, Print, Return, Stmt, StmtElement, StmtVisitor, Var,
     While,
@@ -13,6 +12,21 @@ use hashbrown::HashMap;
 use miette::SourceSpan;
 use std::fmt::Display;
 use std::{fmt, mem};
+
+pub trait Resolve {
+    fn resolve(self) -> Result<(Vec<Stmt>, ResolutionMap), Vec<ResolverError>>;
+}
+
+impl<T> Resolve for T
+where
+    T: IntoIterator<Item = Stmt>,
+{
+    fn resolve(self) -> Result<(Vec<Stmt>, ResolutionMap), Vec<ResolverError>> {
+        let statements = self.into_iter().collect::<Vec<_>>();
+        let resolution_map = Resolver::default().resolve(&statements)?;
+        Ok((statements, resolution_map))
+    }
+}
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct ResolutionMap {
@@ -76,13 +90,9 @@ pub struct Resolver {
 }
 
 impl Resolver {
-    pub fn resolve(
-        &mut self,
-        program: impl Into<Program>,
-    ) -> Result<ResolutionMap, Vec<ResolverError>> {
+    pub fn resolve(&mut self, statements: &[Stmt]) -> Result<ResolutionMap, Vec<ResolverError>> {
         self.scopes.clear();
-        let program = program.into();
-        self.resolve_stmts(program.statements())?;
+        self.resolve_stmts(statements)?;
         Ok(mem::take(&mut self.resolution_map))
     }
 
