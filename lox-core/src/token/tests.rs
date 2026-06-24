@@ -421,14 +421,14 @@ mod token_kind {
     fn alternate_display_format_string_literal() {
         let token_kind = TokenKind::StringLiteral;
         let display_string = format!("{token_kind:#}");
-        assert_that!(display_string).is_equal_to("STRING_LITERAL");
+        assert_that!(display_string).is_equal_to("STRING");
     }
 
     #[test]
     fn alternate_display_format_number_literal() {
         let token_kind = TokenKind::NumberLiteral;
         let display_string = format!("{token_kind:#}");
-        assert_that!(display_string).is_equal_to("NUMBER_LITERAL");
+        assert_that!(display_string).is_equal_to("NUMBER");
     }
 
     #[test]
@@ -671,7 +671,7 @@ mod token {
             location: (2, 1).into(),
         };
         let display_string = format!("{token:#}");
-        assert_that!(display_string).is_equal_to("STRING_LITERAL \"Hello, World!\" Hello, World!");
+        assert_that!(display_string).is_equal_to("STRING \"Hello, World!\" Hello, World!");
     }
 
     #[test]
@@ -683,7 +683,7 @@ mod token {
             location: (2, 1).into(),
         };
         let display_string = format!("{token:#}");
-        assert_that!(display_string).is_equal_to("NUMBER_LITERAL 123 123.0");
+        assert_that!(display_string).is_equal_to("NUMBER 123 123.0");
     }
 
     #[test]
@@ -695,7 +695,7 @@ mod token {
             location: (2, 1).into(),
         };
         let display_string = format!("{token:#}");
-        assert_that!(display_string).is_equal_to("NUMBER_LITERAL 123.456 123.456");
+        assert_that!(display_string).is_equal_to("NUMBER 123.456 123.456");
     }
 
     #[test]

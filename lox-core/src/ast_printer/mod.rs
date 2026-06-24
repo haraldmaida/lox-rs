@@ -21,7 +21,7 @@ impl<'a, W> AstPrinter<'a, W>
 where
     W: fmt::Write,
 {
-    pub fn print(rtc: &mut RuntimeContext<'a>, expr: &Expr, out: &'a mut W) -> Result<(), Error> {
+    pub fn print(rtc: &mut RuntimeContext<'_>, expr: &Expr, out: &'a mut W) -> Result<(), Error> {
         let mut printer = AstPrinter { out };
         expr.accept(&mut printer, rtc)
     }
