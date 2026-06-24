@@ -1,6 +1,5 @@
-use crate::data;
 use crate::data::{
-    Callable, LoxClass, LoxFunction, NativeFunction, Symbol, Value, native_function,
+    Callable, LoxClass, LoxFunction, LoxObject, NativeFunction, Symbol, Value, native_function,
 };
 use crate::environment::{Environment, EnvironmentError};
 use crate::expr::{
@@ -42,7 +41,7 @@ pub enum RuntimeErrorCode {
 impl Display for RuntimeErrorCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::CallExprOnNonCallable => write!(f, "cannot call a non-callable value"),
+            Self::CallExprOnNonCallable => write!(f, "can not call a non-callable value"),
             Self::NotABinaryOperator => write!(
                 f,
                 "not a binary operator where a binary operator like '=', '+', '-', '*' or '/' is expected"
@@ -300,16 +299,28 @@ impl ExprVisitor for Interpreter {
             let arg = self.evaluate_internal(rtc, argument)?;
             arguments.push(arg);
         }
-        if let Value::Callable(callable) = callee {
-            match data::Call::call(&callable, self, rtc, &arguments) {
+        match callee {
+            Value::Nil | Value::Bool(_) | Value::Number(_) | Value::String(_) => {
+                Break(Err(RuntimeError::new(
+                    RuntimeErrorCode::CallExprOnNonCallable,
+                    expr.paren(), // TODO improve error message for call expr
+                )))
+            },
+            Value::Function(function) => match function.call(self, rtc, &arguments) {
                 Ok(value) => Continue(value),
                 Err(error) => Break(Err(error)),
-            }
-        } else {
-            Break(Err(RuntimeError::new(
-                RuntimeErrorCode::CallExprOnNonCallable,
-                expr.paren(), // TODO improve error message for call expr
-            )))
+            },
+            Value::NativeFunction(native_function) => {
+                match native_function.call(&mut (), &mut (), &arguments) {
+                    Ok(value) => Continue(value),
+                    Err(error) => Break(Err(error)),
+                }
+            },
+            Value::Class(class) => match class.call(&mut (), &mut (), &arguments) {
+                Ok(value) => Continue(value),
+                Err(error) => Break(Err(error)),
+            },
+            Value::Object(_object) => todo!(),
         }
     }
 
@@ -489,31 +500,7 @@ impl StmtVisitor for Interpreter {
     }
 }
 
-impl data::Call for Callable {
-    type Interpreter = Interpreter;
-    type Context<'c> = <Self::Interpreter as StmtVisitor>::Context<'c>;
-
-    fn arity(&self) -> usize {
-        match self {
-            Self::LoxFunction(fun) => fun.arity(),
-            Self::NativeFunction(fun) => fun.arity(),
-        }
-    }
-
-    fn call(
-        &self,
-        interpreter: &mut Self::Interpreter,
-        ctx: &mut RuntimeContext<'_>,
-        arguments: &[Value],
-    ) -> Result<Value, RuntimeError> {
-        match self {
-            Self::LoxFunction(fun) => fun.call(interpreter, ctx, arguments),
-            Self::NativeFunction(fun) => fun.call(&mut (), &mut (), arguments),
-        }
-    }
-}
-
-impl data::Call for LoxFunction {
+impl Callable for LoxFunction {
     type Interpreter = Interpreter;
     type Context<'c> = <Self::Interpreter as StmtVisitor>::Context<'c>;
 
@@ -542,7 +529,7 @@ impl data::Call for LoxFunction {
     }
 }
 
-impl data::Call for NativeFunction {
+impl Callable for NativeFunction {
     type Interpreter = ();
     type Context<'c> = ();
 
@@ -557,6 +544,25 @@ impl data::Call for NativeFunction {
         arguments: &[Value],
     ) -> Result<Value, RuntimeError> {
         self.fun_ptr()(arguments)
+    }
+}
+
+impl Callable for LoxClass {
+    type Interpreter = ();
+    type Context<'c> = ();
+
+    fn arity(&self) -> usize {
+        0
+    }
+
+    fn call(
+        &self,
+        _interpreter: &mut Self::Interpreter,
+        _ctx: &mut Self::Context<'_>,
+        _arguments: &[Value],
+    ) -> Result<Value, RuntimeError> {
+        let instance = LoxObject::new(self.clone());
+        Ok(Value::Object(instance))
     }
 }
 

@@ -12,8 +12,12 @@ fn clock_returns_the_current_time_as_a_float_in_seconds_and_fraction_of_seconds(
             assert_that!(val.fract()).is_not_close_to(0.);
         },
         Ok(Value::String(val)) => panic!("expected a number, but got string {val:?}"),
-        Ok(Value::Callable(val)) => panic!("expected a number, but got callable {val:?}"),
+        Ok(Value::Function(val)) => panic!("expected a number, but got function {val:?}"),
+        Ok(Value::NativeFunction(val)) => {
+            panic!("expected a number, but got native function {val:?}")
+        },
         Ok(Value::Class(val)) => panic!("expected a number, but got class {val:?}"),
+        Ok(Value::Object(val)) => panic!("expected a number, but got object {val:?}"),
         Err(err) => panic!("expected a number, but got error {err:?}"),
     }
 }

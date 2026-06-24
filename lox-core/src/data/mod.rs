@@ -7,6 +7,7 @@ use crate::stmt::Function;
 use lasso::{Spur, ThreadedRodeo};
 use std::fmt;
 use std::fmt::{Debug, Display};
+use std::rc::Rc;
 use std::sync::LazyLock;
 
 static SYMBOL_TABLE: LazyLock<ThreadedRodeo> = LazyLock::new(ThreadedRodeo::new);
@@ -60,8 +61,10 @@ pub enum Value {
     Bool(bool),
     Number(f64),
     String(String),
-    Callable(Callable),
+    Function(LoxFunction),
+    NativeFunction(NativeFunction),
     Class(LoxClass),
+    Object(LoxObject),
 }
 
 impl Display for Value {
@@ -71,8 +74,10 @@ impl Display for Value {
             Self::Bool(value) => write!(f, "{value}"),
             Self::Number(value) => write!(f, "{value}"),
             Self::String(value) => write!(f, "{value}"),
-            Self::Callable(value) => write!(f, "{value}"),
+            Self::Function(value) => write!(f, "{value}"),
+            Self::NativeFunction(value) => write!(f, "{value}"),
             Self::Class(value) => write!(f, "{value}"),
+            Self::Object(value) => write!(f, "{value}"),
         }
     }
 }
@@ -127,21 +132,15 @@ impl From<&str> for Value {
     }
 }
 
-impl From<Callable> for Value {
-    fn from(value: Callable) -> Self {
-        Self::Callable(value)
-    }
-}
-
 impl From<LoxFunction> for Value {
     fn from(value: LoxFunction) -> Self {
-        Self::Callable(Callable::LoxFunction(value))
+        Self::Function(value)
     }
 }
 
 impl From<NativeFunction> for Value {
     fn from(value: NativeFunction) -> Self {
-        Self::Callable(Callable::NativeFunction(value))
+        Self::NativeFunction(value)
     }
 }
 
@@ -151,7 +150,13 @@ impl From<LoxClass> for Value {
     }
 }
 
-pub trait Call {
+impl From<LoxObject> for Value {
+    fn from(value: LoxObject) -> Self {
+        Self::Object(value)
+    }
+}
+
+pub trait Callable {
     type Interpreter;
     type Context<'c>;
 
@@ -166,39 +171,6 @@ pub trait Call {
 }
 
 pub type FunPtr = fn(&[Value]) -> Result<Value, RuntimeError>;
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Callable {
-    LoxFunction(LoxFunction),
-    NativeFunction(NativeFunction),
-}
-
-impl Display for Callable {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::LoxFunction(fun) => write!(f, "{fun}"),
-            Self::NativeFunction(fun) => write!(f, "{fun}"),
-        }
-    }
-}
-
-impl PartialOrd for Callable {
-    fn partial_cmp(&self, _other: &Self) -> Option<std::cmp::Ordering> {
-        None
-    }
-}
-
-impl From<LoxFunction> for Callable {
-    fn from(value: LoxFunction) -> Self {
-        Self::LoxFunction(value)
-    }
-}
-
-impl From<NativeFunction> for Callable {
-    fn from(value: NativeFunction) -> Self {
-        Self::NativeFunction(value)
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct LoxFunction {
@@ -215,6 +187,12 @@ impl Display for LoxFunction {
 impl PartialEq for LoxFunction {
     fn eq(&self, other: &Self) -> bool {
         self.declaration == other.declaration
+    }
+}
+
+impl PartialOrd for LoxFunction {
+    fn partial_cmp(&self, _other: &Self) -> Option<std::cmp::Ordering> {
+        None
     }
 }
 
@@ -281,6 +259,12 @@ impl PartialEq for NativeFunction {
     }
 }
 
+impl PartialOrd for NativeFunction {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.name.as_str().partial_cmp(other.name.as_str())
+    }
+}
+
 pub fn native_function(
     name: impl Into<Symbol>,
     parameters: impl IntoIterator<Item = Symbol>,
@@ -289,36 +273,56 @@ pub fn native_function(
     NativeFunction::new(name.into(), parameters.into_iter().collect(), fun_ptr)
 }
 
-#[derive(Debug, Clone)]
-pub struct LoxClass {
-    name: Symbol,
-}
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub struct LoxClass(Rc<LoxClassData>);
 
 impl Display for LoxClass {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.name.as_str())
+        write!(f, "{}", self.0.name.as_str())
     }
 }
 
-impl PartialEq for LoxClass {
+impl LoxClass {
+    pub fn new(name: Symbol) -> Self {
+        Self(Rc::new(LoxClassData { name }))
+    }
+
+    pub fn name(&self) -> Symbol {
+        self.0.name
+    }
+}
+
+#[derive(Debug, Clone)]
+struct LoxClassData {
+    name: Symbol,
+}
+
+impl PartialEq for LoxClassData {
     fn eq(&self, other: &Self) -> bool {
         self.name == other.name
     }
 }
 
-impl PartialOrd for LoxClass {
+impl PartialOrd for LoxClassData {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.name.as_str().partial_cmp(other.name.as_str())
     }
 }
 
-impl LoxClass {
-    pub const fn new(name: Symbol) -> Self {
-        Self { name }
-    }
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub struct LoxObject {
+    class: LoxClass,
+}
 
-    pub const fn name(&self) -> Symbol {
-        self.name
+impl Display for LoxObject {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} instance", self.class.name())
+    }
+}
+
+impl LoxObject {
+    pub const fn new(class: LoxClass) -> Self {
+        Self { class }
     }
 }
 

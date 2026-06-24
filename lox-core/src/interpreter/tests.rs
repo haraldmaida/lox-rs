@@ -1750,6 +1750,27 @@ fn execute_call_to_same_closure_in_different_environments() {
 #[test]
 fn execute_class_declaration() {
     let program = program(
+        r"
+class Bagel {}
+",
+    )
+    .expect("failed to parse program");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+    let mut interpreter = Interpreter::default();
+
+    interpreter.interpret(&mut rtc, &program);
+
+    assert_that!(String::from_utf8(stderr)).ok().is_empty();
+    assert_that!(String::from_utf8(stdout)).ok().is_empty();
+    assert_that!(interpreter.environment().lookup("Bagel")).is_ok();
+}
+
+#[test]
+fn execute_printing_a_class() {
+    let program = program(
         r#"
 class DevonshireCream {
     serveOn() {
@@ -1773,5 +1794,28 @@ print DevonshireCream;
     assert_that!(String::from_utf8(stdout))
         .ok()
         .is_equal_to("DevonshireCream\n");
-    assert_that!(interpreter.environment().lookup("DevonshireCream")).is_ok();
+}
+
+#[test]
+fn execute_class_instantiation() {
+    let program = program(
+        r"
+class Bagel {}
+
+print Bagel();
+",
+    )
+    .expect("failed to parse program");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+    let mut interpreter = Interpreter::default();
+
+    interpreter.interpret(&mut rtc, &program);
+
+    assert_that!(String::from_utf8(stderr)).ok().is_empty();
+    assert_that!(String::from_utf8(stdout))
+        .ok()
+        .is_equal_to("Bagel instance\n");
 }

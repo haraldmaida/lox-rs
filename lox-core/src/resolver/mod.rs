@@ -73,10 +73,10 @@ impl Display for ResolverError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.code {
             ResolverErrorCode::CannotReadLocalVariableInInitializer => {
-                write!(f, "can't read local variable in its own initializer")
+                write!(f, "can not read local variable in its own initializer")
             },
             ResolverErrorCode::CannotReturnFromOutsideFunction => {
-                write!(f, "can't return from outside of any function")
+                write!(f, "can not return from outside of any function")
             },
             ResolverErrorCode::RedeclaredVariableInSameScope => {
                 write!(
