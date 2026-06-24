@@ -61,6 +61,7 @@ pub enum Value {
     Number(f64),
     String(String),
     Callable(Callable),
+    Class(LoxClass),
 }
 
 impl Display for Value {
@@ -71,6 +72,7 @@ impl Display for Value {
             Self::Number(value) => write!(f, "{value}"),
             Self::String(value) => write!(f, "{value}"),
             Self::Callable(value) => write!(f, "{value}"),
+            Self::Class(value) => write!(f, "{value}"),
         }
     }
 }
@@ -140,6 +142,12 @@ impl From<LoxFunction> for Value {
 impl From<NativeFunction> for Value {
     fn from(value: NativeFunction) -> Self {
         Self::Callable(Callable::NativeFunction(value))
+    }
+}
+
+impl From<LoxClass> for Value {
+    fn from(value: LoxClass) -> Self {
+        Self::Class(value)
     }
 }
 
@@ -279,6 +287,39 @@ pub fn native_function(
     fun_ptr: FunPtr,
 ) -> NativeFunction {
     NativeFunction::new(name.into(), parameters.into_iter().collect(), fun_ptr)
+}
+
+#[derive(Debug, Clone)]
+pub struct LoxClass {
+    name: Symbol,
+}
+
+impl Display for LoxClass {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name.as_str())
+    }
+}
+
+impl PartialEq for LoxClass {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+
+impl PartialOrd for LoxClass {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.name.as_str().partial_cmp(other.name.as_str())
+    }
+}
+
+impl LoxClass {
+    pub const fn new(name: Symbol) -> Self {
+        Self { name }
+    }
+
+    pub const fn name(&self) -> Symbol {
+        self.name
+    }
 }
 
 #[cfg(any(test, feature = "dsl"))]

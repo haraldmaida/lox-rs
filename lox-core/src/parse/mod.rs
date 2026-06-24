@@ -1,6 +1,6 @@
 use crate::data::Symbol;
 use crate::expr::{Assign, Binary, Call, Expr, Grouping, Literal, Logical, Unary, Variable};
-use crate::stmt::{Block, Expression, Function, If, Print, Return, Stmt, Var, While};
+use crate::stmt::{Block, Class, Expression, Function, If, Print, Return, Stmt, Var, While};
 use crate::token;
 use crate::token::{Token, TokenKind};
 use crate::tokenize::{LexingError, LexingErrorCode};
@@ -265,7 +265,8 @@ where
             Ok(None) => None,
             Ok(Some(token)) => match token.kind {
                 TokenKind::EndOfFile => None,
-                TokenKind::Fun => Some(self.function("function")),
+                TokenKind::Class => Some(self.class_declaration()),
+                TokenKind::Fun => Some(self.function("function").map(Stmt::from)),
                 TokenKind::Var => Some(self.var_declaration()),
                 _ => {
                     self.revert(token);
@@ -276,7 +277,24 @@ where
         }
     }
 
-    fn function(&mut self, _kind: &str) -> Result<Stmt, SyntaxError> {
+    fn class_declaration(&mut self) -> Result<Stmt, SyntaxError> {
+        let name = self.consume(TokenKind::Identifier)?;
+        self.consume(TokenKind::LeftBrace)?;
+        let mut methods = Vec::new();
+        while let Some(token) = self.advance()? {
+            self.revert(token);
+            if token.kind == TokenKind::RightBrace || token.kind == TokenKind::EndOfFile {
+                break;
+            }
+            let method = self.function("method")?;
+            methods.push(method);
+        }
+
+        self.consume(TokenKind::RightBrace)?;
+        Ok(Class::new(name, None, methods).into())
+    }
+
+    fn function(&mut self, _kind: &str) -> Result<Function, SyntaxError> {
         let name = self.consume(TokenKind::Identifier)?;
         self.consume(TokenKind::LeftParen)?;
         let mut parameters = Vec::new();
@@ -306,7 +324,7 @@ where
         }
         self.consume(TokenKind::LeftBrace)?;
         let body = self.block()?;
-        Ok(Function::new(name, parameters, body).into())
+        Ok(Function::new(name, parameters, body))
     }
 
     fn var_declaration(&mut self) -> Result<Stmt, SyntaxError> {
@@ -335,7 +353,7 @@ where
                     None
                 },
                 TokenKind::EndOfFile => None,
-                TokenKind::Fun => Some(self.function("function")),
+                TokenKind::Fun => Some(self.function("function").map(Stmt::from)),
                 TokenKind::Var => Some(self.var_declaration()),
                 _ => {
                     self.revert(token);

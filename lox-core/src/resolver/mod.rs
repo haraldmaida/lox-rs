@@ -293,8 +293,10 @@ impl StmtVisitor for Resolver {
         Ok(())
     }
 
-    fn visit_class_stmt(&mut self, _rtc: &mut Self::Context<'_>, _stmt: &Class) -> Self::Output {
-        todo!()
+    fn visit_class_stmt(&mut self, _rtc: &mut Self::Context<'_>, stmt: &Class) -> Self::Output {
+        self.declare(stmt.name())?;
+        self.define(stmt.name());
+        Ok(())
     }
 
     fn visit_expression_stmt(

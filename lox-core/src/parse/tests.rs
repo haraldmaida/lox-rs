@@ -2,10 +2,10 @@ use super::*;
 use crate::expr::{
     ExprExt, assign, binary, call, grouping, literal, logical, nil, unary, variable,
 };
-use crate::stmt::{IfExt, StmtExt, block, function, if_, print, return_, stmt, var, while_};
+use crate::stmt::{IfExt, StmtExt, block, class, function, if_, print, return_, stmt, var, while_};
 use crate::token::{
     and, bang, bang_equal, equal_equal, greater, greater_equal, identifier, keyword, less,
-    less_equal, minus, or, plus, right_paren, slash, star,
+    less_equal, minus, or, plus, right_paren, slash, star, token,
 };
 use crate::tokenize::Tokenize;
 use asserting::prelude::*;
@@ -895,6 +895,75 @@ fn parse_function_declaration_no_arguments_and_no_return() {
         identifier("foo", (4, 3)),
         [],
         [print(literal("Hello, World!")).stmt()],
+    )
+    .stmt()]);
+}
+
+#[test]
+fn parse_class_declaration_with_one_method() {
+    let source_code = "class Foo { bar() { return 42; } }";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().contains_exactly([class(
+        identifier("Foo", (6, 3)),
+        None,
+        [function(
+            identifier("bar", (12, 3)),
+            [],
+            [return_(
+                keyword(TokenKind::Return, "return", (20, 6)),
+                literal(42).expr(),
+            )
+            .stmt()],
+        )],
+    )
+    .stmt()]);
+}
+
+#[test]
+fn parse_class_declaration_with_two_methods() {
+    let source_code = r#"
+    class Foo {
+        bar() {
+            return "Hello!";
+        }
+
+         baz(a, b) {
+            return a + b;
+         }
+    }"#;
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().contains_exactly([class(
+        identifier("Foo", (11, 3)),
+        None,
+        [
+            function(
+                identifier("bar", (25, 3)),
+                [],
+                [return_(
+                    keyword(TokenKind::Return, "return", (45, 6)),
+                    literal("Hello!").expr(),
+                )
+                .stmt()],
+            ),
+            function(
+                identifier("baz", (82, 3)),
+                [identifier("a", (86, 1)), identifier("b", (89, 1))],
+                [return_(
+                    keyword(TokenKind::Return, "return", (106, 6)),
+                    binary(
+                        variable(identifier("a", (113, 1))),
+                        token(TokenKind::Plus, "+", (115, 1)),
+                        variable(identifier("b", (117, 1))),
+                    )
+                    .expr(),
+                )
+                .stmt()],
+            ),
+        ],
     )
     .stmt()]);
 }

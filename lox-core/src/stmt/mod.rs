@@ -136,17 +136,13 @@ impl FromIterator<Stmt> for Block {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Class {
-    name: Option<Token>,
+    name: Token,
     superclass: Option<Variable>,
     methods: Vec<Function>,
 }
 
 impl Class {
-    pub const fn new(
-        name: Option<Token>,
-        superclass: Option<Variable>,
-        methods: Vec<Function>,
-    ) -> Self {
+    pub const fn new(name: Token, superclass: Option<Variable>, methods: Vec<Function>) -> Self {
         Self {
             name,
             superclass,
@@ -154,7 +150,7 @@ impl Class {
         }
     }
 
-    pub const fn name(&self) -> Option<Token> {
+    pub const fn name(&self) -> Token {
         self.name
     }
 

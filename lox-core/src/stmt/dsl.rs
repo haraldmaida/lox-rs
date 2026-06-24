@@ -24,15 +24,11 @@ pub fn block(statements: impl IntoIterator<Item = Stmt>) -> Block {
 }
 
 pub fn class(
-    name: impl Into<Option<Token>>,
+    name: Token,
     superclass: impl Into<Option<Variable>>,
     methods: impl IntoIterator<Item = Function>,
 ) -> Class {
-    Class::new(
-        name.into(),
-        superclass.into(),
-        methods.into_iter().collect(),
-    )
+    Class::new(name, superclass.into(), methods.into_iter().collect())
 }
 
 pub fn expression(expr: impl Into<Expression>) -> Expression {

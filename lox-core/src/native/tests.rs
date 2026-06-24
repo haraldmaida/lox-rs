@@ -13,6 +13,7 @@ fn clock_returns_the_current_time_as_a_float_in_seconds_and_fraction_of_seconds(
         },
         Ok(Value::String(val)) => panic!("expected a number, but got string {val:?}"),
         Ok(Value::Callable(val)) => panic!("expected a number, but got callable {val:?}"),
+        Ok(Value::Class(val)) => panic!("expected a number, but got class {val:?}"),
         Err(err) => panic!("expected a number, but got error {err:?}"),
     }
 }

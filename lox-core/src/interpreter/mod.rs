@@ -1,5 +1,7 @@
 use crate::data;
-use crate::data::{Callable, LoxFunction, NativeFunction, Symbol, Value, native_function};
+use crate::data::{
+    Callable, LoxClass, LoxFunction, NativeFunction, Symbol, Value, native_function,
+};
 use crate::environment::{Environment, EnvironmentError};
 use crate::expr::{
     Assign, Binary, Call, Expr, ExprElement, ExprVisitor, Get, Grouping, Literal, Logical, Set,
@@ -32,6 +34,7 @@ pub enum RuntimeErrorCode {
     OperandNotANumber,
     OperandNotANumberOrString,
     OperandsOfDifferentType,
+    UndefinedClass(Symbol),
     UndefinedFunction(Symbol),
     UndefinedVariable(Symbol),
 }
@@ -60,6 +63,7 @@ impl Display for RuntimeErrorCode {
                 f,
                 "operands are of different type but the operator requires all operands to be of the same type"
             ),
+            Self::UndefinedClass(symbol) => write!(f, "use of undefined class '{symbol}'"),
             Self::UndefinedFunction(symbol) => write!(f, "call to undefined function '{symbol}'"),
             Self::UndefinedVariable(symbol) => write!(f, "use of undefined variable '{symbol}'"),
         }
@@ -402,8 +406,20 @@ impl StmtVisitor for Interpreter {
         self.execute_block(rtc, self.environment.new_local(), stmt.statements())
     }
 
-    fn visit_class_stmt(&mut self, _rtc: &mut RuntimeContext<'_>, _stmt: &Class) -> Self::Output {
-        todo!()
+    fn visit_class_stmt(&mut self, _rtc: &mut RuntimeContext<'_>, stmt: &Class) -> Self::Output {
+        let class_name = stmt.name().lexeme();
+        self.environment.define(class_name, Value::Nil);
+        let class = LoxClass::new(class_name);
+        match self.environment.assign(class_name, class) {
+            Ok(()) => {},
+            Err(EnvironmentError::IdentifierNotFound(_)) => {
+                return Break(Err(RuntimeError::new(
+                    RuntimeErrorCode::UndefinedClass(class_name),
+                    stmt.name(),
+                )));
+            },
+        }
+        Continue(())
     }
 
     fn visit_expression_stmt(
