@@ -1,7 +1,7 @@
 use super::*;
 use crate::data::Symbol;
 use crate::parse::Parse;
-use crate::token::{identifier, return_};
+use crate::token::{identifier, return_, this};
 use crate::tokenize::Tokenize;
 use asserting::prelude::*;
 use proptest::prelude::*;
@@ -207,5 +207,33 @@ fn resolve_finds_return_stmt_outside_of_any_function() {
         code: ResolverErrorCode::CannotReturnFromOutsideFunction,
         token: return_((0, 6)),
         location: (0, 6).into(),
+    }]);
+}
+
+#[test]
+fn resolve_finds_usage_of_this_at_global_scope() {
+    let mut resolver = Resolver::default();
+    let statements = parse("print this;");
+
+    let result = resolver.resolve(&statements);
+
+    assert_that!(result).err().contains_exactly([ResolverError {
+        code: ResolverErrorCode::ThisUsedOutsideOfClass,
+        token: this((6, 4)),
+        location: (6, 4).into(),
+    }]);
+}
+
+#[test]
+fn resolve_finds_usage_of_this_in_a_function() {
+    let mut resolver = Resolver::default();
+    let statements = parse("fun notAMethod() { print this; }");
+
+    let result = resolver.resolve(&statements);
+
+    assert_that!(result).err().contains_exactly([ResolverError {
+        code: ResolverErrorCode::ThisUsedOutsideOfClass,
+        token: this((25, 4)),
+        location: (25, 4).into(),
     }]);
 }

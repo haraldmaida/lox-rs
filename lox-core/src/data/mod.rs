@@ -4,7 +4,10 @@ pub use dsl::*;
 use crate::environment::Environment;
 use crate::interpreter::RuntimeError;
 use crate::stmt::Function;
+use crate::token::Token;
+use hashbrown::HashMap;
 use lasso::{Spur, ThreadedRodeo};
+use std::cell::RefCell;
 use std::fmt;
 use std::fmt::{Debug, Display};
 use std::rc::Rc;
@@ -211,6 +214,16 @@ impl LoxFunction {
     pub const fn closure(&self) -> &Environment {
         &self.closure
     }
+
+    #[must_use]
+    pub fn bind(self, object: LoxObject) -> Self {
+        let environment = self.closure.new_local();
+        environment.define("this", Value::Object(object));
+        Self {
+            declaration: self.declaration,
+            closure: environment,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -273,8 +286,14 @@ pub fn native_function(
     NativeFunction::new(name.into(), parameters.into_iter().collect(), fun_ptr)
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone)]
 pub struct LoxClass(Rc<LoxClassData>);
+
+#[derive(Debug, Clone)]
+struct LoxClassData {
+    name: Symbol,
+    methods: HashMap<Symbol, Value>,
+}
 
 impl Display for LoxClass {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -282,47 +301,82 @@ impl Display for LoxClass {
     }
 }
 
+impl PartialEq for LoxClass {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl PartialOrd for LoxClass {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.0.name.as_str().partial_cmp(other.0.name.as_str())
+    }
+}
+
 impl LoxClass {
-    pub fn new(name: Symbol) -> Self {
-        Self(Rc::new(LoxClassData { name }))
+    pub fn new(name: Symbol, methods: HashMap<Symbol, Value>) -> Self {
+        Self(Rc::new(LoxClassData { name, methods }))
     }
 
     pub fn name(&self) -> Symbol {
         self.0.name
     }
+
+    pub fn methods(&self) -> &HashMap<Symbol, Value> {
+        &self.0.methods
+    }
+
+    pub fn find_method(&self, name: Symbol) -> Option<&Value> {
+        self.0.methods.get(&name)
+    }
 }
 
 #[derive(Debug, Clone)]
-struct LoxClassData {
-    name: Symbol,
-}
+pub struct LoxObject(Rc<RefCell<LoxObjectData>>);
 
-impl PartialEq for LoxClassData {
-    fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
-    }
-}
-
-impl PartialOrd for LoxClassData {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.name.as_str().partial_cmp(other.name.as_str())
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub struct LoxObject {
+#[derive(Debug)]
+struct LoxObjectData {
     class: LoxClass,
+    fields: HashMap<Symbol, Value>,
 }
 
 impl Display for LoxObject {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} instance", self.class.name())
+        write!(f, "{} instance", self.0.borrow().class.name().as_str())
+    }
+}
+
+impl PartialEq for LoxObject {
+    fn eq(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl PartialOrd for LoxObject {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.0.borrow().class.partial_cmp(&other.0.borrow().class)
     }
 }
 
 impl LoxObject {
-    pub const fn new(class: LoxClass) -> Self {
-        Self { class }
+    pub fn new(class: LoxClass) -> Self {
+        Self(Rc::new(RefCell::new(LoxObjectData {
+            class,
+            fields: HashMap::new(),
+        })))
+    }
+
+    pub fn set(&self, name: Token, value: Value) {
+        self.0.borrow_mut().fields.insert(name.lexeme(), value);
+    }
+
+    pub fn get(&self, name: Token) -> Option<Value> {
+        self.0
+            .borrow()
+            .fields
+            .get(&name.lexeme())
+            .cloned()
+            .or_else(|| self.0.borrow().class.find_method(name.lexeme()).cloned())
     }
 }
 

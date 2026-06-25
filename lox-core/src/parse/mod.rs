@@ -1,5 +1,7 @@
 use crate::data::Symbol;
-use crate::expr::{Assign, Binary, Call, Expr, Grouping, Literal, Logical, Unary, Variable};
+use crate::expr::{
+    Assign, Binary, Call, Expr, Get, Grouping, Literal, Logical, Set, This, Unary, Variable,
+};
 use crate::stmt::{Block, Class, Expression, Function, If, Print, Return, Stmt, Var, While};
 use crate::token;
 use crate::token::{Token, TokenKind};
@@ -513,12 +515,13 @@ where
         if let Some(token) = self.advance()? {
             if token.kind == TokenKind::Equal {
                 let value = self.assignment()?;
-                if let Expr::Variable(variable) = expr {
-                    let name = variable.take_name();
-                    Ok(Assign::new(name, value).into())
-                } else {
-                    self.revert(token);
-                    Err(self.error(SyntaxErrorCode::InvalidAssignmentTarget))
+                match expr {
+                    Expr::Get(Get { object, name }) => Ok(Set::new(*object, name, value).into()),
+                    Expr::Variable(variable) => {
+                        let name = variable.take_name();
+                        Ok(Assign::new(name, value).into())
+                    },
+                    _ => Err(self.error(SyntaxErrorCode::InvalidAssignmentTarget)),
                 }
             } else {
                 self.revert(token);
@@ -654,11 +657,18 @@ where
     fn call(&mut self) -> Result<Expr, SyntaxError> {
         let mut expr = self.primary()?;
         while let Some(token) = self.advance()? {
-            if token.kind == TokenKind::LeftParen {
-                expr = self.finish_call(expr)?;
-            } else {
-                self.revert(token);
-                break;
+            match token.kind {
+                TokenKind::LeftParen => {
+                    expr = self.finish_call(expr)?;
+                },
+                TokenKind::Dot => {
+                    let name = self.consume(TokenKind::Identifier)?;
+                    expr = Get::new(expr, name).into();
+                },
+                _ => {
+                    self.revert(token);
+                    break;
+                },
             }
         }
         Ok(expr)
@@ -714,6 +724,7 @@ where
                         unreachable!("invalid string token {token:?}! please file a bug report.")
                     }
                 },
+                TokenKind::This => Ok(This::new(token).into()),
                 TokenKind::Identifier => Ok(Variable::new(token).into()),
                 TokenKind::LeftParen => {
                     let expr = self.expression()?;

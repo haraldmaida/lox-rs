@@ -1596,12 +1596,12 @@ fn execute_function_declaration() {
 fn execute_function_declaration_and_call() {
     let program = program(
         r#"
-    fun sayHi(first, last) {
-        print "Hi, " + first + " " + last + "!";
-    }
+        fun sayHi(first, last) {
+            print "Hi, " + first + " " + last + "!";
+        }
 
-    sayHi("Dear", "Reader");
-"#,
+        sayHi("Dear", "Reader");
+        "#,
     )
     .expect("failed to parse program");
 
@@ -1622,15 +1622,15 @@ fn execute_function_declaration_and_call() {
 fn execute_function_declaration_and_call_with_return_value() {
     let program = program(
         r"
-    fun fib(n) {
-        if (n <= 1) return n;
-        return fib(n - 2) + fib(n - 1);
-    }
+        fun fib(n) {
+            if (n <= 1) return n;
+            return fib(n - 2) + fib(n - 1);
+        }
 
-    for (var i = 0; i < 20; i = i + 1) {
-        print fib(i);
-    }
-",
+        for (var i = 0; i < 20; i = i + 1) {
+            print fib(i);
+        }
+        ",
     )
     .expect("failed to parse program");
 
@@ -1684,22 +1684,22 @@ fn execute_native_function_call_to_clock() {
 fn execute_closure_count() {
     let program = program(
         r"
-    fun makeCounter() {
-        var i = 0;
+        fun makeCounter() {
+            var i = 0;
 
-        fun count() {
-            i = i + 1;
-            return i;
+            fun count() {
+                i = i + 1;
+                return i;
+            }
+
+            return count;
         }
 
-        return count;
-    }
-
-    var counter = makeCounter();
-    print counter();
-    print counter();
-    print counter();
-",
+        var counter = makeCounter();
+        print counter();
+        print counter();
+        print counter();
+        ",
     )
     .expect("failed to parse program");
 
@@ -1720,17 +1720,17 @@ fn execute_closure_count() {
 fn execute_call_to_same_closure_in_different_environments() {
     let program = program(
         r#"
-    var a = "global";
-    {
-      fun showA() {
-        print a;
-      }
+        var a = "global";
+        {
+          fun showA() {
+            print a;
+          }
 
-      showA();
-      var a = "block";
-      showA();
-    }
-"#,
+          showA();
+          var a = "block";
+          showA();
+        }
+        "#,
     )
     .expect("failed to parse program");
 
@@ -1751,8 +1751,8 @@ fn execute_call_to_same_closure_in_different_environments() {
 fn execute_class_declaration() {
     let program = program(
         r"
-class Bagel {}
-",
+        class Bagel {}
+        ",
     )
     .expect("failed to parse program");
 
@@ -1772,14 +1772,14 @@ class Bagel {}
 fn execute_printing_a_class() {
     let program = program(
         r#"
-class DevonshireCream {
-    serveOn() {
-        return "Scones";
-    }
-}
+        class DevonshireCream {
+            serveOn() {
+                return "Scones";
+            }
+        }
 
-print DevonshireCream;
-"#,
+        print DevonshireCream;
+        "#,
     )
     .expect("failed to parse program");
 
@@ -1800,10 +1800,10 @@ print DevonshireCream;
 fn execute_class_instantiation() {
     let program = program(
         r"
-class Bagel {}
+        class Bagel {}
 
-print Bagel();
-",
+        print Bagel();
+        ",
     )
     .expect("failed to parse program");
 
@@ -1818,4 +1818,92 @@ print Bagel();
     assert_that!(String::from_utf8(stdout))
         .ok()
         .is_equal_to("Bagel instance\n");
+}
+
+#[test]
+fn execute_calling_method_on_object() {
+    let program = program(
+        r#"
+        class Bacon {
+            eat() {
+            print "Crunch crunch crunch!";
+            }
+        }
+
+        Bacon().eat();
+        "#,
+    )
+    .expect("failed to parse program");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+    let mut interpreter = Interpreter::default();
+
+    interpreter.interpret(&mut rtc, &program);
+
+    assert_that!(String::from_utf8(stderr)).ok().is_empty();
+    assert_that!(String::from_utf8(stdout))
+        .ok()
+        .is_equal_to("Crunch crunch crunch!\n");
+}
+
+#[test]
+fn execute_assigning_and_accessing_field_on_object() {
+    let program = program(
+        r"
+        class Foo {}
+
+        var foo = Foo();
+        foo.bar = 123;
+
+        print foo.bar;
+        ",
+    )
+    .expect("failed to parse program");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+    let mut interpreter = Interpreter::default();
+
+    interpreter.interpret(&mut rtc, &program);
+
+    assert_that!(String::from_utf8(stderr)).ok().is_empty();
+    assert_that!(String::from_utf8(stdout))
+        .ok()
+        .is_equal_to("123\n");
+}
+
+#[test]
+fn execute_callback_return_from_object_method() {
+    let program = program(
+        r"
+        class Thing {
+            getCallback() {
+                fun localFunction() {
+                    print this;
+                }
+
+                return localFunction;
+            }
+        }
+
+        var callback = Thing().getCallback();
+        callback();
+        ",
+    )
+    .expect("failed to parse program");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+    let mut interpreter = Interpreter::default();
+
+    interpreter.interpret(&mut rtc, &program);
+
+    assert_that!(String::from_utf8(stderr)).ok().is_empty();
+    assert_that!(String::from_utf8(stdout))
+        .ok()
+        .is_equal_to("Thing instance\n");
 }

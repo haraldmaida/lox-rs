@@ -197,8 +197,8 @@ impl Call {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Get {
-    object: Box<Expr>,
-    name: Token,
+    pub(crate) object: Box<Expr>,
+    pub(crate) name: Token,
 }
 
 impl Get {

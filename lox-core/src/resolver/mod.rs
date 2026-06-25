@@ -50,16 +50,11 @@ impl ResolutionMap {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum VarState {
-    Declared,
-    Initialized,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResolverErrorCode {
     CannotReadLocalVariableInInitializer,
     CannotReturnFromOutsideFunction,
     RedeclaredVariableInSameScope,
+    ThisUsedOutsideOfClass,
 }
 
 #[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
@@ -85,6 +80,9 @@ impl Display for ResolverError {
                     self.token.lexeme()
                 )
             },
+            ResolverErrorCode::ThisUsedOutsideOfClass => {
+                write!(f, "'this' used outside of a class")
+            },
         }
     }
 }
@@ -95,11 +93,25 @@ impl From<ResolverError> for Vec<ResolverError> {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum VarState {
+    Declared,
+    Initialized,
+}
+
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 enum FunctionKind {
     #[default]
     None,
     Function,
+    Method,
+}
+
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
+enum ClassKind {
+    #[default]
+    None,
+    Class,
 }
 
 #[derive(Default)]
@@ -107,6 +119,7 @@ pub struct Resolver {
     scopes: Vec<HashMap<Symbol, VarState>>,
     resolution_map: ResolutionMap,
     current_function: FunctionKind,
+    current_class: ClassKind,
 }
 
 impl Resolver {
@@ -217,8 +230,8 @@ impl ExprVisitor for Resolver {
         Ok(())
     }
 
-    fn visit_get_expr(&mut self, _rtc: &mut Self::Context<'_>, _expr: &Get) -> Self::Output {
-        todo!()
+    fn visit_get_expr(&mut self, _rtc: &mut Self::Context<'_>, expr: &Get) -> Self::Output {
+        self.resolve_expr(expr.object())
     }
 
     fn visit_grouping_expr(
@@ -243,16 +256,28 @@ impl ExprVisitor for Resolver {
         Ok(())
     }
 
-    fn visit_set_expr(&mut self, _rtc: &mut Self::Context<'_>, _expr: &Set) -> Self::Output {
-        todo!()
+    fn visit_set_expr(&mut self, _rtc: &mut Self::Context<'_>, expr: &Set) -> Self::Output {
+        self.resolve_expr(expr.value())?;
+        self.resolve_expr(expr.object())?;
+        Ok(())
     }
 
     fn visit_super_expr(&mut self, _rtc: &mut Self::Context<'_>, _expr: &Super) -> Self::Output {
         todo!()
     }
 
-    fn visit_this_expr(&mut self, _rtc: &mut Self::Context<'_>, _expr: &This) -> Self::Output {
-        todo!()
+    fn visit_this_expr(&mut self, _rtc: &mut Self::Context<'_>, expr: &This) -> Self::Output {
+        match self.current_class {
+            ClassKind::None => Err(vec![ResolverError {
+                code: ResolverErrorCode::ThisUsedOutsideOfClass,
+                token: expr.keyword(),
+                location: expr.keyword().location,
+            }]),
+            ClassKind::Class => {
+                self.resolve_local(expr.keyword());
+                Ok(())
+            },
+        }
     }
 
     fn visit_unary_expr(&mut self, _rtc: &mut Self::Context<'_>, expr: &Unary) -> Self::Output {
@@ -294,8 +319,19 @@ impl StmtVisitor for Resolver {
     }
 
     fn visit_class_stmt(&mut self, _rtc: &mut Self::Context<'_>, stmt: &Class) -> Self::Output {
+        let enclosing_class = mem::replace(&mut self.current_class, ClassKind::Class);
         self.declare(stmt.name())?;
         self.define(stmt.name());
+        self.begin_scope();
+        self.scopes
+            .last_mut()
+            .expect("scope should be present, as we just pushed it with Self::begin_scope")
+            .insert(Symbol::from("this"), VarState::Initialized);
+        for method in stmt.methods() {
+            self.resolve_function(method, FunctionKind::Method)?;
+        }
+        self.end_scope();
+        self.current_class = enclosing_class;
         Ok(())
     }
 

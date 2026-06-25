@@ -23,6 +23,8 @@ use std::{fmt, mem};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuntimeErrorCode {
+    AccessPropertyOnNonObject,
+    AssignFieldOnNonObject,
     CallExprOnNonCallable,
     /// This error should never occur. However, if it does occur, it is a bug
     /// in the parser. Please report an issue!
@@ -35,12 +37,19 @@ pub enum RuntimeErrorCode {
     OperandsOfDifferentType,
     UndefinedClass(Symbol),
     UndefinedFunction(Symbol),
+    UndefinedProperty(Symbol),
     UndefinedVariable(Symbol),
 }
 
 impl Display for RuntimeErrorCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::AccessPropertyOnNonObject => {
+                write!(f, "accessing property on a non-object value")
+            },
+            Self::AssignFieldOnNonObject => {
+                write!(f, "assigning to field on a non-object value")
+            },
             Self::CallExprOnNonCallable => write!(f, "can not call a non-callable value"),
             Self::NotABinaryOperator => write!(
                 f,
@@ -64,6 +73,7 @@ impl Display for RuntimeErrorCode {
             ),
             Self::UndefinedClass(symbol) => write!(f, "use of undefined class '{symbol}'"),
             Self::UndefinedFunction(symbol) => write!(f, "call to undefined function '{symbol}'"),
+            Self::UndefinedProperty(symbol) => write!(f, "use of undefined property '{symbol}'"),
             Self::UndefinedVariable(symbol) => write!(f, "use of undefined variable '{symbol}'"),
         }
     }
@@ -324,8 +334,26 @@ impl ExprVisitor for Interpreter {
         }
     }
 
-    fn visit_get_expr(&mut self, _rtc: &mut RuntimeContext<'_>, _expr: &Get) -> Self::Output {
-        todo!()
+    fn visit_get_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Get) -> Self::Output {
+        let object = self.evaluate_internal(rtc, expr.object())?;
+        if let Value::Object(object) = object {
+            match object.get(expr.name()) {
+                Some(Value::Function(method)) => {
+                    let bound_method = method.bind(object);
+                    Continue(Value::Function(bound_method))
+                },
+                Some(value) => Continue(value),
+                None => Break(Err(RuntimeError::new(
+                    RuntimeErrorCode::UndefinedProperty(expr.name().lexeme),
+                    expr.name(),
+                ))),
+            }
+        } else {
+            Break(Err(RuntimeError::new(
+                RuntimeErrorCode::AccessPropertyOnNonObject,
+                expr.name(),
+            )))
+        }
     }
 
     fn visit_grouping_expr(
@@ -361,16 +389,32 @@ impl ExprVisitor for Interpreter {
         self.evaluate_internal(rtc, expr.right())
     }
 
-    fn visit_set_expr(&mut self, _rtc: &mut RuntimeContext<'_>, _expr: &Set) -> Self::Output {
-        todo!()
+    fn visit_set_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Set) -> Self::Output {
+        let object = self.evaluate_internal(rtc, expr.object())?;
+        if let Value::Object(object) = object {
+            let value = self.evaluate_internal(rtc, expr.value())?;
+            object.set(expr.name(), value.clone());
+            Continue(value)
+        } else {
+            Break(Err(RuntimeError::new(
+                RuntimeErrorCode::AssignFieldOnNonObject,
+                expr.name(),
+            )))
+        }
     }
 
     fn visit_super_expr(&mut self, _rtc: &mut RuntimeContext<'_>, _expr: &Super) -> Self::Output {
         todo!()
     }
 
-    fn visit_this_expr(&mut self, _rtc: &mut RuntimeContext<'_>, _expr: &This) -> Self::Output {
-        todo!()
+    fn visit_this_expr(&mut self, _rtc: &mut RuntimeContext<'_>, expr: &This) -> Self::Output {
+        match self.lookup_variable(expr.keyword()) {
+            Ok(value) => Continue(value),
+            Err(EnvironmentError::IdentifierNotFound(symbol)) => Break(Err(RuntimeError::new(
+                RuntimeErrorCode::UndefinedProperty(symbol),
+                expr.keyword(),
+            ))),
+        }
     }
 
     fn visit_unary_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Unary) -> Self::Output {
@@ -420,7 +464,18 @@ impl StmtVisitor for Interpreter {
     fn visit_class_stmt(&mut self, _rtc: &mut RuntimeContext<'_>, stmt: &Class) -> Self::Output {
         let class_name = stmt.name().lexeme();
         self.environment.define(class_name, Value::Nil);
-        let class = LoxClass::new(class_name);
+        let methods = stmt
+            .methods()
+            .iter()
+            .map(|method| {
+                (
+                    method.name().lexeme,
+                    Value::from(LoxFunction::new(method.clone(), self.environment.clone())),
+                )
+            })
+            .collect();
+
+        let class = LoxClass::new(class_name, methods);
         match self.environment.assign(class_name, class) {
             Ok(()) => {},
             Err(EnvironmentError::IdentifierNotFound(_)) => {

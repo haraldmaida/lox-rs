@@ -1,6 +1,6 @@
 use super::*;
 use crate::expr::{
-    ExprExt, assign, binary, call, grouping, literal, logical, nil, unary, variable,
+    ExprExt, assign, binary, call, get, grouping, literal, logical, nil, set, unary, variable,
 };
 use crate::stmt::{IfExt, StmtExt, block, class, function, if_, print, return_, stmt, var, while_};
 use crate::token::{
@@ -966,4 +966,108 @@ fn parse_class_declaration_with_two_methods() {
         ],
     )
     .stmt()]);
+}
+
+#[test]
+fn parse_call_to_object_method() {
+    let source_code = r#"
+    class Egg {
+
+        scramble(times) {
+            print "scrambled " + times + " times!";
+        }
+    }
+
+    print Egg().scramble(3);
+"#;
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().contains_exactly([
+        class(
+            identifier("Egg", (11, 3)),
+            None,
+            [function(
+                identifier("scramble", (26, 8)),
+                [identifier("times", (35, 5))],
+                [print(
+                    binary(
+                        binary(
+                            literal("scrambled "),
+                            token(TokenKind::Plus, "+", (75, 1)),
+                            variable(identifier("times", (77, 5))),
+                        ),
+                        token(TokenKind::Plus, "+", (83, 1)),
+                        literal(" times!"),
+                    )
+                    .expr(),
+                )
+                .stmt()],
+            )],
+        )
+        .stmt(),
+        print(call(
+            get(
+                call(
+                    variable(identifier("Egg", (123, 3))),
+                    token(TokenKind::RightParen, ")", (127, 1)),
+                    [],
+                ),
+                identifier("scramble", (129, 8)),
+            ),
+            token(TokenKind::RightParen, ")", (139, 1)),
+            [literal(3).expr()],
+        ))
+        .stmt(),
+    ]);
+}
+
+#[test]
+fn parse_get_access_to_object_field() {
+    let source_code = r"
+    class Foo {}
+
+    print Foo().bar;
+";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().contains_exactly([
+        class(identifier("Foo", (11, 3)), None, []).stmt(),
+        print(get(
+            call(
+                variable(identifier("Foo", (29, 3))),
+                token(TokenKind::RightParen, ")", (33, 1)),
+                [],
+            ),
+            identifier("bar", (35, 3)),
+        ))
+        .stmt(),
+    ]);
+}
+
+#[test]
+fn parse_set_access_to_object_field() {
+    let source_code = r"
+    class Foo {}
+
+    Foo().bar = 42;
+";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().contains_exactly([
+        class(identifier("Foo", (11, 3)), None, []).stmt(),
+        set(
+            call(
+                variable(identifier("Foo", (23, 3))),
+                token(TokenKind::RightParen, ")", (27, 1)),
+                [],
+            ),
+            identifier("bar", (29, 3)),
+            literal(42).expr(),
+        )
+        .expr()
+        .stmt(),
+    ]);
 }
