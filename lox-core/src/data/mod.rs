@@ -181,6 +181,7 @@ pub type FunPtr = fn(&[Value]) -> Result<Value, RuntimeError>;
 pub struct LoxFunction {
     declaration: Function,
     closure: Environment,
+    is_initializer: bool,
 }
 
 impl Display for LoxFunction {
@@ -202,10 +203,11 @@ impl PartialOrd for LoxFunction {
 }
 
 impl LoxFunction {
-    pub const fn new(declaration: Function, closure: Environment) -> Self {
+    pub const fn new(declaration: Function, closure: Environment, is_initializer: bool) -> Self {
         Self {
             declaration,
             closure,
+            is_initializer,
         }
     }
 
@@ -217,6 +219,10 @@ impl LoxFunction {
         &self.closure
     }
 
+    pub const fn is_initializer(&self) -> bool {
+        self.is_initializer
+    }
+
     #[must_use]
     pub fn bind(self, object: LoxObject) -> Self {
         let environment = self.closure.new_local();
@@ -224,6 +230,7 @@ impl LoxFunction {
         Self {
             declaration: self.declaration,
             closure: environment,
+            is_initializer: self.is_initializer,
         }
     }
 }

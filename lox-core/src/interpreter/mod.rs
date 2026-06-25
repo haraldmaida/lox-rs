@@ -21,6 +21,8 @@ use std::ops::ControlFlow;
 use std::ops::ControlFlow::{Break, Continue};
 use std::{fmt, mem};
 
+pub const INIT_METHOD: &str = "init";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuntimeErrorCode {
     AccessPropertyOnNonObject,
@@ -326,7 +328,7 @@ impl ExprVisitor for Interpreter {
                     Err(error) => Break(Err(error)),
                 }
             },
-            Value::Class(class) => match class.call(&mut (), &mut (), &arguments) {
+            Value::Class(class) => match class.call(self, rtc, &arguments) {
                 Ok(value) => Continue(value),
                 Err(error) => Break(Err(error)),
             },
@@ -470,7 +472,11 @@ impl StmtVisitor for Interpreter {
             .map(|method| {
                 (
                     method.name().lexeme,
-                    Value::from(LoxFunction::new(method.clone(), self.environment.clone())),
+                    Value::from(LoxFunction::new(
+                        method.clone(),
+                        self.environment.clone(),
+                        method.name().lexeme == Symbol::from(INIT_METHOD),
+                    )),
                 )
             })
             .collect();
@@ -502,7 +508,7 @@ impl StmtVisitor for Interpreter {
         _rtc: &mut RuntimeContext<'_>,
         stmt: &Function,
     ) -> Self::Output {
-        let function = LoxFunction::new(stmt.clone(), self.environment.clone());
+        let function = LoxFunction::new(stmt.clone(), self.environment.clone(), false);
         self.environment.define(stmt.name().lexeme(), function);
         Continue(())
     }
@@ -577,8 +583,24 @@ impl Callable for LoxFunction {
             .for_each(|(param, arg)| environment.define(param.lexeme(), arg.clone()));
 
         match interpreter.execute_block(ctx, environment, self.declaration().body()) {
-            Continue(()) => Ok(Value::Nil),
-            Break(Ok(value)) => Ok(value),
+            Continue(()) => {
+                if self.is_initializer()
+                    && let Ok(this_value) = self.closure().lookup_at(0, "this")
+                {
+                    Ok(this_value)
+                } else {
+                    Ok(Value::Nil)
+                }
+            },
+            Break(Ok(value)) => {
+                if self.is_initializer()
+                    && let Ok(this_value) = self.closure().lookup_at(0, "this")
+                {
+                    Ok(this_value)
+                } else {
+                    Ok(value)
+                }
+            },
             Break(Err(error)) => Err(error),
         }
     }
@@ -603,8 +625,8 @@ impl Callable for NativeFunction {
 }
 
 impl Callable for LoxClass {
-    type Interpreter = ();
-    type Context<'c> = ();
+    type Interpreter = Interpreter;
+    type Context<'c> = <Self::Interpreter as StmtVisitor>::Context<'c>;
 
     fn arity(&self) -> usize {
         0
@@ -612,11 +634,17 @@ impl Callable for LoxClass {
 
     fn call(
         &self,
-        _interpreter: &mut Self::Interpreter,
-        _ctx: &mut Self::Context<'_>,
-        _arguments: &[Value],
+        interpreter: &mut Self::Interpreter,
+        ctx: &mut Self::Context<'_>,
+        arguments: &[Value],
     ) -> Result<Value, RuntimeError> {
         let instance = LoxObject::new(self.clone());
+        if let Some(Value::Function(initializer)) = self.find_method(INIT_METHOD.into()) {
+            initializer
+                .clone()
+                .bind(instance.clone())
+                .call(interpreter, ctx, arguments)?;
+        }
         Ok(Value::Object(instance))
     }
 }

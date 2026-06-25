@@ -1589,6 +1589,7 @@ fn execute_function_declaration() {
                 .stmt()],
             ),
             interpreter.environment().clone(),
+            false,
         )));
 }
 
@@ -1906,4 +1907,160 @@ fn execute_callback_return_from_object_method() {
     assert_that!(String::from_utf8(stdout))
         .ok()
         .is_equal_to("Thing instance\n");
+}
+
+#[test]
+fn execute_class_instantiation_calls_init_method() {
+    let program = program(
+        r#"
+        class Thing {
+            init() {
+                print "Thing initialized!";
+            }
+        }
+
+        Thing();
+        "#,
+    )
+    .expect("failed to parse program");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+    let mut interpreter = Interpreter::default();
+
+    interpreter.interpret(&mut rtc, &program);
+
+    assert_that!(String::from_utf8(stderr)).ok().is_empty();
+    assert_that!(String::from_utf8(stdout))
+        .ok()
+        .is_equal_to("Thing initialized!\n");
+}
+
+#[test]
+fn execute_invoking_init_directly_on_an_object_returns_this() {
+    let program = program(
+        r#"
+        class Thing {
+            init() {
+                print "Thing initialized!";
+            }
+        }
+
+        var thing = Thing();
+        print thing;
+        print thing.init();
+        "#,
+    )
+    .expect("failed to parse program");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+    let mut interpreter = Interpreter::default();
+
+    interpreter.interpret(&mut rtc, &program);
+
+    assert_that!(String::from_utf8(stderr)).ok().is_empty();
+    assert_that!(String::from_utf8(stdout))
+        .ok()
+        .is_equal_to("Thing initialized!\nThing instance\nThing initialized!\nThing instance\n");
+}
+
+#[test]
+fn execute_instantiate_class_with_initializer_arguments() {
+    let program = program(
+        r#"
+        class Greeting {
+            init(greeting, name) {
+                this.greeting = greeting;
+                this.name = name;
+            }
+
+            display() {
+                print this.greeting + ", " + this.name + "!";
+            }
+        }
+
+        var greeting = Greeting("Hello", "April");
+        greeting.display();
+        "#,
+    )
+    .expect("failed to parse program");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+    let mut interpreter = Interpreter::default();
+
+    interpreter.interpret(&mut rtc, &program);
+
+    assert_that!(String::from_utf8(stderr)).ok().is_empty();
+    assert_that!(String::from_utf8(stdout))
+        .ok()
+        .is_equal_to("Hello, April!\n");
+}
+
+#[test]
+fn execute_instantiate_class_with_return_in_initializer() {
+    let program = program(
+        r"
+        class Foo {
+            init() {
+                return;
+            }
+        }
+
+        var foo = Foo();
+        print foo;
+        ",
+    )
+    .expect("failed to parse program");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+    let mut interpreter = Interpreter::default();
+
+    interpreter.interpret(&mut rtc, &program);
+
+    assert_that!(String::from_utf8(stderr)).ok().is_empty();
+    assert_that!(String::from_utf8(stdout))
+        .ok()
+        .is_equal_to("Foo instance\n");
+}
+
+#[ignore = "check for arity of function calls is missing"]
+#[test]
+fn execute_instantiate_class_with_wrong_initializer_arguments() {
+    let program = program(
+        r#"
+        class Greeting {
+            init(greeting, name) {
+                this.greeting = greeting;
+                this.name = name;
+            }
+
+            display() {
+                print this.greeting + ", " + this.name + "!";
+            }
+        }
+
+        var greeting = Greeting("Hello");
+        greeting.display();
+        "#,
+    )
+    .expect("failed to parse program");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+    let mut interpreter = Interpreter::default();
+
+    interpreter.interpret(&mut rtc, &program);
+
+    assert_that!(String::from_utf8(stderr)).ok().is_empty();
+    assert_that!(String::from_utf8(stdout))
+        .ok()
+        .is_equal_to("Hello, April!\n");
 }

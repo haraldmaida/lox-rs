@@ -132,7 +132,7 @@ fn resolve_returns_error_when_reading_local_variable_in_its_own_initializer() {
     let result = resolver.resolve(&statements);
 
     assert_that!(result).err().contains_exactly([ResolverError {
-        code: ResolverErrorCode::CannotReadLocalVariableInInitializer,
+        code: ResolverErrorCode::ReadLocalVariableInInitializer,
         token: identifier("a", (10, 1)),
         location: (10, 1).into(),
     }]);
@@ -204,7 +204,7 @@ fn resolve_finds_return_stmt_outside_of_any_function() {
     let result = resolver.resolve(&statements);
 
     assert_that!(result).err().contains_exactly([ResolverError {
-        code: ResolverErrorCode::CannotReturnFromOutsideFunction,
+        code: ResolverErrorCode::ReturnFromOutsideFunction,
         token: return_((0, 6)),
         location: (0, 6).into(),
     }]);
@@ -235,5 +235,19 @@ fn resolve_finds_usage_of_this_in_a_function() {
         code: ResolverErrorCode::ThisUsedOutsideOfClass,
         token: this((25, 4)),
         location: (25, 4).into(),
+    }]);
+}
+
+#[test]
+fn resolve_finds_class_initializer_returning_some_value() {
+    let mut resolver = Resolver::default();
+    let statements = parse("class Foo { init() { return \"something else\"; } }");
+
+    let result = resolver.resolve(&statements);
+
+    assert_that!(result).err().contains_exactly([ResolverError {
+        code: ResolverErrorCode::ReturnValueFromInitializer,
+        token: return_((21, 6)),
+        location: (21, 6).into(),
     }]);
 }

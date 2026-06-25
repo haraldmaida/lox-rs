@@ -3,6 +3,7 @@ use crate::expr::{
     Assign, Binary, Call, Expr, ExprElement, ExprVisitor, Get, Grouping, Literal, Logical, Set,
     Super, This, Unary, Variable,
 };
+use crate::interpreter::INIT_METHOD;
 use crate::stmt::{
     Block, Class, Expression, Function, If, Print, Return, Stmt, StmtElement, StmtVisitor, Var,
     While,
@@ -51,9 +52,10 @@ impl ResolutionMap {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResolverErrorCode {
-    CannotReadLocalVariableInInitializer,
-    CannotReturnFromOutsideFunction,
+    ReadLocalVariableInInitializer,
     RedeclaredVariableInSameScope,
+    ReturnFromOutsideFunction,
+    ReturnValueFromInitializer,
     ThisUsedOutsideOfClass,
 }
 
@@ -67,11 +69,8 @@ pub struct ResolverError {
 impl Display for ResolverError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.code {
-            ResolverErrorCode::CannotReadLocalVariableInInitializer => {
+            ResolverErrorCode::ReadLocalVariableInInitializer => {
                 write!(f, "can not read local variable in its own initializer")
-            },
-            ResolverErrorCode::CannotReturnFromOutsideFunction => {
-                write!(f, "can not return from outside of any function")
             },
             ResolverErrorCode::RedeclaredVariableInSameScope => {
                 write!(
@@ -79,6 +78,12 @@ impl Display for ResolverError {
                     "variable with name '{}' already declared in this scope",
                     self.token.lexeme()
                 )
+            },
+            ResolverErrorCode::ReturnFromOutsideFunction => {
+                write!(f, "can not return from outside of any function")
+            },
+            ResolverErrorCode::ReturnValueFromInitializer => {
+                write!(f, "can not return a value from an initializer")
             },
             ResolverErrorCode::ThisUsedOutsideOfClass => {
                 write!(f, "'this' used outside of a class")
@@ -104,6 +109,7 @@ enum FunctionKind {
     #[default]
     None,
     Function,
+    Initializer,
     Method,
 }
 
@@ -293,7 +299,7 @@ impl ExprVisitor for Resolver {
             && scope.get(&expr.name().lexeme) == Some(&VarState::Declared)
         {
             return Err(ResolverError {
-                code: ResolverErrorCode::CannotReadLocalVariableInInitializer,
+                code: ResolverErrorCode::ReadLocalVariableInInitializer,
                 token: expr.name(),
                 location: expr.name().location,
             }
@@ -328,7 +334,12 @@ impl StmtVisitor for Resolver {
             .expect("scope should be present, as we just pushed it with Self::begin_scope")
             .insert(Symbol::from("this"), VarState::Initialized);
         for method in stmt.methods() {
-            self.resolve_function(method, FunctionKind::Method)?;
+            let declaration = if method.name().lexeme.as_str() == INIT_METHOD {
+                FunctionKind::Initializer
+            } else {
+                FunctionKind::Method
+            };
+            self.resolve_function(method, declaration)?;
         }
         self.end_scope();
         self.current_class = enclosing_class;
@@ -367,12 +378,22 @@ impl StmtVisitor for Resolver {
     }
 
     fn visit_return_stmt(&mut self, _rtc: &mut Self::Context<'_>, stmt: &Return) -> Self::Output {
-        if self.current_function == FunctionKind::None {
-            return Err(vec![ResolverError {
-                code: ResolverErrorCode::CannotReturnFromOutsideFunction,
-                token: stmt.keyword(),
-                location: stmt.keyword().location,
-            }]);
+        match self.current_function {
+            FunctionKind::None => {
+                return Err(vec![ResolverError {
+                    code: ResolverErrorCode::ReturnFromOutsideFunction,
+                    token: stmt.keyword(),
+                    location: stmt.keyword().location,
+                }]);
+            },
+            FunctionKind::Initializer if stmt.value().is_some() => {
+                return Err(vec![ResolverError {
+                    code: ResolverErrorCode::ReturnValueFromInitializer,
+                    token: stmt.keyword(),
+                    location: stmt.keyword().location,
+                }]);
+            },
+            _ => {},
         }
         if let Some(value) = stmt.value() {
             self.resolve_expr(value)?;
