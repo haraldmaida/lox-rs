@@ -5,13 +5,15 @@ use crate::environment::Environment;
 use crate::interpreter::RuntimeError;
 use crate::stmt::Function;
 use crate::token::Token;
-use hashbrown::HashMap;
 use lasso::{Spur, ThreadedRodeo};
+use rustc_hash::FxBuildHasher;
 use std::cell::RefCell;
 use std::fmt;
 use std::fmt::{Debug, Display};
 use std::rc::Rc;
 use std::sync::LazyLock;
+
+pub type HashMap<K, V> = std::collections::HashMap<K, V, FxBuildHasher>;
 
 static SYMBOL_TABLE: LazyLock<ThreadedRodeo> = LazyLock::new(ThreadedRodeo::new);
 
@@ -362,7 +364,7 @@ impl LoxObject {
     pub fn new(class: LoxClass) -> Self {
         Self(Rc::new(RefCell::new(LoxObjectData {
             class,
-            fields: HashMap::new(),
+            fields: HashMap::with_hasher(FxBuildHasher),
         })))
     }
 

@@ -1,5 +1,4 @@
-use crate::data::{Symbol, Value};
-use hashbrown::HashMap;
+use crate::data::{HashMap, Symbol, Value};
 use std::cell::RefCell;
 use std::rc::Rc;
 

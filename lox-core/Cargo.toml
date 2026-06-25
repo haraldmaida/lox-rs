@@ -10,7 +10,7 @@ dsl = []
 proptest_support = ["dep:proptest"]
 
 [dependencies]
-hashbrown = { workspace = true }
+rustc-hash = "2"
 lasso = { workspace = true }
 miette = { workspace = true }
 proptest = { workspace = true, optional = true }

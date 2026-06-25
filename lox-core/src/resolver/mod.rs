@@ -1,4 +1,4 @@
-use crate::data::Symbol;
+use crate::data::{HashMap, Symbol};
 use crate::expr::{
     Assign, Binary, Call, Expr, ExprElement, ExprVisitor, Get, Grouping, Literal, Logical, Set,
     Super, This, Unary, Variable,
@@ -8,8 +8,8 @@ use crate::stmt::{
     While,
 };
 use crate::token::Token;
-use hashbrown::HashMap;
 use miette::SourceSpan;
+use rustc_hash::FxBuildHasher;
 use std::fmt::Display;
 use std::{fmt, mem};
 
@@ -34,9 +34,9 @@ pub struct ResolutionMap {
 }
 
 impl ResolutionMap {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
-            distances: HashMap::new(),
+            distances: HashMap::with_hasher(FxBuildHasher),
         }
     }
 
@@ -130,7 +130,7 @@ impl Resolver {
     }
 
     fn begin_scope(&mut self) {
-        self.scopes.push(HashMap::new());
+        self.scopes.push(HashMap::with_hasher(FxBuildHasher));
     }
 
     fn end_scope(&mut self) {
