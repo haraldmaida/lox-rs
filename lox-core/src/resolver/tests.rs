@@ -251,3 +251,17 @@ fn resolve_finds_class_initializer_returning_some_value() {
         location: (21, 6).into(),
     }]);
 }
+
+#[test]
+fn resolve_class_that_tries_to_inherit_from_itsel() {
+    let mut resolver = Resolver::default();
+    let statements = parse("class Foo < Foo { }");
+
+    let result = resolver.resolve(&statements);
+
+    assert_that!(result).err().contains_exactly([ResolverError {
+        code: ResolverErrorCode::InheritanceFromSelf,
+        token: identifier("Foo", (12, 3)),
+        location: (12, 3).into(),
+    }]);
+}

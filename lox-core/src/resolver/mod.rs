@@ -52,6 +52,7 @@ impl ResolutionMap {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ResolverErrorCode {
+    InheritanceFromSelf,
     ReadLocalVariableInInitializer,
     RedeclaredVariableInSameScope,
     ReturnFromOutsideFunction,
@@ -69,6 +70,9 @@ pub struct ResolverError {
 impl Display for ResolverError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.code {
+            ResolverErrorCode::InheritanceFromSelf => {
+                write!(f, "a class can not inherit from itself")
+            },
             ResolverErrorCode::ReadLocalVariableInInitializer => {
                 write!(f, "can not read local variable in its own initializer")
             },
@@ -324,10 +328,20 @@ impl StmtVisitor for Resolver {
         Ok(())
     }
 
-    fn visit_class_stmt(&mut self, _rtc: &mut Self::Context<'_>, stmt: &Class) -> Self::Output {
+    fn visit_class_stmt(&mut self, rtc: &mut Self::Context<'_>, stmt: &Class) -> Self::Output {
         let enclosing_class = mem::replace(&mut self.current_class, ClassKind::Class);
         self.declare(stmt.name())?;
         self.define(stmt.name());
+        if let Some(superclass) = stmt.superclass() {
+            self.visit_variable_expr(rtc, superclass)?;
+            if superclass.name().lexeme == stmt.name().lexeme {
+                return Err(vec![ResolverError {
+                    code: ResolverErrorCode::InheritanceFromSelf,
+                    token: superclass.name(),
+                    location: superclass.name().location,
+                }]);
+            }
+        }
         self.begin_scope();
         self.scopes
             .last_mut()
