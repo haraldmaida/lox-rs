@@ -1648,6 +1648,58 @@ fn execute_function_declaration_and_call_with_return_value() {
     );
 }
 
+#[test]
+fn execute_function_call_with_too_few_argument() {
+    let program = program(
+        r"
+        fun add(a, b, c) {
+          print a + b + c;
+        }
+
+        add(1, 2);
+        ",
+    )
+    .expect("failed to parse program");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+    let mut interpreter = Interpreter::default();
+
+    interpreter.interpret(&mut rtc, &program);
+
+    assert_that!(String::from_utf8(stdout)).ok().is_empty();
+    assert_that!(String::from_utf8(stderr))
+        .ok()
+        .is_equal_to("call with too few arguments, expected 3 but got 2\n");
+}
+
+#[test]
+fn execute_function_call_with_too_many_argument() {
+    let program = program(
+        r"
+        fun add(a, b, c) {
+          print a + b + c;
+        }
+
+        add(1, 2, 3, 4);
+        ",
+    )
+    .expect("failed to parse program");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+    let mut interpreter = Interpreter::default();
+
+    interpreter.interpret(&mut rtc, &program);
+
+    assert_that!(String::from_utf8(stdout)).ok().is_empty();
+    assert_that!(String::from_utf8(stderr))
+        .ok()
+        .is_equal_to("call with too many arguments, expected 3 but got 4\n");
+}
+
 fn system_time_as_secs() -> f64 {
     SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
@@ -1679,6 +1731,23 @@ fn execute_native_function_call_to_clock() {
         .ok()
         .is_not_close_to(0.)
         .is_between(start_time, end_time);
+}
+
+#[test]
+fn execute_native_function_call_to_clock_with_too_many_arguments() {
+    let program = program("print clock(\"Vienna\");").expect("failed to parse program");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+    let mut interpreter = Interpreter::default();
+
+    interpreter.interpret(&mut rtc, &program);
+
+    assert_that!(String::from_utf8(stdout)).ok().is_empty();
+    assert_that!(String::from_utf8(stderr))
+        .ok()
+        .is_equal_to("call with too many arguments, expected 0 but got 1\n");
 }
 
 #[test]
@@ -2030,9 +2099,8 @@ fn execute_instantiate_class_with_return_in_initializer() {
         .is_equal_to("Foo instance\n");
 }
 
-#[ignore = "check for arity of function calls is missing"]
 #[test]
-fn execute_instantiate_class_with_wrong_initializer_arguments() {
+fn execute_instantiate_class_with_too_few_initializer_arguments() {
     let program = program(
         r#"
         class Greeting {
@@ -2047,7 +2115,6 @@ fn execute_instantiate_class_with_wrong_initializer_arguments() {
         }
 
         var greeting = Greeting("Hello");
-        greeting.display();
         "#,
     )
     .expect("failed to parse program");
@@ -2059,8 +2126,40 @@ fn execute_instantiate_class_with_wrong_initializer_arguments() {
 
     interpreter.interpret(&mut rtc, &program);
 
-    assert_that!(String::from_utf8(stderr)).ok().is_empty();
-    assert_that!(String::from_utf8(stdout))
+    assert_that!(String::from_utf8(stdout)).ok().is_empty();
+    assert_that!(String::from_utf8(stderr))
         .ok()
-        .is_equal_to("Hello, April!\n");
+        .is_equal_to("call with too few arguments, expected 2 but got 1\n");
+}
+
+#[test]
+fn execute_instantiate_class_with_too_many_initializer_arguments() {
+    let program = program(
+        r#"
+        class Greeting {
+            init(name) {
+                this.name = name;
+            }
+
+            display() {
+                print "Hello " + this.name + "!";
+            }
+        }
+
+        var greeting = Greeting("Hello", "Madam");
+        "#,
+    )
+    .expect("failed to parse program");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+    let mut interpreter = Interpreter::default();
+
+    interpreter.interpret(&mut rtc, &program);
+
+    assert_that!(String::from_utf8(stdout)).ok().is_empty();
+    assert_that!(String::from_utf8(stderr))
+        .ok()
+        .is_equal_to("call with too many arguments, expected 1 but got 2\n");
 }

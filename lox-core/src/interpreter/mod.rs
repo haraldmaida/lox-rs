@@ -16,6 +16,7 @@ use crate::stmt::{
 };
 use crate::token::{Token, TokenKind};
 use miette::{Diagnostic, SourceSpan};
+use std::cmp::Ordering;
 use std::fmt::Display;
 use std::ops::ControlFlow;
 use std::ops::ControlFlow::{Break, Continue};
@@ -28,6 +29,14 @@ pub enum RuntimeErrorCode {
     AccessPropertyOnNonObject,
     AssignFieldOnNonObject,
     CallExprOnNonCallable,
+    CallWithTooFewArguments {
+        expected: usize,
+        actual: usize,
+    },
+    CallWithTooManyArguments {
+        expected: usize,
+        actual: usize,
+    },
     /// This error should never occur. However, if it does occur, it is a bug
     /// in the parser. Please report an issue!
     NotABinaryOperator,
@@ -53,6 +62,14 @@ impl Display for RuntimeErrorCode {
                 write!(f, "assigning to field on a non-object value")
             },
             Self::CallExprOnNonCallable => write!(f, "can not call a non-callable value"),
+            Self::CallWithTooFewArguments { expected, actual } => write!(
+                f,
+                "call with too few arguments, expected {expected} but got {actual}",
+            ),
+            Self::CallWithTooManyArguments { expected, actual } => write!(
+                f,
+                "call with too many arguments, expected {expected} but got {actual}",
+            ),
             Self::NotABinaryOperator => write!(
                 f,
                 "not a binary operator where a binary operator like '=', '+', '-', '*' or '/' is expected"
@@ -312,27 +329,38 @@ impl ExprVisitor for Interpreter {
             arguments.push(arg);
         }
         match callee {
-            Value::Nil | Value::Bool(_) | Value::Number(_) | Value::String(_) => {
+            Value::Nil
+            | Value::Bool(_)
+            | Value::Number(_)
+            | Value::String(_)
+            | Value::Object(_) => {
                 Break(Err(RuntimeError::new(
                     RuntimeErrorCode::CallExprOnNonCallable,
                     expr.paren(), // TODO improve error message for call expr
                 )))
             },
-            Value::Function(function) => match function.call(self, rtc, &arguments) {
-                Ok(value) => Continue(value),
-                Err(error) => Break(Err(error)),
-            },
-            Value::NativeFunction(native_function) => {
-                match native_function.call(&mut (), &mut (), &arguments) {
+            Value::Function(function) => {
+                match check_arity_of_call(expr.paren(), &function, arguments.len())
+                    .and_then(|()| function.call(self, rtc, &arguments))
+                {
                     Ok(value) => Continue(value),
                     Err(error) => Break(Err(error)),
                 }
             },
-            Value::Class(class) => match class.call(self, rtc, &arguments) {
+            Value::NativeFunction(native_function) => {
+                match check_arity_of_call(expr.paren(), &native_function, arguments.len())
+                    .and_then(|()| native_function.call(&mut (), &mut (), &arguments))
+                {
+                    Ok(value) => Continue(value),
+                    Err(error) => Break(Err(error)),
+                }
+            },
+            Value::Class(class) => match check_arity_of_call(expr.paren(), &class, arguments.len())
+                .and_then(|()| class.call(self, rtc, &arguments))
+            {
                 Ok(value) => Continue(value),
                 Err(error) => Break(Err(error)),
             },
-            Value::Object(_object) => todo!(),
         }
     }
 
@@ -561,6 +589,30 @@ impl StmtVisitor for Interpreter {
     }
 }
 
+fn check_arity_of_call(
+    token: Token,
+    callable: &impl Callable,
+    num_arguments: usize,
+) -> Result<(), RuntimeError> {
+    match num_arguments.cmp(&callable.arity()) {
+        Ordering::Equal => Ok(()),
+        Ordering::Greater => Err(RuntimeError::new(
+            RuntimeErrorCode::CallWithTooManyArguments {
+                expected: callable.arity(),
+                actual: num_arguments,
+            },
+            token,
+        )),
+        Ordering::Less => Err(RuntimeError::new(
+            RuntimeErrorCode::CallWithTooFewArguments {
+                expected: callable.arity(),
+                actual: num_arguments,
+            },
+            token,
+        )),
+    }
+}
+
 impl Callable for LoxFunction {
     type Interpreter = Interpreter;
     type Context<'c> = <Self::Interpreter as StmtVisitor>::Context<'c>;
@@ -629,7 +681,11 @@ impl Callable for LoxClass {
     type Context<'c> = <Self::Interpreter as StmtVisitor>::Context<'c>;
 
     fn arity(&self) -> usize {
-        0
+        if let Some(Value::Function(initializer)) = self.find_method(INIT_METHOD.into()) {
+            initializer.arity()
+        } else {
+            0
+        }
     }
 
     fn call(
