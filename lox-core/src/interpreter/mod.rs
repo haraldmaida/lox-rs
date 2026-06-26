@@ -23,10 +23,13 @@ use std::ops::ControlFlow::{Break, Continue};
 use std::{fmt, mem};
 
 pub const INIT_METHOD: &str = "init";
+pub const SUPER: &str = "super";
+pub const THIS: &str = "this";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RuntimeErrorCode {
-    AccessPropertyOnNonObject,
+    AccessingPropertyOnNonObject,
+    AccessingSuperOutsideOfObject,
     AssignFieldOnNonObject,
     CallExprOnNonCallable,
     CallWithTooFewArguments {
@@ -37,6 +40,7 @@ pub enum RuntimeErrorCode {
         expected: usize,
         actual: usize,
     },
+    ClassDoesNotHaveSuperclass(Symbol),
     /// This error should never occur. However, if it does occur, it is a bug
     /// in the parser. Please report an issue!
     NotABinaryOperator,
@@ -56,8 +60,11 @@ pub enum RuntimeErrorCode {
 impl Display for RuntimeErrorCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::AccessPropertyOnNonObject => {
+            Self::AccessingPropertyOnNonObject => {
                 write!(f, "accessing property on a non-object value")
+            },
+            Self::AccessingSuperOutsideOfObject => {
+                write!(f, "accessing 'super' outside of an object")
             },
             Self::AssignFieldOnNonObject => {
                 write!(f, "assigning to field on a non-object value")
@@ -71,6 +78,9 @@ impl Display for RuntimeErrorCode {
                 f,
                 "call with too many arguments, expected {expected} but got {actual}",
             ),
+            Self::ClassDoesNotHaveSuperclass(symbol) => {
+                write!(f, "the class {symbol} does not have a superclass")
+            },
             Self::NotABinaryOperator => write!(
                 f,
                 "not a binary operator where a binary operator like '=', '+', '-', '*' or '/' is expected"
@@ -382,7 +392,7 @@ impl ExprVisitor for Interpreter {
             }
         } else {
             Break(Err(RuntimeError::new(
-                RuntimeErrorCode::AccessPropertyOnNonObject,
+                RuntimeErrorCode::AccessingPropertyOnNonObject,
                 expr.name(),
             )))
         }
@@ -435,8 +445,32 @@ impl ExprVisitor for Interpreter {
         }
     }
 
-    fn visit_super_expr(&mut self, _rtc: &mut RuntimeContext<'_>, _expr: &Super) -> Self::Output {
-        todo!()
+    fn visit_super_expr(&mut self, _rtc: &mut RuntimeContext<'_>, expr: &Super) -> Self::Output {
+        let Some(distance) = self.locals.get_distance(expr.keyword()) else {
+            unreachable!(
+                "'super' should be defined by the resolver by now! please file a bug report."
+            )
+        };
+        let Ok(Value::Object(object)) = self.environment.lookup_at(distance - 1, THIS) else {
+            return Break(Err(RuntimeError::new(
+                RuntimeErrorCode::AccessingSuperOutsideOfObject,
+                expr.keyword(),
+            )));
+        };
+        let Ok(Value::Class(superclass)) = self.environment.lookup_at(distance, SUPER) else {
+            return Break(Err(RuntimeError::new(
+                RuntimeErrorCode::ClassDoesNotHaveSuperclass(object.class_name()),
+                expr.keyword(),
+            )));
+        };
+
+        let Some(Value::Function(method)) = superclass.find_method(expr.method().lexeme()) else {
+            return Break(Err(RuntimeError::new(
+                RuntimeErrorCode::UndefinedProperty(expr.method().lexeme),
+                expr.method(),
+            )));
+        };
+        Continue(Value::Function(method.clone().bind(object)))
     }
 
     fn visit_this_expr(&mut self, _rtc: &mut RuntimeContext<'_>, expr: &This) -> Self::Output {
@@ -510,6 +544,11 @@ impl StmtVisitor for Interpreter {
         };
         let class_name = stmt.name().lexeme();
         self.environment.define(class_name, Value::Nil);
+        if let Some(superclass) = &superclass {
+            self.environment = self.environment.new_local();
+            self.environment
+                .define(Symbol::from(SUPER), Value::Class(superclass.clone()));
+        }
         let methods = stmt
             .methods()
             .iter()
@@ -524,7 +563,9 @@ impl StmtVisitor for Interpreter {
                 )
             })
             .collect();
-
+        if superclass.is_some() {
+            self.environment = self.environment.enclosing();
+        }
         let class = LoxClass::new(class_name, superclass, methods);
         match self.environment.assign(class_name, class) {
             Ok(()) => {},
@@ -653,7 +694,7 @@ impl Callable for LoxFunction {
         match interpreter.execute_block(ctx, environment, self.declaration().body()) {
             Continue(()) => {
                 if self.is_initializer()
-                    && let Ok(this_value) = self.closure().lookup_at(0, "this")
+                    && let Ok(this_value) = self.closure().lookup_at(0, THIS)
                 {
                     Ok(this_value)
                 } else {
@@ -662,7 +703,7 @@ impl Callable for LoxFunction {
             },
             Break(Ok(value)) => {
                 if self.is_initializer()
-                    && let Ok(this_value) = self.closure().lookup_at(0, "this")
+                    && let Ok(this_value) = self.closure().lookup_at(0, THIS)
                 {
                     Ok(this_value)
                 } else {

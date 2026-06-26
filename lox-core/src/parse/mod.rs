@@ -1,6 +1,6 @@
 use crate::data::Symbol;
 use crate::expr::{
-    Assign, Binary, Call, Expr, Get, Grouping, Literal, Logical, Set, This, Unary, Variable,
+    Assign, Binary, Call, Expr, Get, Grouping, Literal, Logical, Set, Super, This, Unary, Variable,
 };
 use crate::stmt::{Block, Class, Expression, Function, If, Print, Return, Stmt, Var, While};
 use crate::token;
@@ -22,6 +22,7 @@ pub enum SyntaxErrorCode {
     MissingForCondition,
     MissingForIncrement,
     MissingForInitializer,
+    MissingSuperclassMethod,
     MissingToken(TokenKind),
     TooManyCallArguments(usize, usize),
     TooManyFunctionParameters(usize, usize),
@@ -57,6 +58,9 @@ impl Display for SyntaxErrorCode {
             },
             Self::MissingForInitializer => {
                 write!(f, "missing for initializer or semicolon")
+            },
+            Self::MissingSuperclassMethod => {
+                write!(f, "missing superclass method")
             },
             Self::MissingToken(kind) => {
                 write!(f, "missing {kind:#}")
@@ -734,6 +738,11 @@ where
                     } else {
                         unreachable!("invalid string token {token:?}! please file a bug report.")
                     }
+                },
+                TokenKind::Super => {
+                    self.consume(TokenKind::Dot)?;
+                    let method = self.consume(TokenKind::Identifier)?;
+                    Ok(Super::new(token, method).into())
                 },
                 TokenKind::This => Ok(This::new(token).into()),
                 TokenKind::Identifier => Ok(Variable::new(token).into()),

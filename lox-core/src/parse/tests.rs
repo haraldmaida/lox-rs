@@ -1,6 +1,7 @@
 use super::*;
 use crate::expr::{
-    ExprExt, assign, binary, call, get, grouping, literal, logical, nil, set, unary, variable,
+    ExprExt, assign, binary, call, get, grouping, literal, logical, nil, set, this_, unary,
+    variable,
 };
 use crate::stmt::{IfExt, StmtExt, block, class, function, if_, print, return_, stmt, var, while_};
 use crate::token::{
@@ -1091,4 +1092,66 @@ fn parse_class_with_superclass() {
         )
         .stmt(),
     ]);
+}
+
+#[test]
+fn parse_print_this_is_valid() {
+    let source_code = r"
+    class Foo {
+        display() {
+            print this;
+        }
+    }
+
+    Foo().display();
+    ";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().contains_exactly([
+        class(
+            identifier("Foo", (11, 3)),
+            None,
+            [function(
+                identifier("display", (25, 7)),
+                [],
+                [print(this_(keyword(TokenKind::This, "this", (55, 4)))).stmt()],
+            )],
+        )
+        .stmt(),
+        call(
+            get(
+                call(
+                    variable(identifier("Foo", (82, 3))),
+                    right_paren((86, 1)),
+                    [],
+                ),
+                identifier("display", (88, 7)),
+            ),
+            right_paren((96, 1)),
+            [],
+        )
+        .expr()
+        .stmt(),
+    ]);
+}
+
+#[test]
+fn parse_print_super_is_syntax_error() {
+    let source_code = r"
+    class Foo {
+        display() {
+            print super;
+        }
+    }
+
+    Foo().display();
+    ";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).err().contains_exactly([SyntaxError {
+        code: SyntaxErrorCode::MissingToken(TokenKind::Dot),
+        location: (60, 1).into(),
+    }]);
 }

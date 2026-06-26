@@ -394,6 +394,10 @@ impl LoxObject {
         })))
     }
 
+    pub fn class_name(&self) -> Symbol {
+        self.0.borrow().class.name()
+    }
+
     pub fn set(&self, name: Token, value: Value) {
         self.0.borrow_mut().fields.insert(name.lexeme(), value);
     }

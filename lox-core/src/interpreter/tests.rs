@@ -2217,3 +2217,78 @@ fn execute_class_can_call_methods_from_superclass() {
         .ok()
         .is_equal_to("Fry until golden brown.\n");
 }
+
+#[test]
+fn execute_class_can_call_superclass_methods_that_are_overridden() {
+    let program = program(
+        r#"
+        class Doughnut {
+            cook() {
+                print "Fry until golden brown.";
+            }
+        }
+
+        class BostonCream < Doughnut {
+            cook() {
+                super.cook();
+                print "Pipe full of custard and coat with chocolate.";
+            }
+        }
+
+        BostonCream().cook();
+        "#,
+    )
+    .expect("failed to parse program");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+    let mut interpreter = Interpreter::default();
+
+    interpreter.interpret(&mut rtc, &program);
+
+    assert_that!(String::from_utf8(stderr)).ok().is_empty();
+    assert_that!(String::from_utf8(stdout))
+        .ok()
+        .is_equal_to("Fry until golden brown.\nPipe full of custard and coat with chocolate.\n");
+}
+
+#[test]
+fn execute_class_calls_superclass_method_relative_to_itself() {
+    let program = program(
+        r#"
+        class A {
+            method() {
+                print "A method";
+            }
+        }
+
+        class B < A {
+            method() {
+                print "B method";
+            }
+
+            test() {
+                super.method();
+            }
+        }
+
+        class C < B {}
+
+        C().test();
+        "#,
+    )
+    .expect("failed to parse program");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+    let mut interpreter = Interpreter::default();
+
+    interpreter.interpret(&mut rtc, &program);
+
+    assert_that!(String::from_utf8(stderr)).ok().is_empty();
+    assert_that!(String::from_utf8(stdout))
+        .ok()
+        .is_equal_to("A method\n");
+}

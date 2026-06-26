@@ -57,6 +57,8 @@ pub enum ResolverErrorCode {
     RedeclaredVariableInSameScope,
     ReturnFromOutsideFunction,
     ReturnValueFromInitializer,
+    SuperUsedInClassWithoutSuperclass,
+    SuperUsedOutsideOfClass,
     ThisUsedOutsideOfClass,
 }
 
@@ -88,6 +90,12 @@ impl Display for ResolverError {
             },
             ResolverErrorCode::ReturnValueFromInitializer => {
                 write!(f, "can not return a value from an initializer")
+            },
+            ResolverErrorCode::SuperUsedInClassWithoutSuperclass => {
+                write!(f, "'super' used in  a class without a superclass")
+            },
+            ResolverErrorCode::SuperUsedOutsideOfClass => {
+                write!(f, "'super' used outside of a class")
             },
             ResolverErrorCode::ThisUsedOutsideOfClass => {
                 write!(f, "'this' used outside of a class")
@@ -122,6 +130,7 @@ enum ClassKind {
     #[default]
     None,
     Class,
+    SubClass,
 }
 
 #[derive(Default)]
@@ -272,8 +281,23 @@ impl ExprVisitor for Resolver {
         Ok(())
     }
 
-    fn visit_super_expr(&mut self, _rtc: &mut Self::Context<'_>, _expr: &Super) -> Self::Output {
-        todo!()
+    fn visit_super_expr(&mut self, _rtc: &mut Self::Context<'_>, expr: &Super) -> Self::Output {
+        match self.current_class {
+            ClassKind::None => Err(vec![ResolverError {
+                code: ResolverErrorCode::SuperUsedOutsideOfClass,
+                token: expr.keyword(),
+                location: expr.keyword().location,
+            }]),
+            ClassKind::Class => Err(vec![ResolverError {
+                code: ResolverErrorCode::SuperUsedInClassWithoutSuperclass,
+                token: expr.keyword(),
+                location: expr.keyword().location,
+            }]),
+            ClassKind::SubClass => {
+                self.resolve_local(expr.keyword());
+                Ok(())
+            },
+        }
     }
 
     fn visit_this_expr(&mut self, _rtc: &mut Self::Context<'_>, expr: &This) -> Self::Output {
@@ -283,7 +307,7 @@ impl ExprVisitor for Resolver {
                 token: expr.keyword(),
                 location: expr.keyword().location,
             }]),
-            ClassKind::Class => {
+            ClassKind::Class | ClassKind::SubClass => {
                 self.resolve_local(expr.keyword());
                 Ok(())
             },
@@ -332,8 +356,9 @@ impl StmtVisitor for Resolver {
         let enclosing_class = mem::replace(&mut self.current_class, ClassKind::Class);
         self.declare(stmt.name())?;
         self.define(stmt.name());
+
+        // handle superclass
         if let Some(superclass) = stmt.superclass() {
-            self.visit_variable_expr(rtc, superclass)?;
             if superclass.name().lexeme == stmt.name().lexeme {
                 return Err(vec![ResolverError {
                     code: ResolverErrorCode::InheritanceFromSelf,
@@ -341,7 +366,16 @@ impl StmtVisitor for Resolver {
                     location: superclass.name().location,
                 }]);
             }
+            self.current_class = ClassKind::SubClass;
+            self.visit_variable_expr(rtc, superclass)?;
+            self.begin_scope();
+            self.scopes
+                .last_mut()
+                .expect("scope should be present, as we just pushed it with Self::begin_scope")
+                .insert(Symbol::from("super"), VarState::Initialized);
         }
+
+        // handle this class
         self.begin_scope();
         self.scopes
             .last_mut()
@@ -355,7 +389,14 @@ impl StmtVisitor for Resolver {
             };
             self.resolve_function(method, declaration)?;
         }
+        // end of handle this class
         self.end_scope();
+
+        // end of handle superclass
+        if stmt.superclass().is_some() {
+            self.end_scope();
+        }
+
         self.current_class = enclosing_class;
         Ok(())
     }

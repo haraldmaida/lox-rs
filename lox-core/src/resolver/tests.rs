@@ -1,7 +1,7 @@
 use super::*;
 use crate::data::Symbol;
 use crate::parse::Parse;
-use crate::token::{identifier, return_, this};
+use crate::token::{identifier, return_, super_, this};
 use crate::tokenize::Tokenize;
 use asserting::prelude::*;
 use proptest::prelude::*;
@@ -263,5 +263,48 @@ fn resolve_class_that_tries_to_inherit_from_itsel() {
         code: ResolverErrorCode::InheritanceFromSelf,
         token: identifier("Foo", (12, 3)),
         location: (12, 3).into(),
+    }]);
+}
+
+#[test]
+fn resolve_use_of_super_outside_any_class() {
+    let mut resolver = Resolver::default();
+    let statements = parse(
+        r"
+        print super.cook();
+        ",
+    );
+
+    let result = resolver.resolve(&statements);
+
+    assert_that!(result).err().contains_exactly([ResolverError {
+        code: ResolverErrorCode::SuperUsedOutsideOfClass,
+        token: super_((15, 5)),
+        location: (15, 5).into(),
+    }]);
+}
+
+#[test]
+fn resolve_class_accessing_super_without_having_a_superclass() {
+    let mut resolver = Resolver::default();
+    let statements = parse(
+        r#"
+        class Eclair {
+            cook() {
+                super.cook();
+                print "Pipe full of crème pâtissière.";
+            }
+        }
+
+        Eclair().cook();
+        "#,
+    );
+
+    let result = resolver.resolve(&statements);
+
+    assert_that!(result).err().contains_exactly([ResolverError {
+        code: ResolverErrorCode::SuperUsedInClassWithoutSuperclass,
+        token: super_((61, 5)),
+        location: (61, 5).into(),
     }]);
 }
