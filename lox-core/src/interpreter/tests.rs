@@ -2163,3 +2163,27 @@ fn execute_instantiate_class_with_too_many_initializer_arguments() {
         .ok()
         .is_equal_to("call with too many arguments, expected 1 but got 2\n");
 }
+
+#[test]
+fn execute_class_tries_to_inherit_from_var_fails() {
+    let program = program(
+        r#"
+        var NotAClass = "I am totally not a class";
+
+        class SubClass < NotAClass {}
+        "#,
+    )
+    .expect("failed to parse program");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+    let mut interpreter = Interpreter::default();
+
+    interpreter.interpret(&mut rtc, &program);
+
+    assert_that!(String::from_utf8(stdout)).ok().is_empty();
+    assert_that!(String::from_utf8(stderr))
+        .ok()
+        .is_equal_to("superclass must be a class\n");
+}

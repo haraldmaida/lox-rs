@@ -46,6 +46,7 @@ pub enum RuntimeErrorCode {
     OperandNotANumber,
     OperandNotANumberOrString,
     OperandsOfDifferentType,
+    SuperclassIsNotAClass,
     UndefinedClass(Symbol),
     UndefinedFunction(Symbol),
     UndefinedProperty(Symbol),
@@ -90,6 +91,7 @@ impl Display for RuntimeErrorCode {
                 f,
                 "operands are of different type but the operator requires all operands to be of the same type"
             ),
+            Self::SuperclassIsNotAClass => write!(f, "superclass must be a class"),
             Self::UndefinedClass(symbol) => write!(f, "use of undefined class '{symbol}'"),
             Self::UndefinedFunction(symbol) => write!(f, "call to undefined function '{symbol}'"),
             Self::UndefinedProperty(symbol) => write!(f, "use of undefined property '{symbol}'"),
@@ -491,7 +493,21 @@ impl StmtVisitor for Interpreter {
         self.execute_block(rtc, self.environment.new_local(), stmt.statements())
     }
 
-    fn visit_class_stmt(&mut self, _rtc: &mut RuntimeContext<'_>, stmt: &Class) -> Self::Output {
+    fn visit_class_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Class) -> Self::Output {
+        let superclass = if let Some(superclass) = stmt.superclass() {
+            match self.visit_variable_expr(rtc, superclass) {
+                Continue(Value::Class(superclass)) => Some(superclass),
+                Continue(_) | Break(Ok(_)) => {
+                    return Break(Err(RuntimeError::new(
+                        RuntimeErrorCode::SuperclassIsNotAClass,
+                        superclass.name(),
+                    )));
+                },
+                Break(Err(error)) => return Break(Err(error)),
+            }
+        } else {
+            None
+        };
         let class_name = stmt.name().lexeme();
         self.environment.define(class_name, Value::Nil);
         let methods = stmt
@@ -509,7 +525,7 @@ impl StmtVisitor for Interpreter {
             })
             .collect();
 
-        let class = LoxClass::new(class_name, methods);
+        let class = LoxClass::new(class_name, superclass, methods);
         match self.environment.assign(class_name, class) {
             Ok(()) => {},
             Err(EnvironmentError::IdentifierNotFound(_)) => {

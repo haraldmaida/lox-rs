@@ -296,7 +296,10 @@ pub fn native_function(
 }
 
 #[derive(Debug, Clone)]
-pub struct LoxClass(Rc<LoxClassData>);
+pub struct LoxClass {
+    this_class: Rc<LoxClassData>,
+    super_class: Option<Box<Self>>,
+}
 
 #[derive(Debug, Clone)]
 struct LoxClassData {
@@ -306,37 +309,47 @@ struct LoxClassData {
 
 impl Display for LoxClass {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0.name.as_str())
+        write!(f, "{}", self.this_class.name.as_str())
     }
 }
 
 impl PartialEq for LoxClass {
     fn eq(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.0, &other.0)
+        Rc::ptr_eq(&self.this_class, &other.this_class)
     }
 }
 
 impl PartialOrd for LoxClass {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        self.0.name.as_str().partial_cmp(other.0.name.as_str())
+        self.this_class
+            .name
+            .as_str()
+            .partial_cmp(other.this_class.name.as_str())
     }
 }
 
 impl LoxClass {
-    pub fn new(name: Symbol, methods: HashMap<Symbol, Value>) -> Self {
-        Self(Rc::new(LoxClassData { name, methods }))
+    pub fn new(name: Symbol, superclass: Option<Self>, methods: HashMap<Symbol, Value>) -> Self {
+        Self {
+            this_class: Rc::new(LoxClassData { name, methods }),
+            super_class: superclass.map(Box::new),
+        }
     }
 
     pub fn name(&self) -> Symbol {
-        self.0.name
+        self.this_class.name
+    }
+
+    pub fn superclass(&self) -> Option<&Self> {
+        self.super_class.as_deref()
     }
 
     pub fn methods(&self) -> &HashMap<Symbol, Value> {
-        &self.0.methods
+        &self.this_class.methods
     }
 
     pub fn find_method(&self, name: Symbol) -> Option<&Value> {
-        self.0.methods.get(&name)
+        self.this_class.methods.get(&name)
     }
 }
 
