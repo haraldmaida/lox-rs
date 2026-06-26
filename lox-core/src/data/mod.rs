@@ -349,7 +349,13 @@ impl LoxClass {
     }
 
     pub fn find_method(&self, name: Symbol) -> Option<&Value> {
-        self.this_class.methods.get(&name)
+        self.this_class.methods.get(&name).or_else(|| {
+            if let Some(superclass) = &self.super_class {
+                superclass.find_method(name)
+            } else {
+                None
+            }
+        })
     }
 }
 

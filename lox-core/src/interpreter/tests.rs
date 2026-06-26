@@ -2187,3 +2187,33 @@ fn execute_class_tries_to_inherit_from_var_fails() {
         .ok()
         .is_equal_to("superclass must be a class\n");
 }
+
+#[test]
+fn execute_class_can_call_methods_from_superclass() {
+    let program = program(
+        r#"
+        class Doughnut {
+            cook() {
+                print "Fry until golden brown.";
+            }
+        }
+
+        class BostonCream < Doughnut {}
+
+        BostonCream().cook();
+        "#,
+    )
+    .expect("failed to parse program");
+
+    let mut stdout = Vec::new();
+    let mut stderr = Vec::new();
+    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+    let mut interpreter = Interpreter::default();
+
+    interpreter.interpret(&mut rtc, &program);
+
+    assert_that!(String::from_utf8(stderr)).ok().is_empty();
+    assert_that!(String::from_utf8(stdout))
+        .ok()
+        .is_equal_to("Fry until golden brown.\n");
+}
