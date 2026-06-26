@@ -281,6 +281,17 @@ where
 
     fn class_declaration(&mut self) -> Result<Stmt, SyntaxError> {
         let name = self.consume(TokenKind::Identifier)?;
+        let superclass = if let Some(token) = self.advance()? {
+            if token.kind == TokenKind::Less {
+                let superclass = self.consume(TokenKind::Identifier)?;
+                Some(Variable::new(superclass))
+            } else {
+                self.revert(token);
+                None
+            }
+        } else {
+            None
+        };
         self.consume(TokenKind::LeftBrace)?;
         let mut methods = Vec::new();
         while let Some(token) = self.advance()? {
@@ -293,7 +304,7 @@ where
         }
 
         self.consume(TokenKind::RightBrace)?;
-        Ok(Class::new(name, None, methods).into())
+        Ok(Class::new(name, superclass, methods).into())
     }
 
     fn function(&mut self, _kind: &str) -> Result<Function, SyntaxError> {

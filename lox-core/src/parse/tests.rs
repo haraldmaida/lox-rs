@@ -1071,3 +1071,24 @@ fn parse_set_access_to_object_field() {
         .stmt(),
     ]);
 }
+
+#[test]
+fn parse_class_with_superclass() {
+    let source_code = r"
+    class Animal {}
+
+    class Cat < Animal {}
+";
+
+    let result = source_code.tokenize().parse();
+
+    assert_that!(result).ok().contains_exactly([
+        class(identifier("Animal", (11, 6)), None, []).stmt(),
+        class(
+            identifier("Cat", (32, 3)),
+            variable(identifier("Animal", (38, 6))),
+            [],
+        )
+        .stmt(),
+    ]);
+}
