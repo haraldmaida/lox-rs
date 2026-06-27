@@ -46,14 +46,15 @@ fn main() -> Result<(), miette::Error> {
             match source_code.tokenize().parse_expr() {
                 Ok(ast) => {
                     let mut output = String::new();
-                    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+                    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr)
+                        .with_fancy_error_messages(Some(source), &source_code);
                     AstPrinter::print(&mut rtc, &ast, &mut output)?;
                     println!("{output}");
                 },
                 Err(error) => {
                     let error =
                         Report::from(error).with_source_code(NamedSource::new(source, source_code));
-                    eprintln!("\n{error}\n");
+                    eprintln!("{error:?}");
                 },
             }
         },
@@ -72,14 +73,15 @@ fn main() -> Result<(), miette::Error> {
             {
                 Ok(program) => {
                     let mut interpreter = Interpreter::default();
-                    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+                    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr)
+                        .with_fancy_error_messages(Some(source), &source_code);
                     interpreter.interpret(&mut rtc, &program);
                 },
                 Err(syntax_errors) => {
                     for error in syntax_errors {
                         let error = Report::from(error)
                             .with_source_code(NamedSource::new(source, source_code.clone()));
-                        eprintln!("\n{error}\n");
+                        eprintln!("{error:?}");
                     }
                 },
             }

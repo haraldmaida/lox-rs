@@ -182,8 +182,7 @@ impl Interpreter {
         let statements = program.statements();
         for stmt in statements {
             if let Break(Err(error)) = self.execute_internal(rtc, stmt) {
-                writeln!(rtc.stderr(), "{error}")
-                    .unwrap_or_else(|io_err| panic!("failed to write to stderr: {io_err}"));
+                rtc.write_error(error);
             }
         }
     }
@@ -193,8 +192,7 @@ impl Interpreter {
         let statements = chunk.statements();
         for stmt in statements {
             if let Break(Err(error)) = self.execute_internal(rtc, stmt) {
-                writeln!(rtc.stderr(), "{error}")
-                    .unwrap_or_else(|io_err| panic!("failed to write to stderr: {io_err}"));
+                rtc.write_error(error);
             }
         }
     }
@@ -627,9 +625,7 @@ impl StmtVisitor for Interpreter {
 
     fn visit_print_stmt(&mut self, rtc: &mut RuntimeContext<'_>, stmt: &Print) -> Self::Output {
         let value = self.evaluate_internal(rtc, stmt.expression())?;
-        if let Err(err) = writeln!(rtc.stdout(), "{value}") {
-            writeln!(rtc.stderr(), "{err}").expect("failed to write to stderr");
-        }
+        rtc.write_output(&value);
         Continue(())
     }
 
