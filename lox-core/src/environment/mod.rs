@@ -10,44 +10,41 @@ pub enum EnvironmentError {
 
 #[derive(Debug, Clone)]
 pub struct Environment {
-    node: Rc<RefCell<EnvironmentNode>>,
+    node: Rc<EnvironmentNode>,
 }
 
 #[derive(Debug)]
 struct EnvironmentNode {
     /// the environment enclosing this environment. only the root environment
     /// (global scope) has no parent (enclosing = None)
-    enclosing: Option<Rc<RefCell<Self>>>,
+    enclosing: Option<Rc<Self>>,
     /// the definitions in this environment
-    values: HashMap<Symbol, Value>,
+    values: RefCell<HashMap<Symbol, Value>>,
 }
 
 impl Environment {
     pub fn new_root() -> Self {
         Self {
-            node: Rc::new(RefCell::new(EnvironmentNode {
+            node: Rc::new(EnvironmentNode {
                 enclosing: None,
-                values: HashMap::default(),
-            })),
+                values: RefCell::default(),
+            }),
         }
     }
 
     #[must_use]
     pub fn new_local(&self) -> Self {
         Self {
-            node: Rc::new(RefCell::new(EnvironmentNode {
+            node: Rc::new(EnvironmentNode {
                 enclosing: Some(self.node.clone()),
-                values: HashMap::default(),
-            })),
+                values: RefCell::default(),
+            }),
         }
     }
 
-    fn root_node(&self) -> Rc<RefCell<EnvironmentNode>> {
+    fn root_node(&self) -> Rc<EnvironmentNode> {
         let mut current = self.node.clone();
-        while let Some(parent) = {
-            let node = current.borrow();
-            node.enclosing.clone()
-        } {
+        while let Some(parent) = { current.enclosing.clone() } {
             current = parent;
         }
         current
@@ -57,7 +54,6 @@ impl Environment {
     pub fn enclosing(&self) -> Self {
         let enclosing_node = self
             .node
-            .borrow()
             .enclosing
             .clone()
             .unwrap_or_else(|| self.root_node());
@@ -69,20 +65,20 @@ impl Environment {
     fn find_first_node_with_symbol_in_scope(
         &self,
         name: Symbol,
-    ) -> Result<Rc<RefCell<EnvironmentNode>>, EnvironmentError> {
+    ) -> Result<Rc<EnvironmentNode>, EnvironmentError> {
         let mut current = Some(self.node.clone());
         while let Some(node) = current.take() {
-            if node.borrow().values.contains_key(&name) {
+            if node.values.borrow().contains_key(&name) {
                 return Ok(node);
             }
-            current.clone_from(&node.borrow().enclosing);
+            current.clone_from(&node.enclosing);
         }
         Err(EnvironmentError::IdentifierNotFound(name))
     }
 
     pub fn define(&self, name: impl Into<Symbol>, value: impl Into<Value>) {
         let name = name.into();
-        self.node.borrow_mut().values.insert(name, value.into());
+        self.node.values.borrow_mut().insert(name, value.into());
     }
 
     pub fn assign(
@@ -92,15 +88,15 @@ impl Environment {
     ) -> Result<(), EnvironmentError> {
         let name = name.into();
         let node = self.find_first_node_with_symbol_in_scope(name)?;
-        node.borrow_mut().values.insert(name, value.into());
+        node.values.borrow_mut().insert(name, value.into());
         Ok(())
     }
 
     pub fn lookup(&self, name: impl Into<Symbol>) -> Result<Value, EnvironmentError> {
         let name = name.into();
         let node = self.find_first_node_with_symbol_in_scope(name)?;
-        node.borrow()
-            .values
+        node.values
+            .borrow()
             .get(&name)
             .cloned()
             .ok_or(EnvironmentError::IdentifierNotFound(name))
@@ -118,7 +114,7 @@ impl Environment {
             .take(distance)
             .last()
             .unwrap_or_else(|| self.node.clone());
-        target_node.borrow_mut().values.insert(name, value.into());
+        target_node.values.borrow_mut().insert(name, value.into());
         Ok(())
     }
 
@@ -145,18 +141,18 @@ impl Environment {
 }
 
 struct Ancestors {
-    current: Rc<RefCell<EnvironmentNode>>,
+    current: Rc<EnvironmentNode>,
 }
 
 impl Iterator for Ancestors {
-    type Item = Rc<RefCell<EnvironmentNode>>;
+    type Item = Rc<EnvironmentNode>;
 
     fn next(&mut self) -> Option<Self::Item> {
         // we need to allow blocks in conditions, due to lifetime extension of the borrowed
         // field `current`
         // see also Clippy issue [15112](https://github.com/rust-lang/rust-clippy/issues/15112)
         #[allow(clippy::blocks_in_conditions)]
-        match { self.current.borrow().enclosing.clone() } {
+        match { self.current.enclosing.clone() } {
             None => None,
             Some(enclosing) => {
                 self.current = enclosing.clone();
