@@ -1,5 +1,5 @@
 args = []
-status.code = 2
+status.code = 64
 stdout = ""
 stderr = """
 A Lox interpreter
