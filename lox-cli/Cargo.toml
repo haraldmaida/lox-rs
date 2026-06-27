@@ -14,6 +14,7 @@ clap = { workspace = true }
 miette = { workspace = true }
 
 [dev-dependencies]
+asserting = { workspace = true }
 trycmd = "1"
 
 [lints]

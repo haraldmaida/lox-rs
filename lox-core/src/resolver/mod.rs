@@ -48,6 +48,10 @@ impl ResolutionMap {
     pub fn insert_distance(&mut self, token: Token, distance: usize) {
         self.distances.insert(token, distance);
     }
+
+    pub fn extend(&mut self, other: &Self) {
+        self.distances.extend(other.distances.iter());
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

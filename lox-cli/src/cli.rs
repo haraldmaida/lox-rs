@@ -23,4 +23,6 @@ pub enum Command {
         /// Path to the source code file
         source: String,
     },
+    /// Start the REPL
+    Repl,
 }

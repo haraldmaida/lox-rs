@@ -151,12 +151,12 @@ pub struct Interpreter {
 impl Default for Interpreter {
     fn default() -> Self {
         let globals = Environment::new_root();
-        globals.define("clock", native_function("clock", [], clock));
         Self {
             environment: globals.clone(),
             globals,
             locals: ResolutionMap::default(),
         }
+        .with_default_globals()
     }
 }
 
@@ -168,12 +168,29 @@ impl Interpreter {
     pub const fn globals(&self) -> &Environment {
         &self.globals
     }
+
+    fn with_default_globals(self) -> Self {
+        self.globals
+            .define("clock", native_function("clock", [], clock));
+        self
+    }
 }
 
 impl Interpreter {
     pub fn interpret(&mut self, rtc: &mut RuntimeContext<'_>, program: &Program) {
         self.locals.clone_from(program.resolution_map());
         let statements = program.statements();
+        for stmt in statements {
+            if let Break(Err(error)) = self.execute_internal(rtc, stmt) {
+                writeln!(rtc.stderr(), "{error}")
+                    .unwrap_or_else(|io_err| panic!("failed to write to stderr: {io_err}"));
+            }
+        }
+    }
+
+    pub fn interpret_chunk(&mut self, rtc: &mut RuntimeContext<'_>, chunk: &Program) {
+        self.locals.extend(chunk.resolution_map());
+        let statements = chunk.statements();
         for stmt in statements {
             if let Break(Err(error)) = self.execute_internal(rtc, stmt) {
                 writeln!(rtc.stderr(), "{error}")

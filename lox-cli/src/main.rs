@@ -8,6 +8,7 @@ mod dummy_extern_uses {
 }
 
 mod cli;
+mod repl;
 
 use crate::cli::{Cli, Command};
 use clap::Parser;
@@ -19,15 +20,14 @@ use lox_core::resolver::Resolve;
 use lox_core::runtime::RuntimeContext;
 use lox_core::tokenize::Tokenize;
 use miette::{IntoDiagnostic, NamedSource, Report, WrapErr};
-use std::fs;
 use std::path::Path;
+use std::{fs, io};
 
-fn main() -> miette::Result<()> {
+fn main() -> Result<(), miette::Error> {
     let cli = Cli::parse();
 
-    let mut stdout = std::io::stdout();
-    let mut stderr = std::io::stderr();
-    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
+    let mut stdout = io::stdout();
+    let mut stderr = io::stderr();
 
     match &cli.command {
         Command::Tokenize { source } => {
@@ -46,6 +46,7 @@ fn main() -> miette::Result<()> {
             match source_code.tokenize().parse_expr() {
                 Ok(ast) => {
                     let mut output = String::new();
+                    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
                     AstPrinter::print(&mut rtc, &ast, &mut output)?;
                     println!("{output}");
                 },
@@ -71,6 +72,7 @@ fn main() -> miette::Result<()> {
             {
                 Ok(program) => {
                     let mut interpreter = Interpreter::default();
+                    let mut rtc = RuntimeContext::new(&mut stdout, &mut stderr);
                     interpreter.interpret(&mut rtc, &program);
                 },
                 Err(syntax_errors) => {
@@ -82,6 +84,7 @@ fn main() -> miette::Result<()> {
                 },
             }
         },
+        Command::Repl => repl::run(io::stdin(), &mut stdout, &mut stderr).into_diagnostic()?,
     }
 
     Ok(())
