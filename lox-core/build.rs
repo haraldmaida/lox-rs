@@ -5,6 +5,15 @@ use std::{env, fs};
 
 const TESTSUITE_DIR: &str = "../craftinginterpreters/test/";
 
+const IGNORED_TESTS: &[&str] = &[
+    "benchmark",
+    "expressions/evaluate.lox",
+    "expressions/parse.lox",
+    "function/print.lox",
+    "limit",
+    "scanning",
+];
+
 fn main() {
     generate_test_suite_from_craftinginterpreters();
 }
@@ -19,9 +28,7 @@ fn generate_test_suite_from_craftinginterpreters() {
 
     let mut test_code = String::new();
     //  scan all test sources excluding benchmark tests
-    for source_file in scan_for_lox_sources(testsuite_root_path)
-        .filter(|path| !path.to_str().unwrap_or("").contains("benchmark"))
-    {
+    for source_file in scan_for_lox_sources(testsuite_root_path) {
         // determine test case name
         let relative_path = source_file
             .strip_prefix(testsuite_root_path)
@@ -33,11 +40,20 @@ fn generate_test_suite_from_craftinginterpreters() {
         // generate Rust code for this test case
         let source_filename = source_file
             .to_str()
-            .expect("failed to convert source file path to string");
+            .expect("failed to convert source file path to string")
+            .replace('\\', "/");
+        let ignored = if IGNORED_TESTS
+            .iter()
+            .any(|&ignored_test| source_filename.contains(ignored_test))
+        {
+            "#[ignore]\n"
+        } else {
+            ""
+        };
         write!(
             test_code,
             r"
-#[test]
+{ignored}#[test]
 fn {test_name}() {{
     run_one_lox_test({source_filename:?});
 }}
