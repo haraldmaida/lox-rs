@@ -15,7 +15,7 @@ miette = { workspace = true }
 
 [dev-dependencies]
 asserting = { workspace = true }
-trycmd = "1"
+trycmd = { workspace = true }
 
 [lints]
 workspace = true
