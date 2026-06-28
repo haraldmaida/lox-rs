@@ -7,10 +7,16 @@ const TESTSUITE_DIR: &str = "../craftinginterpreters/test/";
 
 const IGNORED_TESTS: &[&str] = &[
     "benchmark",
+    // to evaluate standalone expressions, we would need another test harness
     "expressions/evaluate.lox",
+    // to evaluate standalone expressions, we would need another test harness
     "expressions/parse.lox",
+    // I do not agree that for native functions, the name of the function should
+    // not be included in the display print
     "function/print.lox",
+    // the limit tests are only relevant for the VM implementation
     "limit",
+    // enhanced test harness would be required
     "scanning",
 ];
 
