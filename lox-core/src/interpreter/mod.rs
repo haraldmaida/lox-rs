@@ -394,7 +394,10 @@ impl ExprVisitor for Interpreter {
     fn visit_get_expr(&mut self, rtc: &mut RuntimeContext<'_>, expr: &Get) -> Self::Output {
         let object = self.evaluate_internal(rtc, expr.object())?;
         if let Value::Object(object) = object {
-            match object.get(expr.name()) {
+            if let Some(value) = object.get_field(expr.name().lexeme()) {
+                return Continue(value);
+            }
+            match object.get_method(expr.name().lexeme()) {
                 Some(Value::Function(method)) => {
                     let bound_method = method.bind(object);
                     Continue(Value::Function(bound_method))

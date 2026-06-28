@@ -1571,26 +1571,11 @@ fn execute_function_declaration() {
     let result = interpreter.execute(&mut rtc, &stmt);
 
     assert_that!(result).is_ok();
-    assert_that!(interpreter.environment().lookup("foo"))
-        .ok()
-        .is_equal_to(Value::from(LoxFunction::new(
-            function(
-                identifier("foo", (4, 1)),
-                vec![identifier("x", (8, 1)), identifier("y", (11, 1))],
-                [return_(
-                    keyword(TokenKind::Return, "return", (16, 6)),
-                    binary(
-                        variable(identifier("x", (23, 1))),
-                        plus((25, 1)),
-                        variable(identifier("y", (27, 1))),
-                    )
-                    .expr(),
-                )
-                .stmt()],
-            ),
-            interpreter.environment().clone(),
-            false,
-        )));
+    let Ok(Value::Function(f)) = interpreter.environment().lookup("foo") else {
+        panic!("expected function 'foo' in environment");
+    };
+    assert_that!(f.declaration().name().lexeme()).is_equal_to(Symbol::from("foo"));
+    assert_that!(f.declaration().parameters().len()).is_equal_to(2);
 }
 
 #[test]

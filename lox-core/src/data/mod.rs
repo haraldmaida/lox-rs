@@ -177,22 +177,32 @@ pub trait Callable {
 
 pub type FunPtr = fn(&[Value]) -> Result<Value, RuntimeError>;
 
-#[derive(Debug, Clone)]
-pub struct LoxFunction {
+#[derive(Clone)]
+pub struct LoxFunction(Rc<LoxFunctionData>);
+
+struct LoxFunctionData {
     declaration: Function,
     closure: Environment,
     is_initializer: bool,
 }
 
+impl Debug for LoxFunction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_tuple("LoxFunction")
+            .field(&self.0.declaration.name())
+            .finish()
+    }
+}
+
 impl Display for LoxFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "<fn {}>", self.declaration.name())
+        write!(f, "<fn {}>", self.0.declaration.name())
     }
 }
 
 impl PartialEq for LoxFunction {
     fn eq(&self, other: &Self) -> bool {
-        self.declaration == other.declaration
+        Rc::ptr_eq(&self.0, &other.0)
     }
 }
 
@@ -203,35 +213,31 @@ impl PartialOrd for LoxFunction {
 }
 
 impl LoxFunction {
-    pub const fn new(declaration: Function, closure: Environment, is_initializer: bool) -> Self {
-        Self {
+    pub fn new(declaration: Function, closure: Environment, is_initializer: bool) -> Self {
+        Self(Rc::new(LoxFunctionData {
             declaration,
             closure,
             is_initializer,
-        }
+        }))
     }
 
-    pub const fn declaration(&self) -> &Function {
-        &self.declaration
+    pub fn declaration(&self) -> &Function {
+        &self.0.declaration
     }
 
-    pub const fn closure(&self) -> &Environment {
-        &self.closure
+    pub fn closure(&self) -> &Environment {
+        &self.0.closure
     }
 
-    pub const fn is_initializer(&self) -> bool {
-        self.is_initializer
+    pub fn is_initializer(&self) -> bool {
+        self.0.is_initializer
     }
 
     #[must_use]
-    pub fn bind(self, object: LoxObject) -> Self {
-        let environment = self.closure.new_local();
+    pub fn bind(&self, object: LoxObject) -> Self {
+        let environment = self.0.closure.new_local();
         environment.define("this", Value::Object(object));
-        Self {
-            declaration: self.declaration,
-            closure: environment,
-            is_initializer: self.is_initializer,
-        }
+        Self::new(self.0.declaration.clone(), environment, self.0.is_initializer)
     }
 }
 
@@ -402,13 +408,17 @@ impl LoxObject {
         self.0.borrow_mut().fields.insert(name.lexeme(), value);
     }
 
+    pub fn get_field(&self, name: Symbol) -> Option<Value> {
+        self.0.borrow().fields.get(&name).cloned()
+    }
+
+    pub fn get_method(&self, name: Symbol) -> Option<Value> {
+        self.0.borrow().class.find_method(name).cloned()
+    }
+
     pub fn get(&self, name: Token) -> Option<Value> {
-        self.0
-            .borrow()
-            .fields
-            .get(&name.lexeme())
-            .cloned()
-            .or_else(|| self.0.borrow().class.find_method(name.lexeme()).cloned())
+        self.get_field(name.lexeme())
+            .or_else(|| self.get_method(name.lexeme()))
     }
 }
 

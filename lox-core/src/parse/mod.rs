@@ -370,6 +370,7 @@ where
                     None
                 },
                 TokenKind::EndOfFile => None,
+                TokenKind::Class => Some(self.class_declaration()),
                 TokenKind::Fun => Some(self.function("function").map(Stmt::from)),
                 TokenKind::Var => Some(self.var_declaration()),
                 _ => {
