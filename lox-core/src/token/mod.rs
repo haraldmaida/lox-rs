@@ -229,11 +229,14 @@ impl Token {
     /// Unescapes the lexeme for a string literal in Lox.
     ///
     /// Lox has no escaping, so it just removes the `"` around the string.
-    pub fn unescape(lexeme: &str) -> &str {
+    /// But we need to normalize the line breaks between different platforms.
+    pub fn unescape(lexeme: &str) -> String {
         lexeme
             .strip_prefix('"')
             .and_then(|s| s.strip_suffix('"'))
             .unwrap_or(lexeme)
+            .replace("\r\n", "\n")
+            .replace('\r', "\n")
     }
 
     pub const fn kind(&self) -> TokenKind {
