@@ -1,3 +1,5 @@
+#![allow(clippy::ignore_without_reason)]
+
 // workaround for false positive 'unused crate dependencies' warnings until
 // Rust issue [#95513](https://github.com/rust-lang/rust/issues/95513) is fixed
 mod fixtures;
